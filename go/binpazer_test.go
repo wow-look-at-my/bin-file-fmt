@@ -2,12 +2,14 @@ package binpazer
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"encoding/binary"
 	"hash/crc32"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // memFile is an in-memory io.Writer + io.Seeker + io.Reader (no real file IO).
@@ -166,4 +168,65 @@ func TestCRC32C(t *testing.T) {
 	got := crc32.Checksum([]byte("123456789"), crcTable)
 	assert.Equal(t, uint32(0xE3069283), got)
 
+}
+
+// TestSkipPayload exercises skipping a block's payload instead of reading it.
+func TestSkipPayload(t *testing.T) {
+	var m memFile
+	require.NoError(t, writeSample(&m))
+	m.pos = 0
+
+	br, err := NewReader(&m)
+	require.NoError(t, err)
+
+	b, err := br.Next() // mesh
+	require.NoError(t, err)
+	require.NoError(t, br.SkipPayload(b))
+
+	b, err = br.Next() // note
+	require.NoError(t, err)
+	p, err := br.ReadPayload(b)
+	require.NoError(t, err)
+	assert.Equal(t, notePayload, string(p))
+
+	b, err = br.Next() // large
+	require.NoError(t, err)
+	require.NoError(t, br.SkipPayload(b))
+
+	_, err = br.Next()
+	assert.Equal(t, io.EOF, err)
+}
+
+// TestNoSeekStreaming covers a non-seekable writer: file_length stays the
+// streaming sentinel and the reader terminates on EOF instead.
+func TestNoSeekStreaming(t *testing.T) {
+	var buf bytes.Buffer // bytes.Buffer is not an io.Seeker
+	bw, err := NewWriter(&buf, sampleWriter, "demo", sampleDefs)
+	require.NoError(t, err)
+	require.NoError(t, bw.Block(3, 0, []byte(notePayload)))
+	require.NoError(t, bw.End())
+
+	assert.Equal(t, FileLengthUnknown, binary.LittleEndian.Uint64(buf.Bytes()[32:40]))
+
+	br, err := NewReader(bytes.NewReader(buf.Bytes()))
+	require.NoError(t, err)
+	assert.Equal(t, FileLengthUnknown, br.FileLength)
+
+	b, err := br.Next()
+	require.NoError(t, err)
+	assert.Equal(t, uint16(3), b.TypeID)
+	p, err := br.ReadPayload(b)
+	require.NoError(t, err)
+	assert.Equal(t, notePayload, string(p))
+
+	_, err = br.Next()
+	assert.Equal(t, io.EOF, err)
+}
+
+// TestLargeModeRequiresMultipleOf4 covers the large_mode validation path.
+func TestLargeModeRequiresMultipleOf4(t *testing.T) {
+	var m memFile
+	bw, err := NewWriter(&m, sampleWriter, "demo", sampleDefs)
+	require.NoError(t, err)
+	require.Error(t, bw.Block(2, FlagLargeMode, []byte("xyz"))) // 3 bytes
 }
