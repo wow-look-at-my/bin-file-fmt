@@ -42,17 +42,32 @@ in MP4 `uuid` boxes), PNG-style skip-safety flags, and mmap-grade alignment.**
 | **IFF** (EA, 1985) | chunk = type + length + payload; group chunks for nesting; pad to alignment | little-endian; GUID type ids; u64 lengths |
 | **RIFF** (WAV/AVI/WebP) | little-endian IFF; `LIST` nesting; the canonical "chunked container" | 4cc -> GUID+interning; explicit flags; 64-bit |
 | **PNG** | critical/ancillary/private/safe-to-copy semantics; per-chunk CRC | those 4 bits are explicit flags, not letter-casing; arbitrary type count |
-| **ISO BMFF / MP4** | box = size + type; `uuid` boxes identify private types by 16-byte UUID; `size==1` -> 64-bit largesize | GUIDs are the *norm* (interned), not an escape hatch |
+| **ISO BMFF / MP4** | box = size + 4cc type; the `uuid` box carries a 16-byte UUID (`usertype`) for extension types; `size==1` -> 64-bit largesize | GUIDs are the *norm* (interned), not just an escape hatch |
+| **ASF** (WMV/WMA) | **every object = 16-byte GUID + u64 size + data** -- almost exactly binpazer's block header | binpazer *interns* the GUID to a u16 instead of repeating 16 bytes per object |
 | **Matroska / EBML** | extensible, skip-unknown, tree-structured | fixed-width fields instead of varints (mmap/casting) |
 | **TIFF** | u16 tag ids; endianness marker at offset 0 | sequential blocks, not an IFD offset table (though see optional index) |
 | **Protocol Buffers** | tag-length-value; unknown fields are skippable | a file container, not a message encoding |
 | **ELF** | string/symbol tables intern repeated identifiers | the Block Type Table is that idea applied to block types |
 
-**The distinctive combination** is the GUID->u16 interning table plus explicit
-skip-safety flags plus mmap alignment plus length-prefixed-*and*-null-terminated
-strings. If a drop-in standard is acceptable, **RIFF or MP4 already do 80% of
-this**; binpazer earns its keep only if the GUID-global-identity + zero-copy
-goals matter to you. Worth deciding before we build tooling.
+**On identifiers (4cc vs GUID).** PNG and RIFF do *not* use GUIDs -- a PNG chunk
+type and a RIFF chunk id are each a 4-byte FourCC (`IHDR`, `fmt `): compact and
+greppable, but a tiny namespace (~26^4 usable) that leans on a central registry
+for public codes and can collide for private/unregistered ones (convention, not
+math). MP4 defaults to a 4cc too and provides the 16-byte `uuid` box only as a
+collision-free extension escape hatch. Full GUID-per-object identity is exactly
+what Microsoft's **ASF** does. The "small tag runs out" story is real: WAV's
+16-bit (2-byte) `wFormatTag` space got crowded enough that
+`WAVE_FORMAT_EXTENSIBLE` bolted on a 16-byte GUID `SubFormat` to fix it. A
+random UUIDv4 carries 122 bits of entropy, so collisions are negligible without
+any registry -- which is the whole point of using GUIDs here.
+
+**The distinctive combination** binpazer offers is GUID-everywhere identity (any
+program, past or future, collision-free *without a registry*) **plus interning**
+(so you do not pay ASF's 16-bytes-per-object), plus explicit skip-safety flags,
+mmap alignment, and length-prefixed-*and*-null-terminated strings. If a drop-in
+standard is acceptable, RIFF/MP4 give you the chunked-container structure and ASF
+gives you GUID identity; binpazer earns its keep only if you want *both* at once,
+plus zero-copy. Worth deciding before we build tooling.
 
 ---
 
