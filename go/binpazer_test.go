@@ -2,6 +2,8 @@ package binpazer
 
 import (
 	"bytes"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"hash/crc32"
 	"io"
 	"os"
@@ -77,30 +79,21 @@ func writeSample(w io.Writer) error {
 func verifySample(t *testing.T, r io.Reader) {
 	t.Helper()
 	br, err := NewReader(r)
-	if err != nil {
-		t.Fatalf("NewReader: %v", err)
-	}
-	if br.WriterName != "demo" {
-		t.Errorf("writer name = %q", br.WriterName)
-	}
-	if br.VersionMajor != 1 || br.VersionMinor != 0 {
-		t.Errorf("version = %d.%d", br.VersionMajor, br.VersionMinor)
-	}
-	if br.WriterGUID != sampleWriter {
-		t.Errorf("writer guid mismatch")
-	}
-	if len(br.Types) != 3 {
-		t.Fatalf("types = %d, want 3", len(br.Types))
-	}
-	if br.Types[0].TypeID != 1 || br.Types[0].GUID != BlockTypeTableGUID {
-		t.Errorf("entry0 not BTT")
-	}
-	if br.Types[1].TypeID != 2 || br.Types[1].GUID != sampleMesh {
-		t.Errorf("entry1 not Mesh")
-	}
-	if br.Types[2].TypeID != 3 || br.Types[2].GUID != sampleNote {
-		t.Errorf("entry2 not Note")
-	}
+	require.Nil(t, err)
+
+	assert.Equal(t, "demo", br.WriterName)
+
+	assert.False(t, br.VersionMajor != 1 || br.VersionMinor != 0)
+
+	assert.Equal(t, sampleWriter, br.WriterGUID)
+
+	require.Equal(t, 3, len(br.Types))
+
+	assert.False(t, br.Types[0].TypeID != 1 || br.Types[0].GUID != BlockTypeTableGUID)
+
+	assert.False(t, br.Types[1].TypeID != 2 || br.Types[1].GUID != sampleMesh)
+
+	assert.False(t, br.Types[2].TypeID != 3 || br.Types[2].GUID != sampleNote)
 
 	want := []struct {
 		typ     uint16
@@ -112,44 +105,35 @@ func verifySample(t *testing.T, r io.Reader) {
 		{3, 0, sampleNote, notePayload},
 		{2, FlagLargeMode, sampleMesh, bigPayload},
 	}
-	for i, w := range want {
+	for _, w := range want {
 		b, err := br.Next()
-		if err != nil {
-			t.Fatalf("block %d Next: %v", i, err)
-		}
-		if b.TypeID != w.typ {
-			t.Errorf("block %d type = %d, want %d", i, b.TypeID, w.typ)
-		}
-		if b.Flags != w.flags {
-			t.Errorf("block %d flags = %#x, want %#x", i, b.Flags, w.flags)
-		}
-		if !b.Known || b.GUID != w.guid {
-			t.Errorf("block %d guid not resolved", i)
-		}
-		if int(b.PayloadLen) != len(w.payload) {
-			t.Errorf("block %d len = %d, want %d", i, b.PayloadLen, len(w.payload))
-		}
+		require.Nil(t, err)
+
+		assert.Equal(t, w.typ, b.TypeID)
+
+		assert.Equal(t, w.flags, b.Flags)
+
+		assert.False(t, !b.Known || b.GUID != w.guid)
+
+		assert.Equal(t, len(w.payload), int(b.PayloadLen))
+
 		p, err := br.ReadPayload(b)
-		if err != nil {
-			t.Fatalf("block %d ReadPayload: %v", i, err)
-		}
-		if string(p) != w.payload {
-			t.Errorf("block %d payload = %q, want %q", i, p, w.payload)
-		}
+		require.Nil(t, err)
+
+		assert.Equal(t, w.payload, string(p))
+
 	}
-	if _, err := br.Next(); err != io.EOF {
-		t.Errorf("expected io.EOF after last block, got %v", err)
-	}
+	_, err = br.Next()
+	assert.Equal(t, io.EOF, err)
+
 }
 
 func TestRoundTrip(t *testing.T) {
 	var m memFile
-	if err := writeSample(&m); err != nil {
-		t.Fatalf("writeSample: %v", err)
-	}
-	if len(m.buf) != 280 {
-		t.Errorf("wrote %d bytes, want 280", len(m.buf))
-	}
+	require.NoError(t, writeSample(&m))
+
+	assert.Equal(t, 280, len(m.buf))
+
 	m.pos = 0
 	verifySample(t, &m)
 }
@@ -161,12 +145,10 @@ func TestCrossImplWrite(t *testing.T) {
 		t.Skipf("fixture missing: %v", err)
 	}
 	var m memFile
-	if err := writeSample(&m); err != nil {
-		t.Fatalf("writeSample: %v", err)
-	}
-	if !bytes.Equal(m.buf, fixture) {
-		t.Errorf("Go output differs from C fixture (%d vs %d bytes)", len(m.buf), len(fixture))
-	}
+	require.NoError(t, writeSample(&m))
+
+	assert.True(t, bytes.Equal(m.buf, fixture))
+
 }
 
 // TestCrossImplRead: Go must read the C-written fixture.
@@ -181,7 +163,7 @@ func TestCrossImplRead(t *testing.T) {
 
 // TestCRC32C confirms the table is standard CRC-32C (matching the C impl).
 func TestCRC32C(t *testing.T) {
-	if got := crc32.Checksum([]byte("123456789"), crcTable); got != 0xE3069283 {
-		t.Errorf("CRC-32C(\"123456789\") = %#x, want 0xE3069283", got)
-	}
+	got := crc32.Checksum([]byte("123456789"), crcTable)
+	assert.Equal(t, uint32(0xE3069283), got)
+
 }
