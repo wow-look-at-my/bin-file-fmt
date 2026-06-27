@@ -12,6 +12,10 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    env:
+      # The remote build cache (GO_BUILDCACHE_CONFIG) isn't provisioned for this
+      # repo; it's only a speed optimization, so opt out instead of hard-failing.
+      GO_TOOLCHAIN_CACHING_INTENTIONALLY_NOT_CONFIGURED: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: wow-look-at-my/go-toolchain@v1
