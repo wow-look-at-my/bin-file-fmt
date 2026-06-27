@@ -240,13 +240,45 @@ level.
   container's GUID can enumerate its children.
 - Readers SHOULD enforce a maximum nesting depth against hostile or corrupt files.
 
-### Block Index and Writer Info
+### Block Index
 
-- **Block Index** (GUID `...0002`): an ancillary block mapping each `type_id` to
-  an array of `(offset: u64, length: u64)` for random access in large files
-  without a full walk. When absent, readers walk linearly.
-- **Writer Info** (GUID `...0003`): an alternative home for `writer_name` (and
-  other producer metadata) when the file header is kept as a fixed-size struct.
+The Block Index (predefined `type_id = 65533`, GUID `...0002`) is an optional,
+ancillary block that maps block `type_id`s to their absolute file offsets, so a
+reader can jump straight to a block instead of walking the file. It is written
+*after* the blocks it indexes (their offsets must already be known) and is located
+via the [footer](#footer).
+
+Payload:
+
+| Offset | Size | Field | Type | Notes |
+|---|---|---|---|---|
+| 0 | 4 | `entry_count` | u32 | number of entries |
+| 4 | 4 | `reserved` | u32 | must be 0 |
+| 8 | var | `entries` | Entry[] | 16 bytes each |
+
+Entry:
+
+| Offset | Size | Field | Type | Notes |
+|---|---|---|---|---|
+| 0 | 2 | `type_id` | u16 | the indexed block's type id |
+| 2 | 2 | `reserved` | u16 | must be 0 |
+| 4 | 4 | `reserved` | u32 | must be 0 (room for a future length field) |
+| 8 | 8 | `offset` | u64 | absolute file offset of that block's 8-byte header |
+
+A `type_id` may appear in more than one entry -- one per indexed block instance.
+The index need not be exhaustive: it is a hint, and a block missing from it is
+still found by walking. Because offsets are file-position dependent, the index is
+**not** `safe_to_copy` -- drop or rebuild it when rewriting a file.
+
+Readers SHOULD use the index opportunistically: when the input is seekable and a
+[footer](#footer) is present, read the index and seek directly to a requested
+block; otherwise fall back to a linear walk.
+
+### Writer Info
+
+The Writer Info block (predefined `type_id = 65532`, GUID `...0003`) is an
+optional home for `writer_name` and other producer metadata when the file header
+is kept as a fixed-size struct.
 
 ### Compression
 
@@ -261,8 +293,11 @@ When `compressed` (bit 2) is set, the payload begins with:
 
 ### Footer
 
-An optional fixed 16-byte footer at the very end lets a reader `mmap` and seek to
-`file_length - 16` to find the Block Index without a forward walk.
+An optional fixed 16-byte footer at the very end points to the [Block
+Index](#block-index), so a reader can find it without a forward walk. It is
+written whenever an index is present. A reader checks the last 8 bytes for the
+magic `rezapnib`; if it matches, `index_block_offset` is the absolute offset of
+the Block Index block's 8-byte header.
 
 | Offset (from end) | Size | Field | Type |
 |---|---|---|---|

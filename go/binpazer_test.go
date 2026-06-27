@@ -230,3 +230,61 @@ func TestLargeModeRequiresMultipleOf4(t *testing.T) {
 	require.NoError(t, err)
 	require.Error(t, bw.Block(1, FlagLargeMode, []byte("xyz"))) // 3 bytes
 }
+
+// TestBlockIndex writes a file with an index + footer, then discovers and uses
+// the index to find blocks without walking.
+func TestBlockIndex(t *testing.T) {
+	var m memFile
+	bw, err := NewWriter(&m, sampleWriter, "demo", sampleDefs)
+	require.NoError(t, err)
+	offA := bw.Offset()
+	require.NoError(t, bw.Block(1, 0, []byte("aaaa")))
+	offB := bw.Offset()
+	require.NoError(t, bw.Block(2, 0, []byte("bb")))
+	offC := bw.Offset()
+	require.NoError(t, bw.Block(1, 0, []byte("cccccc")))
+	require.NoError(t, bw.WriteIndex())
+	require.NoError(t, bw.End())
+
+	m.pos = 0
+	r, err := NewReader(&m)
+	require.NoError(t, err)
+	require.True(t, r.HasIndex())
+
+	t1, err := r.Find(1)
+	require.NoError(t, err)
+	assert.Equal(t, []uint64{offA, offC}, t1)
+
+	t2, err := r.Find(2)
+	require.NoError(t, err)
+	assert.Equal(t, []uint64{offB}, t2)
+
+	b, err := r.At(t1[0])
+	require.NoError(t, err)
+	assert.Equal(t, uint16(1), b.TypeID)
+	p, err := r.ReadPayload(b)
+	require.NoError(t, err)
+	assert.Equal(t, "aaaa", string(p))
+}
+
+// TestFindWithoutIndex confirms Find falls back to a walk when no index exists.
+func TestFindWithoutIndex(t *testing.T) {
+	var m memFile
+	bw, err := NewWriter(&m, sampleWriter, "demo", sampleDefs)
+	require.NoError(t, err)
+	offA := bw.Offset()
+	require.NoError(t, bw.Block(1, 0, []byte("aaaa")))
+	require.NoError(t, bw.Block(2, 0, []byte("bb")))
+	offC := bw.Offset()
+	require.NoError(t, bw.Block(1, 0, []byte("cccccc")))
+	require.NoError(t, bw.End()) // no index
+
+	m.pos = 0
+	r, err := NewReader(&m)
+	require.NoError(t, err)
+	require.False(t, r.HasIndex())
+
+	got, err := r.Find(1) // falls back to a walk
+	require.NoError(t, err)
+	assert.Equal(t, []uint64{offA, offC}, got)
+}

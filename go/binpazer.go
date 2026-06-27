@@ -59,6 +59,15 @@ type TypeEntry struct {
 	GUID   GUID
 }
 
+// footerMagic marks the optional 16-byte footer that locates the Block Index.
+const footerMagic = "rezapnib"
+
+// IndexEntry maps a block's type id to its absolute file offset (Block Index).
+type IndexEntry struct {
+	TypeID uint16
+	Offset uint64
+}
+
 func align8(x uint64) uint64 { return (x + 7) &^ 7 }
 
 func bttEntrySize(nameLen int) uint64 { return align8(20 + 4 + uint64(nameLen) + 1) }
@@ -67,10 +76,13 @@ func bttEntrySize(nameLen int) uint64 { return align8(20 + 4 + uint64(nameLen) +
 
 // Writer serializes a binpazer file to an io.Writer.
 type Writer struct {
-	w      io.Writer
-	seeker io.Seeker // non-nil if w also implements io.Seeker
-	off    uint64
-	err    error
+	w           io.Writer
+	seeker      io.Seeker // non-nil if w also implements io.Seeker
+	off         uint64
+	err         error
+	idx         []IndexEntry // recorded as blocks are written
+	indexOffset uint64
+	wroteIndex  bool
 }
 
 var zeros [8]byte
@@ -199,6 +211,8 @@ func (bw *Writer) Block(typeID, flags uint16, payload []byte) error {
 		lengthField = uint32(len(payload))
 	}
 
+	bw.idx = append(bw.idx, IndexEntry{TypeID: typeID, Offset: bw.off})
+
 	var bh [8]byte
 	binary.LittleEndian.PutUint16(bh[0:], typeID)
 	binary.LittleEndian.PutUint16(bh[2:], flags)
@@ -216,10 +230,55 @@ func (bw *Writer) Block(typeID, flags uint16, payload []byte) error {
 	return bw.err
 }
 
-// End finishes the file, back-patching file_length if the writer is seekable.
+// Offset returns the number of bytes written so far, i.e. the file offset where
+// the next block will start. Record it before Block to index that block.
+func (bw *Writer) Offset() uint64 { return bw.off }
+
+// WriteIndex writes a Block Index covering every block written so far. Call it
+// before End, which then emits the footer that locates it.
+func (bw *Writer) WriteIndex() error {
+	if bw.err != nil {
+		return bw.err
+	}
+	payloadLen := uint64(8) + uint64(len(bw.idx))*16
+	if payloadLen > 0xFFFFFFFF {
+		bw.err = errors.New("binpazer: block index too large")
+		return bw.err
+	}
+	bw.indexOffset = bw.off
+
+	var bh [8]byte
+	binary.LittleEndian.PutUint16(bh[0:], TypeBlockIndex)
+	binary.LittleEndian.PutUint16(bh[2:], 0) // ancillary; not safe_to_copy
+	binary.LittleEndian.PutUint32(bh[4:], uint32(payloadLen))
+	bw.write(bh[:])
+
+	var cnt [8]byte
+	binary.LittleEndian.PutUint32(cnt[0:], uint32(len(bw.idx)))
+	bw.write(cnt[:])
+
+	for _, e := range bw.idx {
+		var eb [16]byte
+		binary.LittleEndian.PutUint16(eb[0:], e.TypeID)
+		binary.LittleEndian.PutUint64(eb[8:], e.Offset)
+		bw.write(eb[:])
+	}
+	bw.pad(align8(bw.off) - bw.off)
+	bw.wroteIndex = true
+	return bw.err
+}
+
+// End finishes the file: it writes the footer (if an index was written), then
+// back-patches file_length when the writer is seekable.
 func (bw *Writer) End() error {
 	if bw.err != nil {
 		return bw.err
+	}
+	if bw.wroteIndex {
+		var ft [16]byte
+		binary.LittleEndian.PutUint64(ft[0:], bw.indexOffset)
+		copy(ft[8:], footerMagic)
+		bw.write(ft[:])
 	}
 	if bw.seeker != nil {
 		total := bw.off
@@ -241,8 +300,9 @@ func (bw *Writer) End() error {
 
 // Reader parses a binpazer file from an io.Reader.
 type Reader struct {
-	r   io.Reader
-	off uint64
+	r      io.Reader
+	seeker io.Seeker // non-nil if r also implements io.Seeker
+	off    uint64
 
 	VersionMajor     uint16
 	VersionMinor     uint16
@@ -251,6 +311,9 @@ type Reader struct {
 	FileLength       uint64
 	FirstBlockOffset uint64
 	Types            []TypeEntry
+
+	hasIndex    bool
+	indexOffset uint64
 }
 
 // Block is a parsed block header.
@@ -291,6 +354,9 @@ func (br *Reader) skip(n uint64) error {
 // NewReader reads and validates the file header and Block Type Table.
 func NewReader(r io.Reader) (*Reader, error) {
 	br := &Reader{r: r}
+	if s, ok := r.(io.Seeker); ok {
+		br.seeker = s
+	}
 
 	hdr := make([]byte, 56)
 	if err := br.read(hdr); err != nil {
@@ -375,6 +441,22 @@ func NewReader(r io.Reader) (*Reader, error) {
 	if err := br.skip(bttEnd - br.off); err != nil {
 		return br, err
 	}
+
+	// Opportunistically locate a Block Index via the footer.
+	if br.seeker != nil && br.FileLength != FileLengthUnknown && br.FileLength >= 16 {
+		saved := br.off
+		if _, err := br.seeker.Seek(int64(br.FileLength-16), io.SeekStart); err == nil {
+			ft := make([]byte, 16)
+			if _, err := io.ReadFull(br.r, ft); err == nil && string(ft[8:]) == footerMagic {
+				br.indexOffset = binary.LittleEndian.Uint64(ft[0:])
+				br.hasIndex = true
+			}
+		}
+		if _, err := br.seeker.Seek(int64(saved), io.SeekStart); err != nil {
+			return br, err
+		}
+		br.off = saved
+	}
 	return br, nil
 }
 
@@ -451,4 +533,130 @@ func (br *Reader) ReadPayload(b *Block) ([]byte, error) {
 // SkipPayload skips the current block's payload (and CRC) and advances.
 func (br *Reader) SkipPayload(b *Block) error {
 	return br.skip(b.nextOffset() - br.off)
+}
+
+// HasIndex reports whether a Block Index was located via the footer.
+func (br *Reader) HasIndex() bool { return br.hasIndex }
+
+// Offset returns the reader's current file offset.
+func (br *Reader) Offset() uint64 { return br.off }
+
+// Find returns the file offsets of all blocks with the given type id. It uses
+// the Block Index when present (seeking straight to it) and otherwise walks the
+// file. It requires a seekable reader and preserves the reader's position.
+func (br *Reader) Find(typeID uint16) ([]uint64, error) {
+	if br.seeker == nil {
+		return nil, errors.New("binpazer: Find requires a seekable reader")
+	}
+	saved := br.off
+	offsets, ferr := br.find(typeID)
+	if _, err := br.seeker.Seek(int64(saved), io.SeekStart); err == nil {
+		br.off = saved
+	}
+	if ferr != nil {
+		return nil, ferr
+	}
+	return offsets, nil
+}
+
+func (br *Reader) find(typeID uint16) ([]uint64, error) {
+	var offsets []uint64
+	if br.hasIndex {
+		if _, err := br.seeker.Seek(int64(br.indexOffset), io.SeekStart); err != nil {
+			return nil, err
+		}
+		br.off = br.indexOffset
+		bh := make([]byte, 8)
+		cc := make([]byte, 8)
+		if err := br.read(bh); err != nil {
+			return nil, err
+		}
+		if err := br.read(cc); err != nil {
+			return nil, err
+		}
+		entryCount := binary.LittleEndian.Uint32(cc)
+		e := make([]byte, 16)
+		for i := uint32(0); i < entryCount; i++ {
+			if err := br.read(e); err != nil {
+				return nil, err
+			}
+			if binary.LittleEndian.Uint16(e) == typeID {
+				offsets = append(offsets, binary.LittleEndian.Uint64(e[8:]))
+			}
+		}
+		return offsets, nil
+	}
+
+	// No index -- walk the file.
+	if _, err := br.seeker.Seek(int64(br.FirstBlockOffset), io.SeekStart); err != nil {
+		return nil, err
+	}
+	br.off = br.FirstBlockOffset
+	for br.FileLength == FileLengthUnknown || br.off < br.FileLength {
+		blkOff := br.off
+		bh := make([]byte, 8)
+		n, err := io.ReadFull(br.r, bh)
+		if n == 0 && err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		br.off += 8
+		tid := binary.LittleEndian.Uint16(bh)
+		flags := binary.LittleEndian.Uint16(bh[2:])
+		lf := uint64(binary.LittleEndian.Uint32(bh[4:]))
+		plen := lf
+		if flags&FlagLargeMode != 0 {
+			plen = lf * 4
+		}
+		if tid == typeID {
+			offsets = append(offsets, blkOff)
+		}
+		crc := uint64(0)
+		if flags&FlagHasCRC != 0 {
+			crc = 4
+		}
+		next := align8(blkOff + 8 + plen + crc)
+		if _, err := br.seeker.Seek(int64(next), io.SeekStart); err != nil {
+			return nil, err
+		}
+		br.off = next
+	}
+	return offsets, nil
+}
+
+// At seeks to a block (e.g. an offset from Find) and reads its header,
+// resolving its GUID against the type table. Requires a seekable reader.
+// Afterwards, ReadPayload reads that block.
+func (br *Reader) At(offset uint64) (*Block, error) {
+	if br.seeker == nil {
+		return nil, errors.New("binpazer: At requires a seekable reader")
+	}
+	if _, err := br.seeker.Seek(int64(offset), io.SeekStart); err != nil {
+		return nil, err
+	}
+	br.off = offset
+	bh := make([]byte, 8)
+	if err := br.read(bh); err != nil {
+		return nil, err
+	}
+	b := &Block{}
+	b.TypeID = binary.LittleEndian.Uint16(bh)
+	b.Flags = binary.LittleEndian.Uint16(bh[2:])
+	lf := uint64(binary.LittleEndian.Uint32(bh[4:]))
+	if b.Flags&FlagLargeMode != 0 {
+		b.PayloadLen = lf * 4
+	} else {
+		b.PayloadLen = lf
+	}
+	b.payloadOff = br.off
+	for _, e := range br.Types {
+		if e.TypeID == b.TypeID {
+			b.GUID = e.GUID
+			b.Known = true
+			break
+		}
+	}
+	return b, nil
 }

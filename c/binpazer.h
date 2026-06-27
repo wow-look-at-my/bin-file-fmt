@@ -67,7 +67,8 @@ typedef enum {
     BINPAZER_ERR_FORMAT = -4, /* structurally invalid */
     BINPAZER_ERR_RANGE  = -5, /* value out of range (e.g. large_mode misuse) */
     BINPAZER_ERR_CRC    = -6, /* CRC mismatch */
-    BINPAZER_ERR_CAPACITY = -7/* a caller-supplied buffer is too small */
+    BINPAZER_ERR_CAPACITY = -7, /* a caller-supplied buffer is too small */
+    BINPAZER_ERR_NOSEEK   = -8  /* operation requires a seek callback */
 } binpazer_status;
 
 /* ---- Writing ---- */
@@ -76,8 +77,10 @@ typedef struct {
     binpazer_write_fn write;
     binpazer_seek_fn  seek;   /* may be NULL */
     void             *ctx;
-    uint64_t          offset; /* bytes written so far */
+    uint64_t          offset; /* bytes written so far; == the next block's offset */
     int               err;    /* sticky error (binpazer_status) */
+    uint64_t          index_offset; /* offset of the Block Index block, once written */
+    int               wrote_index;
 } binpazer_writer;
 
 /* One block-type-table entry supplied by the caller. Use user ids (1, 2, ...);
@@ -124,6 +127,8 @@ typedef struct {
     binpazer_guid    writer_guid;
     uint64_t         file_length;        /* sentinel if unknown */
     uint64_t         first_block_offset;
+    int              has_index;          /* a Block Index was located via the footer */
+    uint64_t         index_offset;       /* offset of the Block Index block */
 } binpazer_reader;
 
 typedef struct {
@@ -160,6 +165,35 @@ binpazer_status binpazer_reader_read_payload(
 /* Skips the current block's payload (and CRC) and advances to the next block. */
 binpazer_status binpazer_reader_skip_payload(
     binpazer_reader *r, const binpazer_block *blk);
+
+/* ---- Block Index (optional, predefined type 65533) ---- */
+
+typedef struct {
+    uint16_t type_id;
+    uint64_t offset;   /* absolute file offset of the block's 8-byte header */
+} binpazer_index_entry;
+
+/* Writes a Block Index block from `entries`. Call after the indexed blocks are
+ * written; capture each block's offset by reading `writer.offset` immediately
+ * before writing it. binpazer_writer_end then emits the footer that locates it. */
+binpazer_status binpazer_writer_index(
+    binpazer_writer *w, const binpazer_index_entry *entries, size_t n);
+
+/* Finds blocks by type id, using the Block Index when present (seeking straight
+ * to it) and otherwise walking the file. Requires a seek callback. Fills `out`
+ * with up to `cap` matches; `*count` receives the total match count (which may
+ * exceed `cap`, in which case BINPAZER_ERR_CAPACITY is returned). The reader's
+ * position is preserved. */
+binpazer_status binpazer_reader_find(
+    binpazer_reader *r, uint16_t type_id,
+    binpazer_index_entry *out, size_t cap, size_t *count);
+
+/* Seeks to a block at `offset` (e.g. from binpazer_reader_find) and reads its
+ * header into `blk`, resolving its GUID against `entries`. Requires a seek
+ * callback. Afterwards, binpazer_reader_read_payload reads that block. */
+binpazer_status binpazer_reader_at(
+    binpazer_reader *r, const binpazer_type_entry *entries, size_t entries_count,
+    uint64_t offset, binpazer_block *blk);
 
 /* CRC-32C (Castagnoli), the algorithm used by the has_crc flag. Call with
  * crc = binpazer_crc32c(0, NULL, 0) to start, feed chunks, use the result. */

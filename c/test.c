@@ -33,6 +33,64 @@ static int mem_seek(void *ctx, uint64_t off) {
 static int failures = 0;
 #define CHECK(cond, msg) do { if (!(cond)) { printf("FAIL: %s\n", msg); failures++; } } while (0)
 
+/* Exercises the Block Index: write with an index, discover it via the footer,
+ * find blocks by type without walking, and confirm the no-index walk fallback. */
+static void test_index(void) {
+    static uint8_t bufA[65536], bufB[65536];
+    membuf A = { bufA, sizeof bufA, 0, 0 };
+    membuf B = { bufB, sizeof bufB, 0, 0 };
+
+    binpazer_guid wg = {{0x01}};
+    binpazer_guid g1 = {{0x11}}, g2 = {{0x22}};
+    binpazer_type_def defs[2] = { {1, {{0}}, "A"}, {2, {{0}}, "B"} };
+    defs[0].guid = g1; defs[1].guid = g2;
+
+    /* file A: three blocks + index + footer */
+    binpazer_writer w;
+    binpazer_writer_begin(&w, mem_write, mem_seek, &A, &wg, "demo", defs, 2);
+    binpazer_index_entry idx[3];
+    idx[0].type_id = 1; idx[0].offset = w.offset; binpazer_writer_block(&w, 1, 0, "aaaa", 4);
+    idx[1].type_id = 2; idx[1].offset = w.offset; binpazer_writer_block(&w, 2, 0, "bb", 2);
+    idx[2].type_id = 1; idx[2].offset = w.offset; binpazer_writer_block(&w, 1, 0, "cccccc", 6);
+    CHECK(binpazer_writer_index(&w, idx, 3) == BINPAZER_OK, "index: write index");
+    CHECK(binpazer_writer_end(&w) == BINPAZER_OK && w.err == BINPAZER_OK, "index: end ok");
+
+    A.pos = 0;
+    binpazer_reader r; char nm[32]; binpazer_type_entry te[8]; size_t nte = 0;
+    binpazer_reader_begin(&r, mem_read, mem_seek, &A, nm, sizeof nm, te, 8, &nte);
+    CHECK(r.has_index, "index: discovered via footer");
+
+    binpazer_index_entry found[8]; size_t nf = 0;
+    uint64_t pos_before = r.offset;
+    CHECK(binpazer_reader_find(&r, 1, found, 8, &nf) == BINPAZER_OK, "index: find type1 ok");
+    CHECK(nf == 2, "index: find type1 -> 2");
+    CHECK(found[0].offset == idx[0].offset && found[1].offset == idx[2].offset, "index: find type1 offsets");
+    CHECK(r.offset == pos_before, "index: find preserves position");
+
+    binpazer_block blk; uint8_t pb[32];
+    CHECK(binpazer_reader_at(&r, te, nte, found[0].offset, &blk) == BINPAZER_OK, "index: at ok");
+    CHECK(blk.type_id == 1 && blk.known && blk.payload_len == 4, "index: at header");
+    CHECK(binpazer_reader_read_payload(&r, &blk, pb, sizeof pb) == BINPAZER_OK && memcmp(pb, "aaaa", 4) == 0, "index: at read payload");
+
+    CHECK(binpazer_reader_find(&r, 2, found, 8, &nf) == BINPAZER_OK && nf == 1 && found[0].offset == idx[1].offset, "index: find type2");
+
+    /* file B: same blocks, no index -> find falls back to a walk */
+    binpazer_writer w2;
+    binpazer_writer_begin(&w2, mem_write, mem_seek, &B, &wg, "demo", defs, 2);
+    binpazer_writer_block(&w2, 1, 0, "aaaa", 4);
+    binpazer_writer_block(&w2, 2, 0, "bb", 2);
+    binpazer_writer_block(&w2, 1, 0, "cccccc", 6);
+    binpazer_writer_end(&w2);
+
+    B.pos = 0;
+    binpazer_reader r2; char nm2[32]; binpazer_type_entry te2[8]; size_t nte2 = 0;
+    binpazer_reader_begin(&r2, mem_read, mem_seek, &B, nm2, sizeof nm2, te2, 8, &nte2);
+    CHECK(!r2.has_index, "no-index: footer absent");
+    binpazer_index_entry fb[8]; size_t nfb = 0;
+    CHECK(binpazer_reader_find(&r2, 1, fb, 8, &nfb) == BINPAZER_OK && nfb == 2, "no-index: find via walk -> 2");
+    CHECK(fb[0].offset == idx[0].offset && fb[1].offset == idx[2].offset, "no-index: walk offsets match");
+}
+
 int main(void) {
     static uint8_t storage[65536];
     membuf m = { storage, sizeof storage, 0, 0 };
@@ -122,6 +180,8 @@ int main(void) {
 
     /* end */
     CHECK(binpazer_reader_next(&r, entries, nentries, &blk) == BINPAZER_END, "end of blocks");
+
+    test_index();
 
     if (failures == 0) { printf("OK: all C round-trip checks passed\n"); return 0; }
     printf("%d FAILURE(S)\n", failures);

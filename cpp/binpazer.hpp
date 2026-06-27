@@ -93,6 +93,7 @@ public:
     Writer &operator=(Writer &&) = delete;
 
     Status block(uint16_t type_id, uint16_t flags, const void *payload, uint64_t len) {
+        idx_.push_back(binpazer_index_entry{type_id, w_.offset}); // record for the index
         return static_cast<Status>(binpazer_writer_block(&w_, type_id, flags, payload, len));
     }
     Status block(uint16_t type_id, uint16_t flags, const std::vector<uint8_t> &payload) {
@@ -101,15 +102,22 @@ public:
     Status block(uint16_t type_id, uint16_t flags, std::string_view payload) {
         return block(type_id, flags, payload.data(), payload.size());
     }
+    // Writes a Block Index covering every block written so far. Call before end();
+    // end() then emits the footer that locates it.
+    Status write_index() {
+        return static_cast<Status>(binpazer_writer_index(&w_, idx_.data(), idx_.size()));
+    }
     Status end() { return static_cast<Status>(binpazer_writer_end(&w_)); }
 
-    bool   ok()     const { return w_.err == BINPAZER_OK; }
-    Status status() const { return static_cast<Status>(w_.err); }
+    uint64_t offset() const { return w_.offset; } // == the next block's offset
+    bool     ok()     const { return w_.err == BINPAZER_OK; }
+    Status   status() const { return static_cast<Status>(w_.err); }
 
 private:
-    detail::IoCtx   io_{};
-    binpazer_writer w_{};
-    std::string     name_;
+    detail::IoCtx                     io_{};
+    binpazer_writer                   w_{};
+    std::string                       name_;
+    std::vector<binpazer_index_entry> idx_;
 };
 
 class Reader {
@@ -163,6 +171,36 @@ public:
     }
     Status skip_payload(const Block &b) {
         return static_cast<Status>(binpazer_reader_skip_payload(&r_, &b));
+    }
+
+    bool     has_index() const { return r_.has_index != 0; }
+    uint64_t offset()    const { return r_.offset; }
+
+    // Offsets of all blocks with this type id, using the Block Index when present
+    // (seeking straight to them) and otherwise walking the file.
+    std::vector<uint64_t> find(uint16_t type_id) {
+        std::vector<binpazer_index_entry> buf(16);
+        size_t n = 0;
+        binpazer_status s = binpazer_reader_find(&r_, type_id, buf.data(), buf.size(), &n);
+        if (s == BINPAZER_ERR_CAPACITY) {
+            buf.resize(n);
+            s = binpazer_reader_find(&r_, type_id, buf.data(), buf.size(), &n);
+        }
+        std::vector<uint64_t> out;
+        if (s == BINPAZER_OK) {
+            out.reserve(n);
+            for (size_t i = 0; i < n; ++i) out.push_back(buf[i].offset);
+        }
+        return out;
+    }
+
+    // Seeks to a block (e.g. an offset from find) and returns its header; nullopt
+    // on error. After this, read_payload reads that block.
+    std::optional<Block> at(uint64_t offset) {
+        Block b{};
+        if (binpazer_reader_at(&r_, entries_.data(), entries_.size(), offset, &b) != BINPAZER_OK)
+            return std::nullopt;
+        return b;
     }
 
 private:

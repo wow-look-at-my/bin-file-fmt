@@ -165,8 +165,46 @@ binpazer_status binpazer_writer_block(
     return w_pad(w, align8(w->offset) - w->offset);
 }
 
+binpazer_status binpazer_writer_index(
+    binpazer_writer *w, const binpazer_index_entry *entries, size_t n)
+{
+    if (w->err) return (binpazer_status)w->err;
+    uint64_t payload_len = 8 + (uint64_t)n * 16;
+    if (payload_len > 0xFFFFFFFFu) return (binpazer_status)(w->err = BINPAZER_ERR_RANGE);
+
+    w->index_offset = w->offset;
+
+    uint8_t bh[8];
+    put_u16(bh + 0, BINPAZER_TYPE_BLOCK_INDEX);
+    put_u16(bh + 2, 0); /* ancillary; not safe_to_copy */
+    put_u32(bh + 4, (uint32_t)payload_len);
+    if (w_raw(w, bh, 8)) return (binpazer_status)w->err;
+
+    uint8_t cnt[8];
+    put_u32(cnt + 0, (uint32_t)n);
+    put_u32(cnt + 4, 0);
+    if (w_raw(w, cnt, 8)) return (binpazer_status)w->err;
+
+    for (size_t i = 0; i < n; i++) {
+        uint8_t e[16];
+        put_u16(e + 0, entries[i].type_id);
+        put_u16(e + 2, 0);
+        put_u32(e + 4, 0);
+        put_u64(e + 8, entries[i].offset);
+        if (w_raw(w, e, 16)) return (binpazer_status)w->err;
+    }
+    w->wrote_index = 1;
+    return w_pad(w, align8(w->offset) - w->offset);
+}
+
 binpazer_status binpazer_writer_end(binpazer_writer *w) {
     if (w->err) return (binpazer_status)w->err;
+    if (w->wrote_index) {
+        uint8_t ft[16];
+        put_u64(ft + 0, w->index_offset);
+        memcpy(ft + 8, "rezapnib", 8);
+        if (w_raw(w, ft, 16)) return (binpazer_status)w->err;
+    }
     if (w->seek) {
         uint64_t total = w->offset;
         if (w->seek(w->ctx, 32) != 0) return (binpazer_status)(w->err = BINPAZER_ERR_IO);
@@ -251,7 +289,23 @@ binpazer_status binpazer_reader_begin(
     }
     uint64_t btt_end = align8(btt_start + 8 + btt_len);
     if (r->offset > btt_end) return (binpazer_status)(r->err = BINPAZER_ERR_FORMAT);
-    return r_skip(r, btt_end - r->offset); /* block pad */
+    if (r_skip(r, btt_end - r->offset)) return (binpazer_status)r->err; /* block pad */
+
+    /* Opportunistically locate a Block Index via the footer. */
+    r->has_index = 0;
+    if (r->seek && r->file_length != BINPAZER_FILE_LENGTH_UNKNOWN && r->file_length >= 16) {
+        uint64_t saved = r->offset;
+        uint8_t ft[16];
+        if (r->seek(r->ctx, r->file_length - 16) == 0 &&
+            r->read(r->ctx, ft, 16) == 16 &&
+            memcmp(ft + 8, "rezapnib", 8) == 0) {
+            r->index_offset = get_u64(ft);
+            r->has_index = 1;
+        }
+        if (r->seek(r->ctx, saved) != 0) return (binpazer_status)(r->err = BINPAZER_ERR_IO);
+        r->offset = saved;
+    }
+    return BINPAZER_OK;
 }
 
 binpazer_status binpazer_reader_next(
@@ -312,4 +366,90 @@ binpazer_status binpazer_reader_read_payload(
 binpazer_status binpazer_reader_skip_payload(binpazer_reader *r, const binpazer_block *blk) {
     if (r->err) return (binpazer_status)r->err;
     return r_advance_tail(r, blk);
+}
+
+binpazer_status binpazer_reader_find(
+    binpazer_reader *r, uint16_t type_id,
+    binpazer_index_entry *out, size_t cap, size_t *count)
+{
+    if (r->err) return (binpazer_status)r->err;
+    if (!r->seek) return (binpazer_status)(r->err = BINPAZER_ERR_NOSEEK);
+    if (count) *count = 0;
+
+    size_t total = 0;
+    uint64_t saved = r->offset;
+    binpazer_status st = BINPAZER_OK;
+
+    do {
+        if (r->has_index) {
+            /* Scan only the compact index -- no file walk. */
+            if (r->seek(r->ctx, r->index_offset) != 0) { st = BINPAZER_ERR_IO; break; }
+            r->offset = r->index_offset;
+            uint8_t bh[8], cc[8];
+            if (r_raw(r, bh, 8) || r_raw(r, cc, 8)) { st = (binpazer_status)r->err; break; }
+            uint32_t entry_count = get_u32(cc);
+            for (uint32_t i = 0; i < entry_count; i++) {
+                uint8_t e[16];
+                if (r_raw(r, e, 16)) { st = (binpazer_status)r->err; break; }
+                if (get_u16(e) == type_id) {
+                    if (total < cap) { out[total].type_id = type_id; out[total].offset = get_u64(e + 8); }
+                    total++;
+                }
+            }
+        } else {
+            /* No index -- walk the file. */
+            if (r->seek(r->ctx, r->first_block_offset) != 0) { st = BINPAZER_ERR_IO; break; }
+            r->offset = r->first_block_offset;
+            while (r->file_length == BINPAZER_FILE_LENGTH_UNKNOWN || r->offset < r->file_length) {
+                uint64_t blk_off = r->offset;
+                uint8_t bh[8];
+                size_t got = r->read(r->ctx, bh, 8);
+                if (got == 0) break;
+                if (got != 8) { st = BINPAZER_ERR_IO; break; }
+                r->offset += 8;
+                uint16_t tid = get_u16(bh);
+                uint16_t flags = get_u16(bh + 2);
+                uint32_t lf = get_u32(bh + 4);
+                uint64_t plen = (flags & BINPAZER_FLAG_LARGE_MODE) ? (uint64_t)lf * 4 : lf;
+                if (tid == type_id) {
+                    if (total < cap) { out[total].type_id = tid; out[total].offset = blk_off; }
+                    total++;
+                }
+                uint64_t crc = (flags & BINPAZER_FLAG_HAS_CRC) ? 4 : 0;
+                uint64_t next = align8(blk_off + 8 + plen + crc);
+                if (r->seek(r->ctx, next) != 0) { st = BINPAZER_ERR_IO; break; }
+                r->offset = next;
+            }
+        }
+    } while (0);
+
+    if (count) *count = total;
+    if (st == BINPAZER_OK && total > cap) st = BINPAZER_ERR_CAPACITY;
+    if (r->seek(r->ctx, saved) == 0) r->offset = saved; /* restore position */
+    if (st != BINPAZER_OK && st != BINPAZER_ERR_CAPACITY) r->err = st;
+    return st;
+}
+
+binpazer_status binpazer_reader_at(
+    binpazer_reader *r, const binpazer_type_entry *entries, size_t entries_count,
+    uint64_t offset, binpazer_block *blk)
+{
+    if (r->err) return (binpazer_status)r->err;
+    if (!r->seek) return (binpazer_status)(r->err = BINPAZER_ERR_NOSEEK);
+    if (r->seek(r->ctx, offset) != 0) return (binpazer_status)(r->err = BINPAZER_ERR_IO);
+    r->offset = offset;
+
+    uint8_t bh[8];
+    if (r_raw(r, bh, 8)) return (binpazer_status)r->err;
+    blk->type_id = get_u16(bh);
+    blk->flags   = get_u16(bh + 2);
+    uint32_t lf  = get_u32(bh + 4);
+    blk->payload_len = (blk->flags & BINPAZER_FLAG_LARGE_MODE) ? (uint64_t)lf * 4 : lf;
+    blk->payload_offset = r->offset;
+    blk->known = 0;
+    memset(blk->guid.bytes, 0, 16);
+    for (size_t i = 0; i < entries_count; i++) {
+        if (entries[i].type_id == blk->type_id) { blk->guid = entries[i].guid; blk->known = 1; break; }
+    }
+    return BINPAZER_OK;
 }

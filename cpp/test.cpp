@@ -88,6 +88,44 @@ int main() {
     auto b4 = r.next();
     CHECK(!b4.has_value() && r.ok(), "clean end");
 
+    // --- Block Index: write with an index, discover it, find + at ---
+    {
+        std::vector<uint8_t> ibuf;
+        size_t ip = 0;
+        auto iwrite = [&](const void *b, size_t n) -> size_t {
+            if (ip + n > ibuf.size()) ibuf.resize(ip + n);
+            std::memcpy(ibuf.data() + ip, b, n); ip += n; return n;
+        };
+        auto iseek = [&](uint64_t o) -> bool {
+            if (o > ibuf.size()) ibuf.resize(static_cast<size_t>(o));
+            ip = static_cast<size_t>(o); return true;
+        };
+        uint64_t offA, offB, offC;
+        {
+            binpazer::Writer w(iwrite, writer, "demo", defs, iseek);
+            offA = w.offset(); w.block(1, 0, "aaaa", 4);
+            offB = w.offset(); w.block(2, 0, "bb", 2);
+            offC = w.offset(); w.block(1, 0, "cccccc", 6);
+            CHECK(w.write_index() == binpazer::Status::Ok, "index: write_index");
+            CHECK(w.end() == binpazer::Status::Ok, "index: end");
+        }
+        ip = 0;
+        auto iread = [&](void *b, size_t n) -> size_t {
+            size_t av = ibuf.size() - ip, c = n < av ? n : av;
+            std::memcpy(b, ibuf.data() + ip, c); ip += c; return c;
+        };
+        binpazer::Reader r(iread, iseek);
+        CHECK(r.has_index(), "index: discovered via footer");
+        auto t1 = r.find(1);
+        CHECK(t1.size() == 2 && t1[0] == offA && t1[1] == offC, "index: find type1");
+        auto t2 = r.find(2);
+        CHECK(t2.size() == 1 && t2[0] == offB, "index: find type2");
+        auto blk = r.at(t1[0]);
+        CHECK(blk.has_value() && blk->type_id == 1 && blk->payload_len == 4, "index: at header");
+        auto p = r.read_payload(*blk);
+        CHECK(p.size() == 4 && std::memcmp(p.data(), "aaaa", 4) == 0, "index: at payload");
+    }
+
     if (failures == 0) { std::printf("OK: all C++ round-trip checks passed\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failures);
     return 1;
