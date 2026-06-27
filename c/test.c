@@ -42,8 +42,8 @@ int main(void) {
     binpazer_guid g_note = {{0xde,0xad,0xbe,0xef,0,0,0,0,0,0,0,0,0,0,0,0}};
 
     binpazer_type_def defs[] = {
-        { 2, {{0}}, "Mesh" },
-        { 3, {{0}}, "Note" },
+        { 1, {{0}}, "Mesh" },
+        { 2, {{0}}, "Note" },
     };
     defs[0].guid = g_mesh;
     defs[1].guid = g_note;
@@ -57,12 +57,12 @@ int main(void) {
     CHECK(binpazer_writer_begin(&w, mem_write, mem_seek, &m, &writer, "demo",
                                 defs, 2) == BINPAZER_OK, "writer_begin");
     /* a critical block with a CRC */
-    CHECK(binpazer_writer_block(&w, 2, BINPAZER_FLAG_CRITICAL | BINPAZER_FLAG_HAS_CRC,
+    CHECK(binpazer_writer_block(&w, 1, BINPAZER_FLAG_CRITICAL | BINPAZER_FLAG_HAS_CRC,
                                 mesh_payload, 16) == BINPAZER_OK, "write mesh");
     /* an ancillary block */
-    CHECK(binpazer_writer_block(&w, 3, 0, note_payload, 12) == BINPAZER_OK, "write note");
+    CHECK(binpazer_writer_block(&w, 2, 0, note_payload, 12) == BINPAZER_OK, "write note");
     /* a large_mode block (length counts 4-byte words: 24 bytes -> field 6) */
-    CHECK(binpazer_writer_block(&w, 2, BINPAZER_FLAG_LARGE_MODE,
+    CHECK(binpazer_writer_block(&w, 1, BINPAZER_FLAG_LARGE_MODE,
                                 big_payload, 24) == BINPAZER_OK, "write large");
     CHECK(binpazer_writer_end(&w) == BINPAZER_OK, "writer_end");
     CHECK(w.err == BINPAZER_OK, "writer no error");
@@ -89,18 +89,18 @@ int main(void) {
     CHECK(r.version_major == 1 && r.version_minor == 0, "version");
     CHECK(memcmp(r.writer_guid.bytes, writer.bytes, 16) == 0, "writer guid");
     CHECK(nentries == 3, "btt entry count (BTT + Mesh + Note)");
-    /* entry 0 is the auto BTT, then Mesh(2), Note(3) */
-    CHECK(entries[0].type_id == 1, "entry0 is BTT");
+    /* entry 0 is the auto BTT (65534), then Mesh(1), Note(2) */
+    CHECK(entries[0].type_id == BINPAZER_TYPE_BLOCK_TYPE_TABLE, "entry0 is BTT");
     CHECK(memcmp(entries[0].guid.bytes, BINPAZER_GUID_BLOCK_TYPE_TABLE.bytes, 16) == 0, "entry0 guid");
-    CHECK(entries[1].type_id == 2 && memcmp(entries[1].guid.bytes, g_mesh.bytes,16)==0, "entry1 Mesh");
-    CHECK(entries[2].type_id == 3 && memcmp(entries[2].guid.bytes, g_note.bytes,16)==0, "entry2 Note");
+    CHECK(entries[1].type_id == 1 && memcmp(entries[1].guid.bytes, g_mesh.bytes,16)==0, "entry1 Mesh");
+    CHECK(entries[2].type_id == 2 && memcmp(entries[2].guid.bytes, g_note.bytes,16)==0, "entry2 Note");
 
     binpazer_block blk;
     uint8_t pbuf[64];
 
     /* block 1: Mesh, critical + crc */
     CHECK(binpazer_reader_next(&r, entries, nentries, &blk) == BINPAZER_OK, "next mesh");
-    CHECK(blk.type_id == 2 && blk.known, "mesh type/known");
+    CHECK(blk.type_id == 1 && blk.known, "mesh type/known");
     CHECK(memcmp(blk.guid.bytes, g_mesh.bytes, 16) == 0, "mesh guid resolved");
     CHECK((blk.flags & BINPAZER_FLAG_CRITICAL) && (blk.flags & BINPAZER_FLAG_HAS_CRC), "mesh flags");
     CHECK(blk.payload_len == 16, "mesh len");
@@ -109,7 +109,7 @@ int main(void) {
 
     /* block 2: Note, ancillary */
     CHECK(binpazer_reader_next(&r, entries, nentries, &blk) == BINPAZER_OK, "next note");
-    CHECK(blk.type_id == 3 && blk.payload_len == 12, "note type/len");
+    CHECK(blk.type_id == 2 && blk.payload_len == 12, "note type/len");
     CHECK(binpazer_reader_read_payload(&r, &blk, pbuf, sizeof pbuf) == BINPAZER_OK, "read note payload");
     CHECK(memcmp(pbuf, note_payload, 12) == 0, "note payload bytes");
 

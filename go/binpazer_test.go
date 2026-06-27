@@ -51,7 +51,7 @@ var (
 	sampleWriter = GUID{0xaa, 0xbb, 0xcc, 0xdd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
 	sampleMesh   = GUID{0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00}
 	sampleNote   = GUID{0xde, 0xad, 0xbe, 0xef, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-	sampleDefs   = []TypeDef{{2, sampleMesh, "Mesh"}, {3, sampleNote, "Note"}}
+	sampleDefs   = []TypeDef{{1, sampleMesh, "Mesh"}, {2, sampleNote, "Note"}}
 )
 
 const (
@@ -65,13 +65,13 @@ func writeSample(w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if err := bw.Block(2, FlagCritical|FlagHasCRC, []byte(meshPayload)); err != nil {
+	if err := bw.Block(1, FlagCritical|FlagHasCRC, []byte(meshPayload)); err != nil {
 		return err
 	}
-	if err := bw.Block(3, 0, []byte(notePayload)); err != nil {
+	if err := bw.Block(2, 0, []byte(notePayload)); err != nil {
 		return err
 	}
-	if err := bw.Block(2, FlagLargeMode, []byte(bigPayload)); err != nil {
+	if err := bw.Block(1, FlagLargeMode, []byte(bigPayload)); err != nil {
 		return err
 	}
 	return bw.End()
@@ -91,11 +91,11 @@ func verifySample(t *testing.T, r io.Reader) {
 
 	require.Equal(t, 3, len(br.Types))
 
-	assert.False(t, br.Types[0].TypeID != 1 || br.Types[0].GUID != BlockTypeTableGUID)
+	assert.False(t, br.Types[0].TypeID != TypeBlockTypeTable || br.Types[0].GUID != BlockTypeTableGUID)
 
-	assert.False(t, br.Types[1].TypeID != 2 || br.Types[1].GUID != sampleMesh)
+	assert.False(t, br.Types[1].TypeID != 1 || br.Types[1].GUID != sampleMesh)
 
-	assert.False(t, br.Types[2].TypeID != 3 || br.Types[2].GUID != sampleNote)
+	assert.False(t, br.Types[2].TypeID != 2 || br.Types[2].GUID != sampleNote)
 
 	want := []struct {
 		typ     uint16
@@ -103,9 +103,9 @@ func verifySample(t *testing.T, r io.Reader) {
 		guid    GUID
 		payload string
 	}{
-		{2, FlagCritical | FlagHasCRC, sampleMesh, meshPayload},
-		{3, 0, sampleNote, notePayload},
-		{2, FlagLargeMode, sampleMesh, bigPayload},
+		{1, FlagCritical | FlagHasCRC, sampleMesh, meshPayload},
+		{2, 0, sampleNote, notePayload},
+		{1, FlagLargeMode, sampleMesh, bigPayload},
 	}
 	for _, w := range want {
 		b, err := br.Next()
@@ -203,7 +203,7 @@ func TestNoSeekStreaming(t *testing.T) {
 	var buf bytes.Buffer // bytes.Buffer is not an io.Seeker
 	bw, err := NewWriter(&buf, sampleWriter, "demo", sampleDefs)
 	require.NoError(t, err)
-	require.NoError(t, bw.Block(3, 0, []byte(notePayload)))
+	require.NoError(t, bw.Block(2, 0, []byte(notePayload)))
 	require.NoError(t, bw.End())
 
 	assert.Equal(t, FileLengthUnknown, binary.LittleEndian.Uint64(buf.Bytes()[32:40]))
@@ -214,7 +214,7 @@ func TestNoSeekStreaming(t *testing.T) {
 
 	b, err := br.Next()
 	require.NoError(t, err)
-	assert.Equal(t, uint16(3), b.TypeID)
+	assert.Equal(t, uint16(2), b.TypeID)
 	p, err := br.ReadPayload(b)
 	require.NoError(t, err)
 	assert.Equal(t, notePayload, string(p))
@@ -228,5 +228,5 @@ func TestLargeModeRequiresMultipleOf4(t *testing.T) {
 	var m memFile
 	bw, err := NewWriter(&m, sampleWriter, "demo", sampleDefs)
 	require.NoError(t, err)
-	require.Error(t, bw.Block(2, FlagLargeMode, []byte("xyz"))) // 3 bytes
+	require.Error(t, bw.Block(1, FlagLargeMode, []byte("xyz"))) // 3 bytes
 }

@@ -23,9 +23,14 @@ extern "C" {
 #define BINPAZER_VERSION_MINOR  0
 #define BINPAZER_FILE_LENGTH_UNKNOWN  0xFFFFFFFFFFFFFFFFULL
 
-/* Reserved block type ids. */
+/* Block type ids: 0 and 65535 are invalid; user types ascend from 1;
+ * predefined types descend from 65534. */
 #define BINPAZER_TYPE_INVALID          0
-#define BINPAZER_TYPE_BLOCK_TYPE_TABLE 1
+#define BINPAZER_TYPE_INVALID_MAX      65535
+#define BINPAZER_TYPE_BLOCK_TYPE_TABLE 65534
+#define BINPAZER_TYPE_BLOCK_INDEX      65533
+#define BINPAZER_TYPE_WRITER_INFO      65532
+#define BINPAZER_TYPE_PADDING          65531
 
 /* Block flag bits (the 16-bit `flags` field). */
 enum {
@@ -75,8 +80,9 @@ typedef struct {
     int               err;    /* sticky error (binpazer_status) */
 } binpazer_writer;
 
-/* One block-type-table entry supplied by the caller. Do NOT include type id 1;
- * the Block Type Table entry is added automatically. */
+/* One block-type-table entry supplied by the caller. Use user ids (1, 2, ...);
+ * do not use predefined ids (65531..65534). The Block Type Table's own entry
+ * (65534) is added automatically. */
 typedef struct {
     uint16_t       type_id;
     binpazer_guid  guid;

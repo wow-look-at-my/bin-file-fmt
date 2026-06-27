@@ -20,7 +20,11 @@ const (
 	FileLengthUnknown = ^uint64(0)
 
 	TypeInvalid        = 0
-	TypeBlockTypeTable = 1
+	TypeInvalidMax     = 65535
+	TypeBlockTypeTable = 65534
+	TypeBlockIndex     = 65533
+	TypeWriterInfo     = 65532
+	TypePadding        = 65531
 )
 
 // Block flag bits.

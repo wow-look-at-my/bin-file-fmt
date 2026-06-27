@@ -29,8 +29,8 @@ int main() {
     binpazer::Guid g_note{{0xde,0xad,0xbe,0xef,0,0,0,0,0,0,0,0,0,0,0,0}};
 
     std::vector<binpazer::TypeDef> defs = {
-        {2, g_mesh, "Mesh"},
-        {3, g_note, "Note"},
+        {1, g_mesh, "Mesh"},
+        {2, g_note, "Note"},
     };
 
     const char *mesh = "vertices-go-here";          // 16
@@ -40,9 +40,9 @@ int main() {
     {
         binpazer::Writer w(write, writer, "demo", defs, seek);
         CHECK(w.ok(), "writer constructed");
-        CHECK(w.block(2, binpazer::flag::Critical | binpazer::flag::HasCrc, mesh, 16) == binpazer::Status::Ok, "write mesh");
-        CHECK(w.block(3, 0, note, 12) == binpazer::Status::Ok, "write note");
-        CHECK(w.block(2, binpazer::flag::LargeMode, big, 24) == binpazer::Status::Ok, "write large");
+        CHECK(w.block(1, binpazer::flag::Critical | binpazer::flag::HasCrc, mesh, 16) == binpazer::Status::Ok, "write mesh");
+        CHECK(w.block(2, 0, note, 12) == binpazer::Status::Ok, "write note");
+        CHECK(w.block(1, binpazer::flag::LargeMode, big, 24) == binpazer::Status::Ok, "write large");
         CHECK(w.end() == binpazer::Status::Ok, "writer end");
         CHECK(w.ok(), "writer no error");
     }
@@ -64,18 +64,18 @@ int main() {
     CHECK(std::memcmp(r.writer_guid().bytes, writer.bytes, 16) == 0, "writer guid");
     CHECK(r.file_length() == buf.size(), "file_length patched");
     CHECK(r.types().size() == 3, "btt entry count");
-    CHECK(r.types()[0].type_id == 1, "entry0 BTT");
-    CHECK(r.types()[1].type_id == 2 && std::memcmp(r.types()[1].guid.bytes, g_mesh.bytes,16)==0, "entry1 Mesh");
-    CHECK(r.types()[2].type_id == 3 && std::memcmp(r.types()[2].guid.bytes, g_note.bytes,16)==0, "entry2 Note");
+    CHECK(r.types()[0].type_id == BINPAZER_TYPE_BLOCK_TYPE_TABLE, "entry0 BTT");
+    CHECK(r.types()[1].type_id == 1 && std::memcmp(r.types()[1].guid.bytes, g_mesh.bytes,16)==0, "entry1 Mesh");
+    CHECK(r.types()[2].type_id == 2 && std::memcmp(r.types()[2].guid.bytes, g_note.bytes,16)==0, "entry2 Note");
 
     auto b1 = r.next();
-    CHECK(b1.has_value() && b1->type_id == 2 && b1->known, "block1 mesh");
+    CHECK(b1.has_value() && b1->type_id == 1 && b1->known, "block1 mesh");
     CHECK((b1->flags & binpazer::flag::HasCrc) != 0, "block1 has crc");
     auto p1 = r.read_payload(*b1);
     CHECK(p1.size() == 16 && std::memcmp(p1.data(), mesh, 16) == 0, "block1 payload (crc verified)");
 
     auto b2 = r.next();
-    CHECK(b2.has_value() && b2->type_id == 3 && b2->payload_len == 12, "block2 note");
+    CHECK(b2.has_value() && b2->type_id == 2 && b2->payload_len == 12, "block2 note");
     auto p2 = r.read_payload(*b2);
     CHECK(p2.size() == 12 && std::memcmp(p2.data(), note, 12) == 0, "block2 payload");
 

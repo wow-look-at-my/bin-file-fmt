@@ -20,14 +20,14 @@ int main(int argc, char **argv) {
     binpazer_guid writer = {{0xaa,0xbb,0xcc,0xdd,0,0,0,0,0,0,0,0,0,0,0,1}};
     binpazer_guid g_mesh = {{0x11,0x22,0x33,0x44,0x55,0x66,0x77,0x88,0x99,0xaa,0xbb,0xcc,0xdd,0xee,0xff,0x00}};
     binpazer_guid g_note = {{0xde,0xad,0xbe,0xef,0,0,0,0,0,0,0,0,0,0,0,0}};
-    binpazer_type_def defs[2] = { {2, {{0}}, "Mesh"}, {3, {{0}}, "Note"} };
+    binpazer_type_def defs[2] = { {1, {{0}}, "Mesh"}, {2, {{0}}, "Note"} };
     defs[0].guid = g_mesh; defs[1].guid = g_note;
 
     binpazer_writer w;
     binpazer_writer_begin(&w, file_write, file_seek, f, &writer, "demo", defs, 2);
-    binpazer_writer_block(&w, 2, BINPAZER_FLAG_CRITICAL | BINPAZER_FLAG_HAS_CRC, "vertices-go-here", 16);
-    binpazer_writer_block(&w, 3, 0, "hello, file!", 12);
-    binpazer_writer_block(&w, 2, BINPAZER_FLAG_LARGE_MODE, "0123456789ABCDEF01234567", 24);
+    binpazer_writer_block(&w, 1, BINPAZER_FLAG_CRITICAL | BINPAZER_FLAG_HAS_CRC, "vertices-go-here", 16);
+    binpazer_writer_block(&w, 2, 0, "hello, file!", 12);
+    binpazer_writer_block(&w, 1, BINPAZER_FLAG_LARGE_MODE, "0123456789ABCDEF01234567", 24);
     binpazer_writer_end(&w);
 
     fclose(f);

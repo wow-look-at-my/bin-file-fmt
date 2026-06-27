@@ -124,7 +124,7 @@ Every block begins with an 8-byte little-endian header, directly castable as
 
 | Offset | Size | Field | Type | Notes |
 |---|---|---|---|---|
-| 0 | 2 | `type_id` | u16 | id from the Block Type Table; `0` = invalid, `1` = Block Type Table |
+| 0 | 2 | `type_id` | u16 | id from the Block Type Table; `0` and `65535` invalid; user types ascend from `1`, predefined types descend from `65534` |
 | 2 | 2 | `flags` | u16 | see [Block flags](#block-flags) |
 | 4 | 4 | `length` | u32 | payload size; unit depends on the `large_mode` flag |
 
@@ -164,7 +164,7 @@ follows the payload, before alignment padding.
 
 ## Block Type Table
 
-The first block in every file (`type_id = 1`). It maps each interned `type_id` to
+The first block in every file (`type_id = 65534`). It maps each interned `type_id` to
 its global `guid` and an optional human-readable name (so generic tools can label
 unknown blocks). Block *types* are few, so readers parse this once into a
 `type_id -> {guid, name}` map.
@@ -187,26 +187,34 @@ Entry:
 | 20 | var | `name` | string | type name; may be empty |
 | ... | pad | `padding` | u8[] | zero pad to 8-byte boundary |
 
-- `type_id` is an arbitrary per-file counter. By convention `1` is this table and
-  user types start at `2`, but ids may be listed in any order, and the table may
-  include entries no block uses (no penalty).
-- A `type_id` MUST appear at most once; `type_id = 0` MUST NOT appear.
-- The table SHOULD include its own entry (`type_id = 1` -> the BTT GUID) for full
-  self-description, though a reader already knows block 1 is the table by position.
+- `type_id`s are arbitrary per-file ids: user types ascend from `1`, predefined
+  types descend from `65534`; `0` and `65535` are invalid. Ids may be listed in
+  any order, and the table may include entries no block uses (no penalty).
+- A `type_id` MUST appear at most once; `0` and `65535` MUST NOT appear.
+- The table SHOULD include its own entry (`type_id = 65534` -> the BTT GUID) for
+  full self-description, though a reader already knows the first block is the
+  table by position.
 
 ## Well-known type ids and GUIDs
 
 Reserved GUIDs live in the namespace `62696e70-617a-6572-0000-*` (the first 8
 bytes spell `binpazer` in a hex dump).
 
-| type_id | GUID | Meaning |
+| type_id | Meaning |
+|---|---|
+| 0 | invalid / none (zeroed memory is never a valid block) |
+| 1, 2, 3, ... (ascending) | user block types |
+| ..., 65532, 65533, 65534 (descending) | predefined types (below) |
+| 65535 | invalid |
+
+Predefined types occupy the top of the range, decrementing from 65534:
+
+| type_id | GUID | Predefined type |
 |---|---|---|
-| 0 | -- | invalid / none (zeroed memory is never a valid block) |
-| 1 | `62696e70-617a-6572-0000-000000000001` | Block Type Table (required, first) |
-| (any) | `62696e70-617a-6572-0000-000000000002` | Block Index (optional) |
-| (any) | `62696e70-617a-6572-0000-000000000003` | Writer Info (optional) |
-| (any) | `62696e70-617a-6572-0000-000000000004` | Padding / free space (optional) |
-| 2..65535 | program-assigned | user block types |
+| 65534 | `62696e70-617a-6572-0000-000000000001` | Block Type Table (required, first) |
+| 65533 | `62696e70-617a-6572-0000-000000000002` | Block Index (optional) |
+| 65532 | `62696e70-617a-6572-0000-000000000003` | Writer Info (optional) |
+| 65531 | `62696e70-617a-6572-0000-000000000004` | Padding / free space (optional) |
 
 User programs mint a random UUIDv4 per block type and reuse it across all files.
 
@@ -266,7 +274,7 @@ An optional fixed 16-byte footer at the very end lets a reader `mmap` and seek t
 1. Verify `magic` (`binpazer`) and `signature` (`0D 0A 1A 0A`); reject on mismatch.
 2. If `version_major` exceeds the highest you support, refuse.
 3. Read the fixed header; take `first_block_offset` and `file_length`.
-4. At `first_block_offset`, parse the block; it MUST be `type_id == 1`. Build the
+4. At `first_block_offset`, parse the block; it MUST be `type_id == 65534`. Build the
    `type_id -> {guid, name}` map.
 5. Walk blocks. For each: extract `type_id`, `flags`, `length`; resolve the GUID.
    - Known GUID: handle it.
@@ -291,8 +299,8 @@ Readers MUST ignore unknown flag bits and reserved fields.
 ## Validation
 
 - `magic` and `signature` match exactly.
-- The first block is `type_id == 1`.
-- No duplicate `type_id` in the Block Type Table; never `type_id == 0`.
+- The first block is `type_id == 65534`.
+- No duplicate `type_id` in the Block Type Table; never `0` or `65535`.
 - Every block's `type_id` is present in the table.
 - Reserved fields and bits are 0 on write (ignored on read).
 - Blocks are 8-byte aligned; the final block ends at `file_length` (when not the
@@ -309,11 +317,11 @@ payload is the 12 ASCII bytes `hello, file!` (small mode: `length` in bytes).
 | 0 | 56 | file header (fixed) | `file_length`=192, `first_block_offset`=72, version 1.0 |
 | 56 | 9 | `writer_name` | `04 00 00 00` + `demo` + `00` |
 | 65 | 7 | padding | zero, to offset 72 |
-| 72 | 8 | block 1 header | `type_id`=1, `flags`=`critical`, `length`=88 |
+| 72 | 8 | block 1 header | `type_id`=65534, `flags`=`critical`, `length`=88 |
 | 80 | 8 | BTT payload head | `entry_count`=2, `reserved`=0 |
-| 88 | 40 | BTT entry (type 1) | id=1, BTT GUID, name `BlockTypeTable` (padded) |
-| 128 | 40 | BTT entry (type 2) | id=2, ExampleBlock GUID, name `ExampleBlock` (padded) |
-| 168 | 8 | block 2 header | `type_id`=2, `flags`=ancillary, `length`=12 |
+| 88 | 40 | BTT entry (BTT) | id=65534, BTT GUID, name `BlockTypeTable` (padded) |
+| 128 | 40 | BTT entry (ExampleBlock) | id=1, ExampleBlock GUID, name `ExampleBlock` (padded) |
+| 168 | 8 | block 2 header | `type_id`=1, `flags`=ancillary, `length`=12 |
 | 176 | 12 | block 2 payload | `hello, file!` |
 | 188 | 4 | padding | zero, to offset 192 |
 | 192 | -- | end | `= file_length` |
@@ -325,5 +333,5 @@ First 12 bytes:
  b  i  n  p  a  z  e  r  \r \n  ^Z \n
 ```
 
-Block 1's header bytes (`type_id`=1, `flags`=`0x0001`, `length`=88):
-`01 00 01 00 58 00 00 00`.
+Block 1's header bytes (`type_id`=65534=`0xFFFE`, `flags`=`0x0001`, `length`=88):
+`FE FF 01 00 58 00 00 00`.
