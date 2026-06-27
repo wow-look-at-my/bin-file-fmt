@@ -7,6 +7,20 @@ the file and skip blocks it does not understand. The layout is little-endian and
 
 See **[SPEC.md](./SPEC.md)** for the format.
 
+## Implementations
+
+Minimal-dependency libraries that do **no file IO and no mmap** -- the caller
+injects IO via callbacks (C/C++) or `io.Reader`/`io.Writer` (Go).
+
+| Dir | Language | IO | Test |
+|---|---|---|---|
+| [`c/`](./c) | C11, allocation-free | `read`/`write` (+ optional `seek`) function pointers | `make -C c test` |
+| [`cpp/`](./cpp) | C++17, header-only RAII over the C core | `std::function` callbacks | `make -C cpp test` |
+| [`go/`](./go) | pure Go, stdlib only | `io.Reader` / `io.Writer` (`io.Seeker` optional) | `go-toolchain` (in `go/`) |
+
+All three write byte-identical files; the Go tests verify this against a
+C-generated fixture ([`go/testdata/sample.binpazer`](./go/testdata)).
+
 ## In brief
 
 - Fixed file header: `magic` = `binpazer`, version, writer GUID + name, file length.
