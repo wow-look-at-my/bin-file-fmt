@@ -315,10 +315,40 @@ well-known block so simple readers can ignore them.
 
 ### 9.1 Nesting / container blocks
 
-If `flags.container` is set, the block payload is itself a sequence of binpazer
-blocks (same 16-byte header, same alignment, offsets relative to the payload
-start). This gives RIFF-`LIST`-style trees. A reader that does not care about a
-subtree skips the whole thing via the parent's `payload_length`.
+**What `flags.container` (bit 4) does:** it changes how a reader interprets the
+block's `payload`, and nothing else -- it adds zero bytes on disk.
+
+- **Clear (default):** the payload is opaque *leaf* data whose meaning is defined
+  by the block type's GUID. A reader hands the bytes to that type's handler.
+- **Set:** the payload *is* a sequence of binpazer blocks -- each a normal
+  16-byte-header block, 8-byte aligned, with offsets relative to the start of the
+  payload. A reader parses children by recursing with the same logic it uses at
+  the top level.
+
+Properties this gives you:
+
+1. **Trees.** Hierarchy like RIFF `LIST` / IFF `FORM` / nested MP4 boxes: a
+   `Scene` block contains `Mesh` blocks that contain `VertexBuffer` blocks, etc.
+2. **One-jump subtree skip.** The parent's `payload_length` spans all
+   descendants, so a reader that does not care about (or does not understand) the
+   parent steps over the *entire* subtree with a single offset advance -- it
+   never has to walk the children.
+3. **Backward compatible by construction.** A reader that ignores bit 4 treats
+   the block as opaque and skips it via `payload_length` -- still correct.
+
+Rules:
+
+- **Children share the file-global Block Type Table.** `type_id`s inside a
+  container resolve against the same table as top-level blocks (interning is
+  per-file, not per-container), so there is no nested type table.
+- **A container payload is blocks only** -- no type-defined prefix bytes. If a
+  container needs its own header data, put it in a leaf child block at the front.
+  This keeps the payload generically walkable: even a tool that does not know the
+  container's GUID can enumerate (and skip) its children structurally.
+- The container's own GUID still identifies *what kind* of container it is; the
+  flag only says "my payload is blocks."
+- **Readers SHOULD enforce a maximum nesting depth** to bound recursion against
+  hostile or corrupt files.
 
 ### 9.2 Block Index / Writer Info
 
