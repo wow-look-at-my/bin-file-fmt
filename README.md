@@ -1,21 +1,21 @@
 # bin-file-fmt
 
-A flexible, block-based binary file format (**binpazer**) designed to be
-walkable without understanding every block (like PNG/RIFF, pushed further) and
-to be `mmap`-friendly for zero-copy reads in C.
+**binpazer** -- a flexible, block-based binary container format. A small fixed
+header is followed by a sequence of self-describing blocks, so a reader can walk
+the file and skip blocks it does not understand. The layout is little-endian and
+8-byte aligned so a C program can `mmap` the file and cast pointers into it.
 
-See **[SPEC.md](./SPEC.md)** for the full format specification. It is a DRAFT /
-request-for-comment -- sections marked `[OPEN]` still want a decision and
-`[DEVIATION]` marks where the draft diverges from the original notes (with
-rationale).
+See **[SPEC.md](./SPEC.md)** for the format.
 
-## TL;DR
+## In brief
 
-- Fixed file header (`magic` = `binpazer`, version, writer GUID + name, length).
-- A sequence of **blocks**: `type_id` + `flags` + `type_version` + `payload_length`
-  + payload, 8-byte aligned.
+- Fixed file header: `magic` = `binpazer`, version, writer GUID + name, file length.
+- Each block: an 8-byte header (`type_id` + `flags` + `length`) then payload,
+  8-byte aligned. The header casts directly as a C struct.
 - Block types are identified globally by **GUID**, interned to small per-file
   `type_id` integers via a required **Block Type Table** (the first block).
 - A `critical`/ancillary flag tells readers whether skipping an unknown block is
   safe.
-- Strings are length-prefixed **and** null-terminated (navigable + C-mmappable).
+- `length` is a byte count, or -- with the `large_mode` flag -- a count of 4-byte
+  words (for payloads over 4 GiB).
+- Strings are length-prefixed **and** null-terminated.
