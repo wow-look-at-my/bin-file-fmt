@@ -133,6 +133,7 @@ typedef struct {
     uint64_t         first_block_offset;
     int              has_index;          /* a Block Index was located via the footer */
     uint64_t         index_offset;       /* offset of the Block Index block */
+    uint64_t         blocks_end;         /* end of the block stream (excludes a trailing footer) */
 } binpazer_reader;
 
 typedef struct {

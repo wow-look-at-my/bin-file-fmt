@@ -61,6 +61,7 @@ type TypeDef struct {
 type TypeEntry struct {
 	TypeID uint16
 	GUID   GUID
+	Name   string
 }
 
 // footerMagic marks the optional 16-byte footer that locates the Block Index.
@@ -318,6 +319,7 @@ type Reader struct {
 
 	hasIndex    bool
 	indexOffset uint64
+	blocksEnd   uint64 // end of the block stream (excludes a trailing footer)
 }
 
 // Block is a parsed block header.
@@ -329,6 +331,9 @@ type Block struct {
 	Known      bool
 	payloadOff uint64
 }
+
+// Offset returns the block's absolute file offset (the start of its 8-byte header).
+func (b *Block) Offset() uint64 { return b.payloadOff - 8 }
 
 func (b *Block) nextOffset() uint64 {
 	crc := uint64(0)
@@ -429,7 +434,14 @@ func NewReader(r io.Reader) (*Reader, error) {
 			return br, err
 		}
 		nlen := uint64(binary.LittleEndian.Uint32(lp2))
-		if err := br.skip(nlen + 1); err != nil { // name + NUL
+		if nlen > 0 {
+			nb := make([]byte, nlen)
+			if err := br.read(nb); err != nil {
+				return br, err
+			}
+			e.Name = string(nb)
+		}
+		if err := br.skip(1); err != nil { // trailing NUL
 			return br, err
 		}
 		raw := 25 + nlen
@@ -461,13 +473,17 @@ func NewReader(r io.Reader) (*Reader, error) {
 		}
 		br.off = saved
 	}
+	br.blocksEnd = br.FileLength
+	if br.hasIndex {
+		br.blocksEnd = br.FileLength - 16 // exclude the trailing footer
+	}
 	return br, nil
 }
 
 // Next reads the next block header, resolving its GUID against the type table.
 // It returns io.EOF after the last block. The payload is not read.
 func (br *Reader) Next() (*Block, error) {
-	if br.FileLength != FileLengthUnknown && br.off >= br.FileLength {
+	if br.blocksEnd != FileLengthUnknown && br.off >= br.blocksEnd {
 		return nil, io.EOF
 	}
 	bh := make([]byte, 8)
@@ -596,7 +612,7 @@ func (br *Reader) find(typeID uint16) ([]uint64, error) {
 		return nil, err
 	}
 	br.off = br.FirstBlockOffset
-	for br.FileLength == FileLengthUnknown || br.off < br.FileLength {
+	for br.blocksEnd == FileLengthUnknown || br.off < br.blocksEnd {
 		blkOff := br.off
 		bh := make([]byte, 8)
 		n, err := io.ReadFull(br.r, bh)

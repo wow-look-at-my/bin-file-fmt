@@ -305,6 +305,8 @@ binpazer_status binpazer_reader_begin(
         if (r->seek(r->ctx, saved) != 0) return (binpazer_status)(r->err = BINPAZER_ERR_IO);
         r->offset = saved;
     }
+    r->blocks_end = r->file_length;
+    if (r->has_index) r->blocks_end = r->file_length - 16; /* exclude the footer */
     return BINPAZER_OK;
 }
 
@@ -314,7 +316,7 @@ binpazer_status binpazer_reader_next(
     binpazer_block *blk)
 {
     if (r->err) return (binpazer_status)r->err;
-    if (r->file_length != BINPAZER_FILE_LENGTH_UNKNOWN && r->offset >= r->file_length)
+    if (r->blocks_end != BINPAZER_FILE_LENGTH_UNKNOWN && r->offset >= r->blocks_end)
         return BINPAZER_END;
 
     uint8_t bh[8];
@@ -400,7 +402,7 @@ binpazer_status binpazer_reader_find(
             /* No index -- walk the file. */
             if (r->seek(r->ctx, r->first_block_offset) != 0) { st = BINPAZER_ERR_IO; break; }
             r->offset = r->first_block_offset;
-            while (r->file_length == BINPAZER_FILE_LENGTH_UNKNOWN || r->offset < r->file_length) {
+            while (r->blocks_end == BINPAZER_FILE_LENGTH_UNKNOWN || r->offset < r->blocks_end) {
                 uint64_t blk_off = r->offset;
                 uint8_t bh[8];
                 size_t got = r->read(r->ctx, bh, 8);

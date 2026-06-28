@@ -290,6 +290,22 @@ func TestBlockIndex(t *testing.T) {
 	p, err := r.ReadPayload(b)
 	require.NoError(t, err)
 	assert.Equal(t, "aaaa", string(p))
+
+	// a full walk must stop before the footer (not misparse it as a block)
+	m.pos = 0
+	rw, err := NewReader(&m)
+	require.NoError(t, err)
+	walked := 0
+	for {
+		wb, err := rw.Next()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		require.NoError(t, rw.SkipPayload(wb))
+		walked++
+	}
+	assert.Equal(t, 4, walked) // 3 blocks + the index block; footer excluded
 }
 
 // TestFindWithoutIndex confirms Find falls back to a walk when no index exists.

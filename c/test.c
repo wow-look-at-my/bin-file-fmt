@@ -74,6 +74,17 @@ static void test_index(void) {
 
     CHECK(binpazer_reader_find(&r, 2, found, 8, &nf) == BINPAZER_OK && nf == 1 && found[0].offset == idx[1].offset, "index: find type2");
 
+    /* a full walk must stop before the footer, not misparse it as a block */
+    A.pos = 0;
+    binpazer_reader rw; char nmw[16]; binpazer_type_entry tew[8]; size_t ntew = 0;
+    binpazer_reader_begin(&rw, mem_read, mem_seek, &A, nmw, sizeof nmw, tew, 8, &ntew);
+    int walked = 0; binpazer_block wb;
+    while (binpazer_reader_next(&rw, tew, ntew, &wb) == BINPAZER_OK) {
+        if (binpazer_reader_skip_payload(&rw, &wb)) break;
+        walked++;
+    }
+    CHECK(walked == 4 && rw.err == BINPAZER_OK, "index: walk stops before footer (4 blocks)");
+
     /* file B: same blocks, no index -> find falls back to a walk */
     binpazer_writer w2;
     binpazer_writer_begin(&w2, mem_write, mem_seek, &B, &wg, "demo", defs, 2);
