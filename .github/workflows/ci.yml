@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: wow-look-at-my/go-toolchain@v1
+        with:
+          working-directory: go
+          autorelease: false
+          upload-artifacts: false
+
+  c-cpp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: C tests
+        run: make -C c test
+      - name: C++ tests
+        run: make -C cpp test
+      - name: C tests (ASan + UBSan)
+        run: |
+          cc -std=c11 -Wall -Wextra -O1 -fsanitize=address,undefined -fno-sanitize-recover=all c/binpazer.c c/test.c -o /tmp/test_c_san
+          /tmp/test_c_san
+      - name: C++ tests (ASan + UBSan)
+        run: |
+          c++ -std=c++17 -Wall -Wextra -O1 -fsanitize=address,undefined -fno-sanitize-recover=all -Ic cpp/test.cpp c/binpazer.c -o /tmp/test_cpp_san
+          /tmp/test_cpp_san
+      - name: Cross-impl fixture is reproducible
+        run: |
+          cc -std=c11 -O2 c/binpazer.c c/gen.c -o /tmp/binpazer_gen
+          /tmp/binpazer_gen /tmp/sample.binpazer
+          cmp /tmp/sample.binpazer go/testdata/sample.binpazer
