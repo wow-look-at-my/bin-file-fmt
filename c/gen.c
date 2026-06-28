@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
     binpazer_writer_begin(&w, file_write, file_seek, f, &writer, "demo", defs, 2);
     binpazer_writer_block(&w, 1, BINPAZER_FLAG_CRITICAL | BINPAZER_FLAG_HAS_CRC, "vertices-go-here", 16);
     binpazer_writer_block(&w, 2, 0, "hello, file!", 12);
-    binpazer_writer_block(&w, 1, BINPAZER_FLAG_LARGE_MODE, "0123456789ABCDEF01234567", 24);
+    binpazer_writer_block(&w, 1, 0, "0123456789ABCDEF01234567", 24);
     binpazer_writer_end(&w);
 
     fclose(f);

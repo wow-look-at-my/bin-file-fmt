@@ -91,6 +91,34 @@ static void test_index(void) {
     CHECK(fb[0].offset == idx[0].offset && fb[1].offset == idx[2].offset, "no-index: walk offsets match");
 }
 
+/* Exercises large_mode with 4096-byte (page) units. */
+static void test_large(void) {
+    static uint8_t buf[8192];
+    membuf m = { buf, sizeof buf, 0, 0 };
+    binpazer_guid wg = {{0x07}};
+    binpazer_type_def defs[1] = { {1, {{0}}, "Big"} };
+    static unsigned char big[4096];
+    for (int i = 0; i < 4096; i++) big[i] = (unsigned char)i;
+
+    binpazer_writer w;
+    binpazer_writer_begin(&w, mem_write, mem_seek, &m, &wg, "demo", defs, 1);
+    CHECK(binpazer_writer_block(&w, 1, BINPAZER_FLAG_LARGE_MODE, big, 100) == BINPAZER_ERR_RANGE,
+          "large: rejects non-4096 multiple");
+    w.err = BINPAZER_OK; /* clear sticky error from the rejected write */
+    CHECK(binpazer_writer_block(&w, 1, BINPAZER_FLAG_LARGE_MODE, big, 4096) == BINPAZER_OK, "large: write 4096");
+    CHECK(binpazer_writer_end(&w) == BINPAZER_OK, "large: end");
+
+    m.pos = 0;
+    binpazer_reader r; char nm[16]; binpazer_type_entry te[4]; size_t nte = 0;
+    binpazer_reader_begin(&r, mem_read, mem_seek, &m, nm, sizeof nm, te, 4, &nte);
+    binpazer_block blk;
+    CHECK(binpazer_reader_next(&r, te, nte, &blk) == BINPAZER_OK, "large: next");
+    CHECK((blk.flags & BINPAZER_FLAG_LARGE_MODE) && blk.payload_len == 4096, "large: decoded 4096");
+    static uint8_t rb[4096];
+    CHECK(binpazer_reader_read_payload(&r, &blk, rb, sizeof rb) == BINPAZER_OK && memcmp(rb, big, 4096) == 0,
+          "large: payload bytes");
+}
+
 int main(void) {
     static uint8_t storage[65536];
     membuf m = { storage, sizeof storage, 0, 0 };
@@ -119,9 +147,9 @@ int main(void) {
                                 mesh_payload, 16) == BINPAZER_OK, "write mesh");
     /* an ancillary block */
     CHECK(binpazer_writer_block(&w, 2, 0, note_payload, 12) == BINPAZER_OK, "write note");
-    /* a large_mode block (length counts 4-byte words: 24 bytes -> field 6) */
-    CHECK(binpazer_writer_block(&w, 1, BINPAZER_FLAG_LARGE_MODE,
-                                big_payload, 24) == BINPAZER_OK, "write large");
+    /* a third (normal) block, repeating type id 1 */
+    CHECK(binpazer_writer_block(&w, 1, 0,
+                                big_payload, 24) == BINPAZER_OK, "write third");
     CHECK(binpazer_writer_end(&w) == BINPAZER_OK, "writer_end");
     CHECK(w.err == BINPAZER_OK, "writer no error");
 
@@ -171,17 +199,18 @@ int main(void) {
     CHECK(binpazer_reader_read_payload(&r, &blk, pbuf, sizeof pbuf) == BINPAZER_OK, "read note payload");
     CHECK(memcmp(pbuf, note_payload, 12) == 0, "note payload bytes");
 
-    /* block 3: large_mode */
-    CHECK(binpazer_reader_next(&r, entries, nentries, &blk) == BINPAZER_OK, "next large");
-    CHECK((blk.flags & BINPAZER_FLAG_LARGE_MODE) != 0, "large flag");
-    CHECK(blk.payload_len == 24, "large len decoded (6 words * 4)");
-    CHECK(binpazer_reader_read_payload(&r, &blk, pbuf, sizeof pbuf) == BINPAZER_OK, "read large payload");
-    CHECK(memcmp(pbuf, big_payload, 24) == 0, "large payload bytes");
+    /* block 3: a normal repeat of type 1 */
+    CHECK(binpazer_reader_next(&r, entries, nentries, &blk) == BINPAZER_OK, "next third");
+    CHECK(blk.type_id == 1 && (blk.flags & BINPAZER_FLAG_LARGE_MODE) == 0, "third normal");
+    CHECK(blk.payload_len == 24, "third len");
+    CHECK(binpazer_reader_read_payload(&r, &blk, pbuf, sizeof pbuf) == BINPAZER_OK, "read third payload");
+    CHECK(memcmp(pbuf, big_payload, 24) == 0, "third payload bytes");
 
     /* end */
     CHECK(binpazer_reader_next(&r, entries, nentries, &blk) == BINPAZER_END, "end of blocks");
 
     test_index();
+    test_large();
 
     if (failures == 0) { printf("OK: all C round-trip checks passed\n"); return 0; }
     printf("%d FAILURE(S)\n", failures);

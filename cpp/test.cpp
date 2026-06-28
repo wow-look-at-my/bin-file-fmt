@@ -42,7 +42,7 @@ int main() {
         CHECK(w.ok(), "writer constructed");
         CHECK(w.block(1, binpazer::flag::Critical | binpazer::flag::HasCrc, mesh, 16) == binpazer::Status::Ok, "write mesh");
         CHECK(w.block(2, 0, note, 12) == binpazer::Status::Ok, "write note");
-        CHECK(w.block(1, binpazer::flag::LargeMode, big, 24) == binpazer::Status::Ok, "write large");
+        CHECK(w.block(1, 0, big, 24) == binpazer::Status::Ok, "write third");
         CHECK(w.end() == binpazer::Status::Ok, "writer end");
         CHECK(w.ok(), "writer no error");
     }
@@ -80,8 +80,8 @@ int main() {
     CHECK(p2.size() == 12 && std::memcmp(p2.data(), note, 12) == 0, "block2 payload");
 
     auto b3 = r.next();
-    CHECK(b3.has_value() && (b3->flags & binpazer::flag::LargeMode), "block3 large");
-    CHECK(b3->payload_len == 24, "block3 len decoded");
+    CHECK(b3.has_value() && b3->type_id == 1 && (b3->flags & binpazer::flag::LargeMode) == 0, "block3 normal");
+    CHECK(b3->payload_len == 24, "block3 len");
     auto p3 = r.read_payload(*b3);
     CHECK(p3.size() == 24 && std::memcmp(p3.data(), big, 24) == 0, "block3 payload");
 
@@ -124,6 +124,38 @@ int main() {
         CHECK(blk.has_value() && blk->type_id == 1 && blk->payload_len == 4, "index: at header");
         auto p = r.read_payload(*blk);
         CHECK(p.size() == 4 && std::memcmp(p.data(), "aaaa", 4) == 0, "index: at payload");
+    }
+
+    // --- large_mode (4096-byte units) ---
+    {
+        std::vector<uint8_t> lbuf;
+        size_t lp = 0;
+        auto lwrite = [&](const void *b, size_t n) -> size_t {
+            if (lp + n > lbuf.size()) lbuf.resize(lp + n);
+            std::memcpy(lbuf.data() + lp, b, n); lp += n; return n;
+        };
+        auto lseek = [&](uint64_t o) -> bool {
+            if (o > lbuf.size()) lbuf.resize(static_cast<size_t>(o));
+            lp = static_cast<size_t>(o); return true;
+        };
+        std::vector<uint8_t> big4(4096);
+        for (size_t i = 0; i < big4.size(); ++i) big4[i] = static_cast<uint8_t>(i);
+        std::vector<binpazer::TypeDef> d = {{1, g_mesh, "Big"}};
+        {
+            binpazer::Writer w(lwrite, writer, "demo", d, lseek);
+            CHECK(w.block(1, binpazer::flag::LargeMode, big4) == binpazer::Status::Ok, "large: write 4096");
+            CHECK(w.end() == binpazer::Status::Ok, "large: end");
+        }
+        lp = 0;
+        auto lread = [&](void *b, size_t n) -> size_t {
+            size_t av = lbuf.size() - lp, c = n < av ? n : av;
+            std::memcpy(b, lbuf.data() + lp, c); lp += c; return c;
+        };
+        binpazer::Reader r(lread, lseek);
+        auto b = r.next();
+        CHECK(b.has_value() && (b->flags & binpazer::flag::LargeMode) && b->payload_len == 4096, "large: decoded 4096");
+        auto p = r.read_payload(*b);
+        CHECK(p.size() == 4096 && std::memcmp(p.data(), big4.data(), 4096) == 0, "large: payload");
     }
 
     if (failures == 0) { std::printf("OK: all C++ round-trip checks passed\n"); return 0; }

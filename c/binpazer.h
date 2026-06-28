@@ -31,6 +31,11 @@ extern "C" {
 #define BINPAZER_TYPE_BLOCK_INDEX      65533
 #define BINPAZER_TYPE_WRITER_INFO      65532
 #define BINPAZER_TYPE_PADDING          65531
+#define BINPAZER_TYPE_GROUP            65530
+
+/* large_mode (flag bit 4): `length` counts units of this many bytes (one page),
+ * raising the per-block cap from 4 GiB to (2^32-1)*4096 (~16 TiB). */
+#define BINPAZER_LARGE_UNIT 4096
 
 /* Block flag bits (the 16-bit `flags` field). */
 enum {
@@ -38,8 +43,7 @@ enum {
     BINPAZER_FLAG_SAFE_TO_COPY = 1u << 1,
     BINPAZER_FLAG_COMPRESSED   = 1u << 2,
     BINPAZER_FLAG_HAS_CRC      = 1u << 3,
-    BINPAZER_FLAG_CONTAINER    = 1u << 4,
-    BINPAZER_FLAG_LARGE_MODE   = 1u << 5
+    BINPAZER_FLAG_LARGE_MODE   = 1u << 4
 };
 
 typedef struct { uint8_t bytes[16]; } binpazer_guid;
@@ -101,7 +105,7 @@ binpazer_status binpazer_writer_begin(
 
 /* Writes one block. `payload` may be NULL iff payload_len == 0.
  * If `flags` has LARGE_MODE, payload_len is the byte length and must be a
- * multiple of 4 (the on-disk length field stores payload_len / 4). */
+ * multiple of BINPAZER_LARGE_UNIT (4096); the length field stores the unit count. */
 binpazer_status binpazer_writer_block(
     binpazer_writer *w, uint16_t type_id, uint16_t flags,
     const void *payload, uint64_t payload_len);

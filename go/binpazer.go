@@ -25,6 +25,7 @@ const (
 	TypeBlockIndex     = 65533
 	TypeWriterInfo     = 65532
 	TypePadding        = 65531
+	TypeGroup          = 65530
 )
 
 // Block flag bits.
@@ -33,9 +34,12 @@ const (
 	FlagSafeToCopy uint16 = 1 << 1
 	FlagCompressed uint16 = 1 << 2
 	FlagHasCRC     uint16 = 1 << 3
-	FlagContainer  uint16 = 1 << 4
-	FlagLargeMode  uint16 = 1 << 5
+	FlagLargeMode  uint16 = 1 << 4
 )
+
+// LargeUnit is the byte size of one large_mode length unit (one page). With a
+// u32 length field this raises the per-block cap to (2^32-1)*4096 (~16 TiB).
+const LargeUnit = 4096
 
 // GUID is a 16-byte block-type identifier, in canonical (RFC 4122) byte order.
 type GUID [16]byte
@@ -193,16 +197,16 @@ func (bw *Writer) Block(typeID, flags uint16, payload []byte) error {
 	}
 	var lengthField uint32
 	if flags&FlagLargeMode != 0 {
-		if len(payload)%4 != 0 {
-			bw.err = errors.New("binpazer: large_mode payload must be a multiple of 4 bytes")
+		if len(payload)%LargeUnit != 0 {
+			bw.err = errors.New("binpazer: large_mode payload must be a multiple of 4096 bytes")
 			return bw.err
 		}
-		words := uint64(len(payload)) / 4
-		if words > 0xFFFFFFFF {
+		units := uint64(len(payload)) / LargeUnit
+		if units > 0xFFFFFFFF {
 			bw.err = errors.New("binpazer: payload too large")
 			return bw.err
 		}
-		lengthField = uint32(words)
+		lengthField = uint32(units)
 	} else {
 		if uint64(len(payload)) > 0xFFFFFFFF {
 			bw.err = errors.New("binpazer: payload exceeds 4 GiB (use FlagLargeMode)")
@@ -481,7 +485,7 @@ func (br *Reader) Next() (*Block, error) {
 	b.Flags = binary.LittleEndian.Uint16(bh[2:])
 	lf := uint64(binary.LittleEndian.Uint32(bh[4:]))
 	if b.Flags&FlagLargeMode != 0 {
-		b.PayloadLen = lf * 4
+		b.PayloadLen = lf * LargeUnit
 	} else {
 		b.PayloadLen = lf
 	}
@@ -511,7 +515,7 @@ func (br *Reader) ReadPayload(b *Block) ([]byte, error) {
 		var bh [8]byte
 		var lf uint32
 		if b.Flags&FlagLargeMode != 0 {
-			lf = uint32(b.PayloadLen / 4)
+			lf = uint32(b.PayloadLen / LargeUnit)
 		} else {
 			lf = uint32(b.PayloadLen)
 		}
@@ -608,7 +612,7 @@ func (br *Reader) find(typeID uint16) ([]uint64, error) {
 		lf := uint64(binary.LittleEndian.Uint32(bh[4:]))
 		plen := lf
 		if flags&FlagLargeMode != 0 {
-			plen = lf * 4
+			plen = lf * LargeUnit
 		}
 		if tid == typeID {
 			offsets = append(offsets, blkOff)
@@ -646,7 +650,7 @@ func (br *Reader) At(offset uint64) (*Block, error) {
 	b.Flags = binary.LittleEndian.Uint16(bh[2:])
 	lf := uint64(binary.LittleEndian.Uint32(bh[4:]))
 	if b.Flags&FlagLargeMode != 0 {
-		b.PayloadLen = lf * 4
+		b.PayloadLen = lf * LargeUnit
 	} else {
 		b.PayloadLen = lf
 	}

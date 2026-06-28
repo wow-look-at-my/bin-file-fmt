@@ -30,6 +30,6 @@ C-generated fixture ([`go/testdata/sample.binpazer`](./go/testdata)).
   `type_id` integers via a required **Block Type Table** (the first block).
 - A `critical`/ancillary flag tells readers whether skipping an unknown block is
   safe.
-- `length` is a byte count, or -- with the `large_mode` flag -- a count of 4-byte
-  words (for payloads over 4 GiB).
+- `length` is a byte count, or -- with the `large_mode` flag -- a count of
+  4096-byte (page) units, for payloads over 4 GiB and up to ~16 TiB.
 - Strings are length-prefixed **and** null-terminated.

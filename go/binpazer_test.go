@@ -71,7 +71,7 @@ func writeSample(w io.Writer) error {
 	if err := bw.Block(2, 0, []byte(notePayload)); err != nil {
 		return err
 	}
-	if err := bw.Block(1, FlagLargeMode, []byte(bigPayload)); err != nil {
+	if err := bw.Block(1, 0, []byte(bigPayload)); err != nil {
 		return err
 	}
 	return bw.End()
@@ -105,7 +105,7 @@ func verifySample(t *testing.T, r io.Reader) {
 	}{
 		{1, FlagCritical | FlagHasCRC, sampleMesh, meshPayload},
 		{2, 0, sampleNote, notePayload},
-		{1, FlagLargeMode, sampleMesh, bigPayload},
+		{1, 0, sampleMesh, bigPayload},
 	}
 	for _, w := range want {
 		b, err := br.Next()
@@ -223,12 +223,37 @@ func TestNoSeekStreaming(t *testing.T) {
 	assert.Equal(t, io.EOF, err)
 }
 
-// TestLargeModeRequiresMultipleOf4 covers the large_mode validation path.
-func TestLargeModeRequiresMultipleOf4(t *testing.T) {
-	var m memFile
-	bw, err := NewWriter(&m, sampleWriter, "demo", sampleDefs)
+// TestLargeMode round-trips a 4096-byte large_mode block and checks validation.
+func TestLargeMode(t *testing.T) {
+	big := make([]byte, 4096)
+	for i := range big {
+		big[i] = byte(i)
+	}
+	defs := []TypeDef{{1, sampleMesh, "Big"}}
+
+	// a payload that isn't a multiple of 4096 is rejected
+	var bad memFile
+	wbad, err := NewWriter(&bad, sampleWriter, "demo", defs)
 	require.NoError(t, err)
-	require.Error(t, bw.Block(1, FlagLargeMode, []byte("xyz"))) // 3 bytes
+	require.Error(t, wbad.Block(1, FlagLargeMode, big[:100]))
+
+	// round-trip a 4096-byte large block
+	var m memFile
+	w, err := NewWriter(&m, sampleWriter, "demo", defs)
+	require.NoError(t, err)
+	require.NoError(t, w.Block(1, FlagLargeMode, big))
+	require.NoError(t, w.End())
+
+	m.pos = 0
+	r, err := NewReader(&m)
+	require.NoError(t, err)
+	b, err := r.Next()
+	require.NoError(t, err)
+	assert.NotZero(t, b.Flags&FlagLargeMode)
+	assert.Equal(t, uint64(4096), b.PayloadLen)
+	p, err := r.ReadPayload(b)
+	require.NoError(t, err)
+	assert.True(t, bytes.Equal(p, big))
 }
 
 // TestBlockIndex writes a file with an index + footer, then discovers and uses

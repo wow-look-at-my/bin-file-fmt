@@ -137,10 +137,10 @@ binpazer_status binpazer_writer_block(
 
     uint32_t length_field;
     if (flags & BINPAZER_FLAG_LARGE_MODE) {
-        if (payload_len % 4 != 0) return (binpazer_status)(w->err = BINPAZER_ERR_RANGE);
-        uint64_t words = payload_len / 4;
-        if (words > 0xFFFFFFFFu) return (binpazer_status)(w->err = BINPAZER_ERR_RANGE);
-        length_field = (uint32_t)words;
+        if (payload_len % BINPAZER_LARGE_UNIT != 0) return (binpazer_status)(w->err = BINPAZER_ERR_RANGE);
+        uint64_t units = payload_len / BINPAZER_LARGE_UNIT;
+        if (units > 0xFFFFFFFFu) return (binpazer_status)(w->err = BINPAZER_ERR_RANGE);
+        length_field = (uint32_t)units;
     } else {
         if (payload_len > 0xFFFFFFFFu) return (binpazer_status)(w->err = BINPAZER_ERR_RANGE);
         length_field = (uint32_t)payload_len;
@@ -326,7 +326,7 @@ binpazer_status binpazer_reader_next(
     blk->type_id = get_u16(bh);
     blk->flags   = get_u16(bh + 2);
     uint32_t lf  = get_u32(bh + 4);
-    blk->payload_len = (blk->flags & BINPAZER_FLAG_LARGE_MODE) ? (uint64_t)lf * 4 : lf;
+    blk->payload_len = (blk->flags & BINPAZER_FLAG_LARGE_MODE) ? (uint64_t)lf * BINPAZER_LARGE_UNIT : lf;
     blk->payload_offset = r->offset;
     blk->known = 0;
     memset(blk->guid.bytes, 0, 16);
@@ -354,7 +354,7 @@ binpazer_status binpazer_reader_read_payload(
         uint8_t cb[4]; if (r_raw(r, cb, 4)) return (binpazer_status)r->err;
         uint8_t bh[8];
         uint32_t lf = (blk->flags & BINPAZER_FLAG_LARGE_MODE)
-                    ? (uint32_t)(blk->payload_len / 4) : (uint32_t)blk->payload_len;
+                    ? (uint32_t)(blk->payload_len / BINPAZER_LARGE_UNIT) : (uint32_t)blk->payload_len;
         put_u16(bh + 0, blk->type_id); put_u16(bh + 2, blk->flags); put_u32(bh + 4, lf);
         uint32_t crc = binpazer_crc32c(0, bh, 8);
         if (blk->payload_len) crc = binpazer_crc32c(crc, buf, (size_t)blk->payload_len);
@@ -410,7 +410,7 @@ binpazer_status binpazer_reader_find(
                 uint16_t tid = get_u16(bh);
                 uint16_t flags = get_u16(bh + 2);
                 uint32_t lf = get_u32(bh + 4);
-                uint64_t plen = (flags & BINPAZER_FLAG_LARGE_MODE) ? (uint64_t)lf * 4 : lf;
+                uint64_t plen = (flags & BINPAZER_FLAG_LARGE_MODE) ? (uint64_t)lf * BINPAZER_LARGE_UNIT : lf;
                 if (tid == type_id) {
                     if (total < cap) { out[total].type_id = tid; out[total].offset = blk_off; }
                     total++;
@@ -444,7 +444,7 @@ binpazer_status binpazer_reader_at(
     blk->type_id = get_u16(bh);
     blk->flags   = get_u16(bh + 2);
     uint32_t lf  = get_u32(bh + 4);
-    blk->payload_len = (blk->flags & BINPAZER_FLAG_LARGE_MODE) ? (uint64_t)lf * 4 : lf;
+    blk->payload_len = (blk->flags & BINPAZER_FLAG_LARGE_MODE) ? (uint64_t)lf * BINPAZER_LARGE_UNIT : lf;
     blk->payload_offset = r->offset;
     blk->known = 0;
     memset(blk->guid.bytes, 0, 16);

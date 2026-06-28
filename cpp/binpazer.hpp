@@ -42,7 +42,6 @@ enum : uint16_t {
     SafeToCopy = BINPAZER_FLAG_SAFE_TO_COPY,
     Compressed = BINPAZER_FLAG_COMPRESSED,
     HasCrc     = BINPAZER_FLAG_HAS_CRC,
-    Container  = BINPAZER_FLAG_CONTAINER,
     LargeMode  = BINPAZER_FLAG_LARGE_MODE,
 };
 } // namespace flag

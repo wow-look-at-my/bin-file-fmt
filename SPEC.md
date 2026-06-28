@@ -128,21 +128,22 @@ Every block begins with an 8-byte little-endian header, directly castable as
 | 2 | 2 | `flags` | u16 | see [Block flags](#block-flags) |
 | 4 | 4 | `length` | u32 | payload size; unit depends on the `large_mode` flag |
 
-`length` is interpreted by the `large_mode` flag (bit 5):
+`length` is interpreted by the `large_mode` flag (bit 4):
 
 - **`large_mode` clear:** `length` is a **byte** count. Max payload `2^32 - 1`
   (4 GiB).
-- **`large_mode` set:** `length` is a count of **4-byte words**; payload size =
-  `length * 4`. Max payload `(2^32 - 1) * 4` (~16 GiB), in 4-byte granularity.
+- **`large_mode` set:** `length` is a count of **4096-byte units** (one page);
+  payload size = `length * 4096`. Max payload `(2^32 - 1) * 4096` (~16 TiB), in
+  4096-byte granularity.
 
 Let `byte_len = large_mode ? length * 4 : length`. The payload starts at
 `block_start + 8`, and the next block is at
 `align_up(block_start + 8 + byte_len + (has_crc ? 4 : 0), 8)`.
 
 Large mode trades byte-exact sizing for reach. A block that is both large and not
-a multiple of 4 bytes records its own trailing slack inside the payload (e.g. a
-leading `u8 padding_bytes`); the format does not track sub-word lengths in large
-mode.
+a multiple of 4096 bytes records its own trailing slack inside the payload (e.g. a
+leading `u8 padding_bytes`); the format does not track sub-page lengths in large
+mode. 4096 is the common OS page size, so large payloads stay page-aligned.
 
 There is no version field in the header. A block type versions itself: mint a new
 GUID for an incompatible revision, or carry a version field inside the payload.
@@ -158,9 +159,8 @@ follows the payload, before alignment padding.
 | 1 | `safe_to_copy` | If set, an editor that does not understand this block may copy it verbatim when rewriting the file. If clear, drop it on rewrite when not understood. |
 | 2 | `compressed` | Payload begins with a compression descriptor (see [Compression](#compression)). |
 | 3 | `has_crc` | A 4-byte CRC-32C trailer follows the payload. |
-| 4 | `container` | Payload is itself a sequence of blocks (see [Nesting](#nesting-container-blocks)). |
-| 5 | `large_mode` | `length` counts 4-byte words instead of bytes (see [Block header](#block-header)). |
-| 6.. | reserved | must be 0; readers MUST ignore unknown bits |
+| 4 | `large_mode` | `length` counts 4096-byte units instead of bytes (see [Block header](#block-header)). |
+| 5.. | reserved | must be 0; readers MUST ignore unknown bits |
 
 ## Block Type Table
 
@@ -215,6 +215,7 @@ Predefined types occupy the top of the range, decrementing from 65534:
 | 65533 | `62696e70-617a-6572-0000-000000000002` | Block Index (optional) |
 | 65532 | `62696e70-617a-6572-0000-000000000003` | Writer Info (optional) |
 | 65531 | `62696e70-617a-6572-0000-000000000004` | Padding / free space (optional) |
+| 65530 | `62696e70-617a-6572-0000-000000000005` | Group (optional, nests blocks) |
 
 User programs mint a random UUIDv4 per block type and reuse it across all files.
 
@@ -222,22 +223,24 @@ User programs mint a random UUIDv4 per block type and reuse it across all files.
 
 Each is gated by a flag or a well-known block, so simple readers can ignore it.
 
-### Nesting (container blocks)
+### Group blocks (nesting)
 
-When `container` (bit 4) is set, the payload is a sequence of blocks instead of
-opaque leaf data -- adding zero bytes on disk, just reinterpreting the payload.
-Children are normal blocks, 8-byte aligned, with offsets relative to the payload
-start; a reader parses them by recursing with the same logic it uses at the top
-level.
+The Group block (predefined `type_id = 65530`, GUID `...0005`) holds a sequence of
+blocks as its payload, giving hierarchy without a flag bit: a generic tool that
+recognizes the Group GUID descends into it; one that does not treats it as an
+opaque block and skips it via `length`. (Any block type whose handler knows its
+payload is sub-blocks can nest too -- the Group type just makes nesting explicit
+and type-agnostic.)
 
-- The parent's `length` spans all descendants, so a reader that does not care
-  about (or understand) the parent skips the entire subtree in one offset advance.
-- A reader that ignores bit 4 treats the block as opaque and skips it correctly.
+- A Group's children are normal blocks, 8-byte aligned, with offsets relative to
+  the payload start; a reader parses them by recursing with the top-level logic.
+- The parent's `length` spans all descendants, so a reader uninterested in a Group
+  skips the entire subtree in one offset advance.
 - Children resolve `type_id`s against the same file-global Block Type Table; there
   is no nested table.
-- A container payload is blocks only -- no type-defined prefix. Put any header
-  data in a leaf child block at the front, so even a tool that does not know the
-  container's GUID can enumerate its children.
+- A Group payload is blocks only -- no type-defined prefix. Put any header data in
+  a leaf child block at the front, so even a tool that does not know the contents
+  can enumerate the children.
 - Readers SHOULD enforce a maximum nesting depth against hostile or corrupt files.
 
 ### Block Index
