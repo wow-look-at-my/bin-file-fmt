@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io"
 	"os"
 
@@ -51,6 +52,14 @@ func openReader(cmd *cobra.Command, path string, maxAlloc int64) (*binpazer.Read
 		return nil, nil, err
 	}
 	return br, c, nil
+}
+
+// writeJSON emits v as indented JSON (snake_case field names come from the
+// struct tags) with a trailing newline.
+func writeJSON(w io.Writer, v any) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(v)
 }
 
 // maxAllocFlag registers --max-alloc on a reading command and returns the
