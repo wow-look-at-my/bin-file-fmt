@@ -30,10 +30,14 @@ func (m *memFile) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 func (m *memFile) Seek(off int64, whence int) (int64, error) {
-	if whence != io.SeekStart {
-		panic("only SeekStart used")
+	switch whence {
+	case io.SeekStart:
+		m.pos = off
+	case io.SeekCurrent:
+		m.pos += off
+	case io.SeekEnd:
+		m.pos = int64(len(m.buf)) + off
 	}
-	m.pos = off
 	m.grow(m.pos)
 	return m.pos, nil
 }
@@ -57,7 +61,7 @@ var (
 const (
 	meshPayload = "vertices-go-here"         // 16
 	notePayload = "hello, file!"             // 12
-	bigPayload  = "0123456789ABCDEF01234567" // 24 (multiple of 4)
+	bigPayload  = "0123456789ABCDEF01234567" // 24
 )
 
 func writeSample(w io.Writer) error {
@@ -328,4 +332,34 @@ func TestFindWithoutIndex(t *testing.T) {
 	got, err := r.Find(1) // falls back to a walk
 	require.NoError(t, err)
 	assert.Equal(t, []uint64{offA, offC}, got)
+}
+
+// TestDuplicateTypeIDFirstWins pins the duplicate-id resolution order: a block
+// whose type id appears twice in the table resolves to the FIRST entry, the
+// same answer the original linear scan gave (and the map lookup must keep).
+func TestDuplicateTypeIDFirstWins(t *testing.T) {
+	var m memFile
+	bw, err := NewWriter(&m, sampleWriter, "demo", []TypeDef{
+		{7, sampleMesh, "First"},
+		{7, sampleNote, "Second"}, // same id, different GUID
+	})
+	require.NoError(t, err)
+	off := bw.Offset()
+	require.NoError(t, bw.Block(7, 0, []byte("x")))
+	require.NoError(t, bw.End())
+
+	m.pos = 0
+	br, err := NewReader(&m)
+	require.NoError(t, err)
+	require.Len(t, br.Types, 3) // BTT's own entry + the two duplicates
+
+	b, err := br.Next()
+	require.NoError(t, err)
+	require.True(t, b.Known)
+	assert.Equal(t, sampleMesh, b.GUID, "Next must resolve the first table entry")
+
+	b, err = br.At(off)
+	require.NoError(t, err)
+	require.True(t, b.Known)
+	assert.Equal(t, sampleMesh, b.GUID, "At must resolve the first table entry")
 }

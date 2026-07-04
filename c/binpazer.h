@@ -37,11 +37,10 @@ extern "C" {
  * raising the per-block cap from 4 GiB to (2^32-1)*4096 (~16 TiB). */
 #define BINPAZER_LARGE_UNIT 4096
 
-/* Block flag bits (the 16-bit `flags` field). */
+/* Block flag bits (the 16-bit `flags` field). Bit 2 is reserved, must be 0. */
 enum {
     BINPAZER_FLAG_CRITICAL     = 1u << 0,
     BINPAZER_FLAG_SAFE_TO_COPY = 1u << 1,
-    BINPAZER_FLAG_COMPRESSED   = 1u << 2,
     BINPAZER_FLAG_HAS_CRC      = 1u << 3,
     BINPAZER_FLAG_LARGE_MODE   = 1u << 4
 };
@@ -146,9 +145,13 @@ typedef struct {
 } binpazer_block;
 
 /* Reads and validates the file header and the Block Type Table. The table is
- * copied into `entries` (up to `entries_cap`); `*entries_count` receives the
- * number stored. `writer_name_buf` (if non-NULL) receives the writer name,
- * truncated to fit and always NUL-terminated. */
+ * copied into `entries`; `*entries_count` receives the number stored. If
+ * `entries` is non-NULL and the table holds more than `entries_cap` entries,
+ * BINPAZER_ERR_CAPACITY is returned (nothing is stored) and `*entries_count`
+ * receives the required count so the caller can retry with a bigger buffer.
+ * Passing `entries` == NULL opts out of the table entirely.
+ * `writer_name_buf` (if non-NULL) receives the writer name, truncated to fit
+ * and always NUL-terminated. */
 binpazer_status binpazer_reader_begin(
     binpazer_reader *r,
     binpazer_read_fn read, binpazer_seek_fn seek, void *ctx,

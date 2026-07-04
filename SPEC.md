@@ -82,7 +82,7 @@ view of such a string truncates early).
 +-------------------------------+  offset 0
 | File header                   |  fixed fields + writer_name + pad
 +-------------------------------+  offset = first_block_offset
-| Block: Block Type Table       |  type_id = 1, required, first block
+| Block: Block Type Table       |  type_id = 65534, required, first block
 +-------------------------------+
 | Block ...                     |
 | Block ...                     |
@@ -136,7 +136,7 @@ Every block begins with an 8-byte little-endian header, directly castable as
   payload size = `length * 4096`. Max payload `(2^32 - 1) * 4096` (~16 TiB), in
   4096-byte granularity.
 
-Let `byte_len = large_mode ? length * 4 : length`. The payload starts at
+Let `byte_len = large_mode ? length * 4096 : length`. The payload starts at
 `block_start + 8`, and the next block is at
 `align_up(block_start + 8 + byte_len + (has_crc ? 4 : 0), 8)`.
 
@@ -157,7 +157,7 @@ follows the payload, before alignment padding.
 |---|---|---|
 | 0 | `critical` | If set and the reader does not know this `type_id`'s GUID, the file cannot be correctly processed -- the reader MUST stop. If clear (ancillary), an unknown block is safe to skip. |
 | 1 | `safe_to_copy` | If set, an editor that does not understand this block may copy it verbatim when rewriting the file. If clear, drop it on rewrite when not understood. |
-| 2 | `compressed` | Payload begins with a compression descriptor (see [Compression](#compression)). |
+| 2 | reserved | must be 0 (see [Compression](#compression)) |
 | 3 | `has_crc` | A 4-byte CRC-32C trailer follows the payload. |
 | 4 | `large_mode` | `length` counts 4096-byte units instead of bytes (see [Block header](#block-header)). |
 | 5.. | reserved | must be 0; readers MUST ignore unknown bits |
@@ -285,14 +285,12 @@ is kept as a fixed-size struct.
 
 ### Compression
 
-When `compressed` (bit 2) is set, the payload begins with:
-
-| Offset | Size | Field | Type | Notes |
-|---|---|---|---|---|
-| 0 | 2 | `codec_id` | u16 | 1 = zstd, 2 = lz4, 3 = deflate |
-| 2 | 2 | `reserved` | u16 | 0 |
-| 4 | 8 | `uncompressed_length` | u64 | size after decompression |
-| 16 | ... | `compressed_data` | u8[] | |
+Deliberately absent from this version: every payload is stored bytes, and
+block flag bit 2 (once earmarked for a `compressed` flag) is reserved, must
+be 0. A single flag bit cannot carry codec identity -- there is more than one
+compression codec in the real world -- so a boolean flag would be a dead end.
+A future revision that adds compression will define a codec-identifying
+mechanism instead.
 
 ### Footer
 
@@ -339,7 +337,9 @@ Readers MUST ignore unknown flag bits and reserved fields.
 - `magic` and `signature` match exactly.
 - The first block is `type_id == 65534`.
 - No duplicate `type_id` in the Block Type Table; never `0` or `65535`.
-- Every block's `type_id` is present in the table.
+- Every block's `type_id` is present in the table. Predefined ids
+  (65530-65534) are implicitly defined by this spec and exempt -- writers MAY
+  emit predefined blocks (e.g. the Block Index) without a table entry.
 - Reserved fields and bits are 0 on write (ignored on read).
 - Blocks are 8-byte aligned; the final block ends at `file_length` (when not the
   streaming sentinel).

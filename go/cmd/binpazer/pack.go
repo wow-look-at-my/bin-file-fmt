@@ -74,17 +74,74 @@ func runPack(m *Manifest, baseDir string, w io.Writer) error {
 	return bw.End()
 }
 
+// memFile is a growable in-memory io.WriteSeeker. pack targets it when
+// writing to stdout, so the writer can still seek back and patch file_length;
+// the finished bytes are then streamed out in one pass and stay identical to
+// what a seekable file destination would receive.
+type memFile struct {
+	buf []byte
+	pos int64
+}
+
+func (m *memFile) Write(p []byte) (int, error) {
+	end := m.pos + int64(len(p))
+	if end > int64(len(m.buf)) {
+		if end > int64(cap(m.buf)) {
+			m.buf = append(m.buf[:cap(m.buf)], make([]byte, int(end)-cap(m.buf))...)
+		}
+		m.buf = m.buf[:end]
+	}
+	copy(m.buf[m.pos:], p)
+	m.pos = end
+	return len(p), nil
+}
+
+func (m *memFile) Seek(offset int64, whence int) (int64, error) {
+	var base int64
+	switch whence {
+	case io.SeekStart:
+		base = 0
+	case io.SeekCurrent:
+		base = m.pos
+	case io.SeekEnd:
+		base = int64(len(m.buf))
+	default:
+		return 0, fmt.Errorf("memFile: invalid whence %d", whence)
+	}
+	if base+offset < 0 {
+		return 0, fmt.Errorf("memFile: negative seek position")
+	}
+	m.pos = base + offset
+	return m.pos, nil
+}
+
 func init() {
 	var out string
 	cmd := &cobra.Command{
-		Use:   "pack <manifest.json>",
+		Use:   "pack <manifest.json | ->",
 		Short: "Build a binpazer file from a JSON manifest",
-		Args:  cobra.ExactArgs(1),
+		Long: `Build a binpazer file from a JSON manifest.
+
+"-" reads the manifest from stdin (file references then resolve relative to
+the current directory). "--out -" writes the archive to stdout; the archive
+is assembled in memory first so its bytes are identical to file output.`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if out == "" {
 				return fmt.Errorf("--out is required")
 			}
-			raw, err := os.ReadFile(args[0])
+			var (
+				raw     []byte
+				err     error
+				baseDir string
+			)
+			if args[0] == "-" {
+				raw, err = io.ReadAll(cmd.InOrStdin())
+				baseDir = "."
+			} else {
+				raw, err = os.ReadFile(args[0])
+				baseDir = filepath.Dir(args[0])
+			}
 			if err != nil {
 				return err
 			}
@@ -92,18 +149,29 @@ func init() {
 			if err := json.Unmarshal(raw, &m); err != nil {
 				return fmt.Errorf("parsing manifest: %w", err)
 			}
+			if out == "-" {
+				mf := &memFile{}
+				if err := runPack(&m, baseDir, mf); err != nil {
+					return err
+				}
+				if _, err := cmd.OutOrStdout().Write(mf.buf); err != nil {
+					return err
+				}
+				fmt.Fprintf(cmd.ErrOrStderr(), "wrote %d bytes to stdout\n", len(mf.buf))
+				return nil
+			}
 			f, err := os.Create(out)
 			if err != nil {
 				return err
 			}
 			defer f.Close()
-			if err := runPack(&m, filepath.Dir(args[0]), f); err != nil {
+			if err := runPack(&m, baseDir, f); err != nil {
 				return err
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "wrote %s\n", out)
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&out, "out", "o", "", "output file (required)")
+	cmd.Flags().StringVarP(&out, "out", "o", "", "output file, or - for stdout (required)")
 	rootCmd.AddCommand(cmd)
 }

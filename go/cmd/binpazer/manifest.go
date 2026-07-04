@@ -33,12 +33,11 @@ type ManifestBlock struct {
 	File       string   `json:"file,omitempty"`
 }
 
-var flagOrder = []string{"critical", "safe_to_copy", "compressed", "has_crc", "large_mode"}
+var flagOrder = []string{"critical", "safe_to_copy", "has_crc", "large_mode"}
 
 var flagBits = map[string]uint16{
 	"critical":     binpazer.FlagCritical,
 	"safe_to_copy": binpazer.FlagSafeToCopy,
-	"compressed":   binpazer.FlagCompressed,
 	"has_crc":      binpazer.FlagHasCRC,
 	"large_mode":   binpazer.FlagLargeMode,
 }
