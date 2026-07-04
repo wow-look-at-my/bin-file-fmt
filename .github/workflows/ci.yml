@@ -17,8 +17,28 @@ jobs:
       - uses: wow-look-at-my/go-toolchain@v1
         with:
           working-directory: go
+          # autorelease would publish under the repo-derived project name
+          # (bin-file-fmt/binpazer); the publish job below uses the same
+          # buildhost action with the tool's real name, binpazer, instead.
           autorelease: false
-          upload-artifacts: false
+          upload-artifacts: true
+
+  # Publish the CLI matrix binaries from the go-build artifact to
+  # https://pazer.build as project "binpazer" (git branch recorded on the
+  # release, so any branch tip is downloadable via
+  # https://dl.pazer.build/binpazer?branch=<branch>&os=<os>&arch=<arch>).
+  # Auth is GitHub OIDC; the project is auto-provisioned on first publish.
+  publish:
+    runs-on: ubuntu-latest
+    needs: [go, c-cpp]
+    permissions:
+      id-token: write # mint the OIDC token buildhost trusts
+      actions: read # download the go-build artifact from this run
+      contents: read
+    steps:
+      - uses: wow-look-at-my/buildhost/.github/actions/buildhost-publish@master
+        with:
+          project: binpazer
 
   c-cpp:
     runs-on: ubuntu-latest
