@@ -14,15 +14,10 @@ import (
 // runUnpack reads a binpazer file and writes each block's payload to outDir as
 // blockN.bin, returning a Manifest that references them. Re-packing the manifest
 // reproduces the file (the index is regenerated from "index": true).
-func runUnpack(r io.Reader, outDir string) (*Manifest, error) {
-	br, err := binpazer.NewReader(r)
-	if err != nil {
-		return nil, err
-	}
+func runUnpack(br *binpazer.Reader, outDir string) (*Manifest, error) {
 	m := &Manifest{
 		WriterGUID: br.WriterGUID.String(),
 		WriterName: br.WriterName,
-		Index:      br.HasIndex(),
 	}
 	for _, t := range br.Types {
 		if t.TypeID == binpazer.TypeBlockTypeTable {
@@ -52,6 +47,9 @@ func runUnpack(r io.Reader, outDir string) (*Manifest, error) {
 		m.Blocks = append(m.Blocks, ManifestBlock{TypeID: b.TypeID, Flags: flagNames(b.Flags), File: name})
 		i++
 	}
+	// Recorded after the walk: a non-seekable input only discovers the footer
+	// (and thus the index) when the walk reaches it.
+	m.Index = br.HasIndex()
 	return m, nil
 }
 
@@ -73,8 +71,9 @@ func streamBlockToFile(br *binpazer.Reader, b *binpazer.Block, path string) erro
 
 func init() {
 	var outDir string
+	var maxAlloc *int64
 	cmd := &cobra.Command{
-		Use:   "unpack <file.binpazer>",
+		Use:   "unpack <file.binpazer | ->",
 		Short: "Extract a file into a JSON manifest + payload files",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -84,12 +83,14 @@ func init() {
 			if err := os.MkdirAll(outDir, 0o755); err != nil {
 				return err
 			}
-			f, err := os.Open(args[0])
+			br, c, err := openReader(cmd, args[0], *maxAlloc)
 			if err != nil {
 				return err
 			}
-			defer f.Close()
-			m, err := runUnpack(f, outDir)
+			if c != nil {
+				defer c.Close()
+			}
+			m, err := runUnpack(br, outDir)
 			if err != nil {
 				return err
 			}
@@ -105,5 +106,6 @@ func init() {
 		},
 	}
 	cmd.Flags().StringVarP(&outDir, "dir", "d", "", "output directory (required)")
+	maxAlloc = maxAllocFlag(cmd)
 	rootCmd.AddCommand(cmd)
 }

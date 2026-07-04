@@ -4,18 +4,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
 	binpazer "github.com/wow-look-at-my/bin-file-fmt/go"
 )
 
 // runDump hex-dumps block payloads. If only >= 0, only that block index is dumped.
-func runDump(rs io.ReadSeeker, w io.Writer, only int) error {
-	br, err := binpazer.NewReader(rs)
-	if err != nil {
-		return err
-	}
+func runDump(br *binpazer.Reader, w io.Writer, only int) error {
 	n := 0
 	for {
 		b, err := br.Next()
@@ -48,19 +43,23 @@ func runDump(rs io.ReadSeeker, w io.Writer, only int) error {
 
 func init() {
 	var only int
+	var maxAlloc *int64
 	cmd := &cobra.Command{
-		Use:   "dump <file.binpazer>",
+		Use:   "dump <file.binpazer | ->",
 		Short: "Hex-dump block payloads",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			f, err := os.Open(args[0])
+			br, c, err := openReader(cmd, args[0], *maxAlloc)
 			if err != nil {
 				return err
 			}
-			defer f.Close()
-			return runDump(f, cmd.OutOrStdout(), only)
+			if c != nil {
+				defer c.Close()
+			}
+			return runDump(br, cmd.OutOrStdout(), only)
 		},
 	}
 	cmd.Flags().IntVar(&only, "block", -1, "dump only this block index (default: all)")
+	maxAlloc = maxAllocFlag(cmd)
 	rootCmd.AddCommand(cmd)
 }

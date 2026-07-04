@@ -12,16 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// execute runs the CLI with args, capturing combined output.
-func execute(args ...string) (string, error) {
-	var buf bytes.Buffer
-	rootCmd.SetOut(&buf)
-	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs(args)
-	err := rootCmd.Execute()
-	return buf.String(), err
-}
-
 func TestCLIEndToEnd(t *testing.T) {
 	dir := t.TempDir()
 	big := make([]byte, 4096)

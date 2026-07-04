@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -16,15 +15,11 @@ func isPredefined(id uint16) bool {
 
 // runValidate checks a file against the spec. It returns a list of problems
 // (empty means conformant) or a fatal structural error (bad magic/header/BTT).
-func runValidate(rs io.ReadSeeker) ([]string, error) {
-	br, err := binpazer.NewReader(rs)
-	if err != nil {
-		return nil, err
-	}
-	size := br.InputSize() // rs is seekable, so the reader learned it
+func runValidate(br *binpazer.Reader) ([]string, error) {
+	size := br.InputSize() // -1 when the input is not seekable (piped stdin)
 
 	var problems []string
-	if br.FileLength != binpazer.FileLengthUnknown && int64(br.FileLength) != size {
+	if size >= 0 && br.FileLength != binpazer.FileLengthUnknown && int64(br.FileLength) != size {
 		problems = append(problems, fmt.Sprintf("file_length=%d but file is %d bytes", br.FileLength, size))
 	}
 	n := 0
@@ -58,17 +53,20 @@ func runValidate(rs io.ReadSeeker) ([]string, error) {
 }
 
 func init() {
+	var maxAlloc *int64
 	cmd := &cobra.Command{
-		Use:   "validate <file.binpazer>",
+		Use:   "validate <file.binpazer | ->",
 		Short: "Check a file for spec conformance",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			f, err := os.Open(args[0])
+			br, c, err := openReader(cmd, args[0], *maxAlloc)
 			if err != nil {
-				return err
+				return fmt.Errorf("not a valid binpazer file: %w", err)
 			}
-			defer f.Close()
-			problems, err := runValidate(f)
+			if c != nil {
+				defer c.Close()
+			}
+			problems, err := runValidate(br)
 			if err != nil {
 				return fmt.Errorf("not a valid binpazer file: %w", err)
 			}
@@ -79,5 +77,6 @@ func init() {
 			return fmt.Errorf("%d problem(s):\n  %s", len(problems), strings.Join(problems, "\n  "))
 		},
 	}
+	maxAlloc = maxAllocFlag(cmd)
 	rootCmd.AddCommand(cmd)
 }

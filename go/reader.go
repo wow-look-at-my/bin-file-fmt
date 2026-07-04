@@ -366,9 +366,27 @@ func (br *Reader) readBTT() error {
 
 // Next reads the next block header, resolving its GUID against the type table.
 // It returns io.EOF after the last block. The payload is not read.
+//
+// On a non-seekable input the footer cannot be excluded from the walk up
+// front, so when file_length is known and exactly 16 bytes of it remain, Next
+// peeks for the footer magic and ends the walk there (recording the index
+// location) instead of misparsing the footer as a block header. This mirrors
+// the position-based footer detection the seekable probe already performs.
 func (br *Reader) Next() (*Block, error) {
 	if br.blocksEnd != FileLengthUnknown && br.off >= br.blocksEnd {
 		return nil, io.EOF
+	}
+	if !br.hasIndex && br.FileLength != FileLengthUnknown && br.FileLength >= 16 &&
+		br.off == br.FileLength-16 {
+		if ft, err := br.r.Peek(16); err == nil && string(ft[8:16]) == footerMagic {
+			br.indexOffset = binary.LittleEndian.Uint64(ft[0:8])
+			br.hasIndex = true
+			if _, err := br.r.Discard(16); err != nil {
+				return nil, err
+			}
+			br.off += 16
+			return nil, io.EOF
+		}
 	}
 	bh := make([]byte, 8)
 	n, err := io.ReadFull(br.r, bh)

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -12,11 +11,7 @@ import (
 
 // runInfo prints a human-readable summary: header, the block type table, and a
 // list of blocks with their flags, offsets, and sizes.
-func runInfo(rs io.ReadSeeker, w io.Writer) error {
-	br, err := binpazer.NewReader(rs)
-	if err != nil {
-		return err
-	}
+func runInfo(br *binpazer.Reader, w io.Writer) error {
 	fmt.Fprintf(w, "binpazer v%d.%d\n", br.VersionMajor, br.VersionMinor)
 	fmt.Fprintf(w, "writer:      %s (%s)\n", br.WriterName, br.WriterGUID)
 	if br.FileLength == binpazer.FileLengthUnknown {
@@ -58,18 +53,22 @@ func runInfo(rs io.ReadSeeker, w io.Writer) error {
 }
 
 func init() {
+	var maxAlloc *int64
 	cmd := &cobra.Command{
-		Use:   "info <file.binpazer>",
+		Use:   "info <file.binpazer | ->",
 		Short: "Show header, block type table, and block listing",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			f, err := os.Open(args[0])
+			br, c, err := openReader(cmd, args[0], *maxAlloc)
 			if err != nil {
 				return err
 			}
-			defer f.Close()
-			return runInfo(f, cmd.OutOrStdout())
+			if c != nil {
+				defer c.Close()
+			}
+			return runInfo(br, cmd.OutOrStdout())
 		},
 	}
+	maxAlloc = maxAllocFlag(cmd)
 	rootCmd.AddCommand(cmd)
 }
