@@ -126,6 +126,45 @@ int main() {
         CHECK(p.size() == 4 && std::memcmp(p.data(), "aaaa", 4) == 0, "index: at payload");
     }
 
+    // --- BTT capacity: >256 types must never be silently truncated ---
+    {
+        std::vector<uint8_t> tbuf;
+        size_t tp = 0;
+        auto twrite = [&](const void *b, size_t n) -> size_t {
+            if (tp + n > tbuf.size()) tbuf.resize(tp + n);
+            std::memcpy(tbuf.data() + tp, b, n); tp += n; return n;
+        };
+        auto tseek = [&](uint64_t o) -> bool {
+            if (o > tbuf.size()) tbuf.resize(static_cast<size_t>(o));
+            tp = static_cast<size_t>(o); return true;
+        };
+        std::vector<binpazer::TypeDef> many;
+        for (int i = 1; i <= 300; ++i)
+            many.push_back({static_cast<uint16_t>(i), g_mesh, "T" + std::to_string(i)});
+        {
+            binpazer::Writer w(twrite, writer, "demo", many, tseek);
+            CHECK(w.block(1, 0, "x", 1) == binpazer::Status::Ok, "btt-cap: write block");
+            CHECK(w.end() == binpazer::Status::Ok, "btt-cap: writer end");
+        }
+        tp = 0;
+        auto tread = [&](void *b, size_t n) -> size_t {
+            size_t av = tbuf.size() - tp, c = n < av ? n : av;
+            std::memcpy(b, tbuf.data() + tp, c); tp += c; return c;
+        };
+        binpazer::Reader r(tread, tseek); // seekable: grows to fit and re-parses
+        CHECK(r.ok(), "btt-cap: seekable reader ok");
+        CHECK(r.types().size() == 301, "btt-cap: all 301 entries loaded");
+        CHECK(r.types()[300].type_id == 300, "btt-cap: last entry intact");
+        auto b = r.next();
+        CHECK(b.has_value() && b->type_id == 1 && b->known, "btt-cap: walk still works");
+
+        tp = 0;
+        binpazer::Reader r2(tread); // no seek: loud error, not silent truncation
+        CHECK(!r2.ok() && r2.status() == binpazer::Status::ErrCapacity,
+              "btt-cap: no-seek reader reports ErrCapacity");
+        CHECK(r2.types().empty(), "btt-cap: no partial table on error");
+    }
+
     // --- large_mode (4096-byte units) ---
     {
         std::vector<uint8_t> lbuf;

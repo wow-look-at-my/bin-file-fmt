@@ -121,17 +121,33 @@ private:
 
 class Reader {
 public:
+    // Type ids are 16-bit, so no conformant Block Type Table can hold more
+    // distinct entries than this; larger declared counts are rejected as
+    // Status::ErrCapacity instead of being allocated for.
+    static constexpr size_t kMaxTypeEntries = 65536;
+
     explicit Reader(ReadFn read, SeekFn seek = {}) {
         io_.read = std::move(read);
         io_.seek = std::move(seek);
-        entries_.resize(256); // generous; block types per file are few
+        entries_.resize(256); // covers typical files without a second pass
         char    namebuf[256] = {0};
         size_t  n = 0;
-        binpazer_reader_begin(&r_, detail::tramp_read,
-                              io_.seek ? detail::tramp_seek : nullptr, &io_,
-                              namebuf, sizeof namebuf,
-                              entries_.data(), entries_.size(), &n);
-        entries_.resize(r_.err == BINPAZER_OK ? n : 0);
+        binpazer_status s = binpazer_reader_begin(
+            &r_, detail::tramp_read, io_.seek ? detail::tramp_seek : nullptr,
+            &io_, namebuf, sizeof namebuf, entries_.data(), entries_.size(), &n);
+        if (s == BINPAZER_ERR_CAPACITY && n <= kMaxTypeEntries &&
+            io_.seek && io_.seek(0)) {
+            // The table declares more entries than the buffer: size the buffer
+            // from the declared count (already validated by the C core against
+            // the table's own byte length) and parse again from the start.
+            // Without a seek callback the error stands -- never truncate.
+            entries_.resize(n);
+            n = 0;
+            s = binpazer_reader_begin(
+                &r_, detail::tramp_read, detail::tramp_seek, &io_,
+                namebuf, sizeof namebuf, entries_.data(), entries_.size(), &n);
+        }
+        entries_.resize(s == BINPAZER_OK ? n : 0);
         writer_name_ = namebuf;
     }
 

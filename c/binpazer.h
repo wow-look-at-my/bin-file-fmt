@@ -146,9 +146,13 @@ typedef struct {
 } binpazer_block;
 
 /* Reads and validates the file header and the Block Type Table. The table is
- * copied into `entries` (up to `entries_cap`); `*entries_count` receives the
- * number stored. `writer_name_buf` (if non-NULL) receives the writer name,
- * truncated to fit and always NUL-terminated. */
+ * copied into `entries`; `*entries_count` receives the number stored. If
+ * `entries` is non-NULL and the table holds more than `entries_cap` entries,
+ * BINPAZER_ERR_CAPACITY is returned (nothing is stored) and `*entries_count`
+ * receives the required count so the caller can retry with a bigger buffer.
+ * Passing `entries` == NULL opts out of the table entirely.
+ * `writer_name_buf` (if non-NULL) receives the writer name, truncated to fit
+ * and always NUL-terminated. */
 binpazer_status binpazer_reader_begin(
     binpazer_reader *r,
     binpazer_read_fn read, binpazer_seek_fn seek, void *ctx,

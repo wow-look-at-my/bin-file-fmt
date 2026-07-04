@@ -130,6 +130,43 @@ static void test_large(void) {
           "large: payload bytes");
 }
 
+/* An entries buffer smaller than the table must fail loudly (ERR_CAPACITY,
+ * required count reported), never silently drop entries. */
+static void test_btt_capacity(void) {
+    static uint8_t buf[65536];
+    membuf m = { buf, sizeof buf, 0, 0 };
+
+    binpazer_guid wg = {{0x03}};
+    binpazer_type_def defs[3] = { {1, {{0x31}}, "A"}, {2, {{0x32}}, "B"}, {3, {{0x33}}, "C"} };
+    binpazer_writer w;
+    binpazer_writer_begin(&w, mem_write, mem_seek, &m, &wg, "demo", defs, 3);
+    CHECK(binpazer_writer_end(&w) == BINPAZER_OK, "btt-cap: write file");
+
+    /* 4 entries on disk (BTT + 3 user types); a 2-entry buffer is too small */
+    m.pos = 0;
+    binpazer_reader r; char nm[16]; binpazer_type_entry te[2]; size_t nte = 0;
+    CHECK(binpazer_reader_begin(&r, mem_read, mem_seek, &m, nm, sizeof nm, te, 2, &nte)
+              == BINPAZER_ERR_CAPACITY,
+          "btt-cap: undersized buffer -> ERR_CAPACITY");
+    CHECK(nte == 4, "btt-cap: required count reported");
+
+    /* entries == NULL opts out of the table -- still OK */
+    m.pos = 0;
+    binpazer_reader r2; size_t n2 = 0;
+    CHECK(binpazer_reader_begin(&r2, mem_read, mem_seek, &m, NULL, 0, NULL, 0, &n2)
+              == BINPAZER_OK,
+          "btt-cap: NULL entries opt-out is OK");
+
+    /* an exactly-sized buffer stores everything */
+    m.pos = 0;
+    binpazer_reader r3; binpazer_type_entry te3[4]; size_t n3 = 0;
+    CHECK(binpazer_reader_begin(&r3, mem_read, mem_seek, &m, NULL, 0, te3, 4, &n3)
+              == BINPAZER_OK && n3 == 4,
+          "btt-cap: exact-size buffer OK");
+    CHECK(te3[0].type_id == BINPAZER_TYPE_BLOCK_TYPE_TABLE && te3[3].type_id == 3,
+          "btt-cap: entries intact");
+}
+
 int main(void) {
     static uint8_t storage[65536];
     membuf m = { storage, sizeof storage, 0, 0 };
@@ -222,6 +259,7 @@ int main(void) {
 
     test_index();
     test_large();
+    test_btt_capacity();
 
     if (failures == 0) { printf("OK: all C round-trip checks passed\n"); return 0; }
     printf("%d FAILURE(S)\n", failures);

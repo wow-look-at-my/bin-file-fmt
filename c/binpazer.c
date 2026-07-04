@@ -273,6 +273,19 @@ binpazer_status binpazer_reader_begin(
     uint8_t cc[8]; if (r_raw(r, cc, 8)) return (binpazer_status)r->err;
     uint32_t entry_count = get_u32(cc);
 
+    /* Each entry occupies at least 32 bytes on disk (20-byte header, 4-byte
+     * name length, empty name, NUL, padded to 8), so a count the table's own
+     * payload cannot hold is structurally invalid. */
+    if (btt_len < 8 || (uint64_t)entry_count * 32u > (uint64_t)btt_len - 8)
+        return (binpazer_status)(r->err = BINPAZER_ERR_FORMAT);
+    /* An undersized caller buffer is an error, not a silent truncation (the
+     * dropped types would later resolve as unknown). Report the required
+     * count so the caller can retry with a bigger buffer. */
+    if (entries && entry_count > entries_cap) {
+        if (entries_count) *entries_count = entry_count;
+        return (binpazer_status)(r->err = BINPAZER_ERR_CAPACITY);
+    }
+
     for (uint32_t i = 0; i < entry_count; i++) {
         uint8_t eh[20]; if (r_raw(r, eh, 20)) return (binpazer_status)r->err;
         uint16_t tid = get_u16(eh);
@@ -281,7 +294,7 @@ binpazer_status binpazer_reader_begin(
         if (r_skip(r, (uint64_t)nlen + 1)) return (binpazer_status)r->err; /* name + NUL */
         uint64_t raw = (uint64_t)25 + nlen;
         if (r_skip(r, align8(raw) - raw)) return (binpazer_status)r->err;  /* entry pad */
-        if (entries && i < entries_cap) {
+        if (entries) {
             entries[i].type_id = tid;
             memcpy(entries[i].guid.bytes, eh + 4, 16);
             if (entries_count) *entries_count = i + 1;
