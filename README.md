@@ -37,6 +37,19 @@ dissect binpazer files:
 cd go && go-toolchain        # builds go/build/binpazer
 ```
 
+Prebuilt binaries (linux/darwin/windows x amd64/arm64) are published to
+[pazer.build](https://pazer.build) on every push, as project
+`bin-file-fmt/binpazer` with the git branch recorded on each release:
+
+```sh
+curl -fSsL --location-trusted -H "Authorization: Bearer $BUILDHOST_TOKEN" \
+  "https://dl.pazer.build/bin-file-fmt/binpazer?os=linux&arch=amd64" \
+  -o binpazer && chmod +x binpazer
+```
+
+(add `&branch=<branch>` for a branch tip; `--location-trusted` keeps the
+auth header across the redirect to the static download host.)
+
 Any positional file argument accepts `-` for stdin (and `-o -`/`--out -` for
 stdout), so the tool composes in pipelines. On non-seekable input, per-field
 allocation claims are capped at 1 GiB (tune with `--max-alloc`); seekable input

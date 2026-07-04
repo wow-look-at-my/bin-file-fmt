@@ -54,8 +54,12 @@ Go rules:
   ```
 
 CI (`.github/workflows/ci.yml`): a `go` job (`wow-look-at-my/go-toolchain@v1`)
-and a `c-cpp` job (make tests, both ASan builds, the fixture `cmp` above).
-Nothing merges red.
+and a `c-cpp` job (make tests, both ASan builds, the fixture `cmp` above),
+plus a `publish` job gated on both that ships the CLI matrix binaries to
+https://pazer.build as project `bin-file-fmt/binpazer`. The project name is
+repo-derived because buildhost scopes a repo's OIDC token to the repo's own
+namespace (`bin-file-fmt` and `bin-file-fmt/<...>`); a `project: binpazer`
+override gets a 404 -- do not "fix" the name. Nothing merges red.
 
 ## Layout
 
