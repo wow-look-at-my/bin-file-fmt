@@ -82,7 +82,7 @@ view of such a string truncates early).
 +-------------------------------+  offset 0
 | File header                   |  fixed fields + writer_name + pad
 +-------------------------------+  offset = first_block_offset
-| Block: Block Type Table       |  type_id = 1, required, first block
+| Block: Block Type Table       |  type_id = 65534, required, first block
 +-------------------------------+
 | Block ...                     |
 | Block ...                     |
@@ -136,7 +136,7 @@ Every block begins with an 8-byte little-endian header, directly castable as
   payload size = `length * 4096`. Max payload `(2^32 - 1) * 4096` (~16 TiB), in
   4096-byte granularity.
 
-Let `byte_len = large_mode ? length * 4 : length`. The payload starts at
+Let `byte_len = large_mode ? length * 4096 : length`. The payload starts at
 `block_start + 8`, and the next block is at
 `align_up(block_start + 8 + byte_len + (has_crc ? 4 : 0), 8)`.
 

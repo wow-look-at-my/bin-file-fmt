@@ -50,7 +50,7 @@ var BlockTypeTableGUID = GUID{0x62, 0x69, 0x6e, 0x70, 0x61, 0x7a, 0x65, 0x72, 0,
 var crcTable = crc32.MakeTable(crc32.Castagnoli)
 
 // TypeDef declares one block type for the Block Type Table. Do not include type
-// id 1; the table's own entry is added automatically.
+// id 65534; the table's own entry is added automatically.
 type TypeDef struct {
 	TypeID uint16
 	GUID   GUID
@@ -191,7 +191,7 @@ func NewWriter(w io.Writer, writerGUID GUID, name string, defs []TypeDef) (*Writ
 }
 
 // Block writes one block. If flags has FlagLargeMode, len(payload) must be a
-// multiple of 4 (the on-disk length field stores len/4).
+// multiple of 4096 (the on-disk length field stores len/4096).
 func (bw *Writer) Block(typeID, flags uint16, payload []byte) error {
 	if bw.err != nil {
 		return bw.err

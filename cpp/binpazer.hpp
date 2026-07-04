@@ -68,7 +68,7 @@ inline int    tramp_seek(void *c, uint64_t o)              { return static_cast<
 class Writer {
 public:
     // Writes the file header and Block Type Table immediately. Do not include
-    // type id 1 in `defs`; the table entry is added automatically.
+    // type id 65534 in `defs`; the table entry is added automatically.
     Writer(WriteFn write, const Guid &writer_guid, std::string_view name,
            const std::vector<TypeDef> &defs, SeekFn seek = {}) {
         io_.write = std::move(write);

@@ -57,7 +57,7 @@ var (
 const (
 	meshPayload = "vertices-go-here"         // 16
 	notePayload = "hello, file!"             // 12
-	bigPayload  = "0123456789ABCDEF01234567" // 24 (multiple of 4)
+	bigPayload  = "0123456789ABCDEF01234567" // 24
 )
 
 func writeSample(w io.Writer) error {

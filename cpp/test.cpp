@@ -35,7 +35,7 @@ int main() {
 
     const char *mesh = "vertices-go-here";          // 16
     const char *note = "hello, file!";              // 12
-    const char *big  = "0123456789ABCDEF01234567";  // 24 (multiple of 4)
+    const char *big  = "0123456789ABCDEF01234567";  // 24
 
     {
         binpazer::Writer w(write, writer, "demo", defs, seek);

@@ -147,7 +147,7 @@ int main(void) {
 
     const char *mesh_payload = "vertices-go-here";          /* 16 bytes */
     const char *note_payload = "hello, file!";              /* 12 bytes */
-    const char *big_payload  = "0123456789ABCDEF01234567";  /* 24 bytes, multiple of 4 */
+    const char *big_payload  = "0123456789ABCDEF01234567";  /* 24 bytes */
 
     /* ---- write ---- */
     binpazer_writer w;
