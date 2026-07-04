@@ -37,11 +37,10 @@ extern "C" {
  * raising the per-block cap from 4 GiB to (2^32-1)*4096 (~16 TiB). */
 #define BINPAZER_LARGE_UNIT 4096
 
-/* Block flag bits (the 16-bit `flags` field). */
+/* Block flag bits (the 16-bit `flags` field). Bit 2 is reserved, must be 0. */
 enum {
     BINPAZER_FLAG_CRITICAL     = 1u << 0,
     BINPAZER_FLAG_SAFE_TO_COPY = 1u << 1,
-    BINPAZER_FLAG_COMPRESSED   = 1u << 2,
     BINPAZER_FLAG_HAS_CRC      = 1u << 3,
     BINPAZER_FLAG_LARGE_MODE   = 1u << 4
 };

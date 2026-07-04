@@ -137,6 +137,9 @@ Decision to preserve: the `unknown_type_id` rule **exempts predefined ids
 would flag every indexed file. Teaching the writer to add the entry instead
 would change output bytes in all three implementations plus the fixture.
 
-The `compressed` flag (bit 2) is **reserved** in SPEC.md: defined but not
-implemented anywhere; readers deliver such payloads verbatim. Do not bolt a
-codec onto one implementation -- it lands in all three or not at all.
+The `compressed` flag was **removed entirely** (2026-07-04): block flag bit 2
+is reserved, must be 0, and `validate` reports it under `reserved_nonzero`.
+A boolean flag cannot carry codec identity (there is more than one codec in
+the real world), so future compression support means a codec-identifying
+mechanism designed into SPEC.md -- do not reintroduce a boolean flag, and do
+not bolt a codec onto one implementation; it lands in all three or not at all.

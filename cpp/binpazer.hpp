@@ -40,7 +40,6 @@ namespace flag {
 enum : uint16_t {
     Critical   = BINPAZER_FLAG_CRITICAL,
     SafeToCopy = BINPAZER_FLAG_SAFE_TO_COPY,
-    Compressed = BINPAZER_FLAG_COMPRESSED,
     HasCrc     = BINPAZER_FLAG_HAS_CRC,
     LargeMode  = BINPAZER_FLAG_LARGE_MODE,
 };

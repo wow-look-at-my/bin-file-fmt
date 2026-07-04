@@ -29,11 +29,10 @@ const (
 	TypeGroup          = 65530
 )
 
-// Block flag bits.
+// Block flag bits. Bit 2 is reserved, must be 0 (SPEC.md "Compression").
 const (
 	FlagCritical   uint16 = 1 << 0
 	FlagSafeToCopy uint16 = 1 << 1
-	FlagCompressed uint16 = 1 << 2
 	FlagHasCRC     uint16 = 1 << 3
 	FlagLargeMode  uint16 = 1 << 4
 )

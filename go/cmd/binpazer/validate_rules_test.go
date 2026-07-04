@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"hash/crc32"
 	"os"
 	"path/filepath"
 	"testing"
@@ -175,6 +176,30 @@ func TestValidateRuleReservedZero(t *testing.T) {
 		res, err := validateJSON(t, data)
 		assertFails(t, res, err, ruleReservedZero)
 		assert.Contains(t, findRule(res, ruleReservedZero)[0].Detail, "reserved flag bits")
+	})
+
+	// Bit 2 -- the removed `compressed` flag -- is reserved now. Patch it into
+	// the has_crc block of an otherwise valid file, re-sealing the CRC the way
+	// a writer that set the bit would have (the CRC-32C covers the 8-byte
+	// header): the ONLY finding must be the reserved bit, not a CRC mismatch.
+	t.Run("removed_compressed_bit", func(t *testing.T) {
+		data := validArchive(t, false)
+		br, err := binpazer.NewReader(bytes.NewReader(data))
+		require.NoError(t, err)
+		b, err := br.Next()
+		require.NoError(t, err)
+		require.EqualValues(t, 1, b.TypeID, "first walked block must be the has_crc mesh block")
+		require.NotZero(t, b.Flags&binpazer.FlagHasCRC)
+		off := b.Offset()
+		data[off+2] |= 1 << 2
+		end := off + 8 + b.PayloadLen
+		crc := crc32.Checksum(data[off:end], crc32.MakeTable(crc32.Castagnoli))
+		binary.LittleEndian.PutUint32(data[end:], crc)
+
+		res, err := validateJSON(t, data)
+		assertFails(t, res, err, ruleReservedZero)
+		require.Len(t, res.Findings, 1, "the reserved bit must be the only finding: %+v", res.Findings)
+		assert.Contains(t, res.Findings[0].Detail, "reserved flag bits 0x0004")
 	})
 
 	t.Run("index_reserved", func(t *testing.T) {

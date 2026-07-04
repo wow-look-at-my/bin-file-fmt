@@ -37,9 +37,10 @@ var allRules = []string{
 	ruleLength, ruleStringTerm, ruleStringUTF8, ruleCRC, ruleIndex, ruleStructure,
 }
 
-// knownFlagsMask covers the five defined block flag bits; the rest are reserved.
+// knownFlagsMask covers the four defined block flag bits; the rest -- including
+// bit 2, the removed `compressed` flag -- are reserved and must be 0.
 const knownFlagsMask = binpazer.FlagCritical | binpazer.FlagSafeToCopy |
-	binpazer.FlagCompressed | binpazer.FlagHasCRC | binpazer.FlagLargeMode
+	binpazer.FlagHasCRC | binpazer.FlagLargeMode
 
 // finding is one concrete rule violation.
 type finding struct {

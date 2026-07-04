@@ -91,7 +91,7 @@ binpazer pack manifest.json -o demo.binpazer
 - `writer_guid` / `writer_name` -- the file-header identity.
 - `types` -- the Block Type Table entries: `type_id`, `guid`, optional `name`.
 - `blocks` -- written in order; each has a `type_id`, optional `flags` (any of
-  `critical`, `safe_to_copy`, `compressed`, `has_crc`, `large_mode`), and
+  `critical`, `safe_to_copy`, `has_crc`, `large_mode`), and
   exactly one content source: `data` (UTF-8 text), `data_base64`, or `file`
   (a path relative to the manifest).
 - `"index": true` -- append a Block Index + footer so readers can jump by type.
