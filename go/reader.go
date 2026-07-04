@@ -118,12 +118,33 @@ func (br *Reader) read(p []byte) error {
 	return nil
 }
 
+// skip advances the reader n bytes. Seekable inputs seek instead of reading
+// through, bounded by the real input size so a truncated file still surfaces
+// ErrTruncated exactly like the read-through path; non-seekable inputs fall
+// back to reading and discarding.
 func (br *Reader) skip(n uint64) error {
 	if n == 0 {
 		return nil
 	}
 	if n > math.MaxInt64 {
 		return fmt.Errorf("binpazer: cannot skip %d bytes: %w", n, ErrCapacityExceeded)
+	}
+	if br.seeker != nil && br.inputSize >= 0 {
+		target := br.off + n
+		if target > uint64(br.inputSize) {
+			// Mirror the read-through path: stop at end of input, then
+			// report the truncation.
+			if _, err := br.seeker.Seek(br.inputSize, io.SeekStart); err != nil {
+				return err
+			}
+			br.off = uint64(br.inputSize)
+			return br.wrapEOF(io.ErrUnexpectedEOF)
+		}
+		if _, err := br.seeker.Seek(int64(target), io.SeekStart); err != nil {
+			return err
+		}
+		br.off = target
+		return nil
 	}
 	m, err := io.CopyN(io.Discard, br.r, int64(n))
 	br.off += uint64(m)

@@ -243,3 +243,34 @@ func TestInputSize(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(280), br.InputSize())
 }
+
+// TestSeekSkipTruncationDetected: skip() seeks on seekable inputs, so make
+// sure a file cut mid-block (after the payload the claim check admits, but
+// before the block's aligned end) still reports ErrTruncated -- and does so
+// identically to the non-seekable read-through path.
+func TestSeekSkipTruncationDetected(t *testing.T) {
+	// A streaming writer leaves file_length unknown, so the walk cannot stop
+	// early on blocksEnd; the 3-byte payload needs 5 pad bytes we then cut.
+	var buf bytes.Buffer
+	bw, err := NewWriter(&buf, sampleWriter, "demo", sampleDefs)
+	require.NoError(t, err)
+	require.NoError(t, bw.Block(2, 0, []byte("abc")))
+	require.NoError(t, bw.End())
+	cut := buf.Bytes()[:buf.Len()-5]
+
+	for name, r := range map[string]io.Reader{
+		"seekable":     bytes.NewReader(cut),
+		"non-seekable": nonSeeker{bytes.NewReader(cut)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			br, err := NewReader(r)
+			require.NoError(t, err)
+			b, err := br.Next()
+			require.NoError(t, err) // the 3 payload bytes are all present...
+			err = br.SkipPayload(b) // ...but the pad to the 8-byte boundary is not
+			require.Error(t, err)
+			assert.True(t, errors.Is(err, ErrTruncated), "got %v", err)
+			assert.Equal(t, uint64(len(cut)), br.Offset(), "reader must stop at end of input")
+		})
+	}
+}
