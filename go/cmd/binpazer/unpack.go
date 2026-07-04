@@ -45,18 +45,30 @@ func runUnpack(r io.Reader, outDir string) (*Manifest, error) {
 			}
 			continue
 		}
-		p, err := br.ReadPayload(b)
-		if err != nil {
-			return nil, err
-		}
 		name := fmt.Sprintf("block%d.bin", i)
-		if err := os.WriteFile(filepath.Join(outDir, name), p, 0o644); err != nil {
+		if err := streamBlockToFile(br, b, filepath.Join(outDir, name)); err != nil {
 			return nil, err
 		}
 		m.Blocks = append(m.Blocks, ManifestBlock{TypeID: b.TypeID, Flags: flagNames(b.Flags), File: name})
 		i++
 	}
 	return m, nil
+}
+
+// streamBlockToFile streams the block's payload straight to path (64 KiB
+// chunks, CRC verified when present) so no payload is ever buffered whole.
+// On error the partial file is removed.
+func streamBlockToFile(br *binpazer.Reader, b *binpazer.Block, path string) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		return err
+	}
+	if _, err := br.WritePayloadTo(b, f); err != nil {
+		f.Close()
+		os.Remove(path)
+		return err
+	}
+	return f.Close()
 }
 
 func init() {

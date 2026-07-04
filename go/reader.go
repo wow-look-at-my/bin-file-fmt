@@ -401,8 +401,9 @@ func (br *Reader) resolveType(b *Block) {
 	}
 }
 
-// ReadPayload reads the current block's payload (verifying the CRC if present)
-// and advances to the next block.
+// ReadPayload reads the current block's payload into memory (verifying the
+// CRC if present) and advances to the next block. For payloads that should
+// not be buffered whole, use WritePayloadTo or PayloadReader instead.
 func (br *Reader) ReadPayload(b *Block) ([]byte, error) {
 	if err := br.claim(payloadClaim(b.PayloadLen, b.Flags), "block payload"); err != nil {
 		return nil, err
@@ -412,24 +413,11 @@ func (br *Reader) ReadPayload(b *Block) ([]byte, error) {
 		return nil, err
 	}
 	if b.Flags&FlagHasCRC != 0 {
-		cb := make([]byte, 4)
-		if err := br.read(cb); err != nil {
-			return nil, err
-		}
-		var bh [8]byte
-		var lf uint32
-		if b.Flags&FlagLargeMode != 0 {
-			lf = uint32(b.PayloadLen / LargeUnit)
-		} else {
-			lf = uint32(b.PayloadLen)
-		}
-		binary.LittleEndian.PutUint16(bh[0:], b.TypeID)
-		binary.LittleEndian.PutUint16(bh[2:], b.Flags)
-		binary.LittleEndian.PutUint32(bh[4:], lf)
-		crc := crc32.Update(0, crcTable, bh[:])
+		hb := b.headerBytes()
+		crc := crc32.Update(0, crcTable, hb[:])
 		crc = crc32.Update(crc, crcTable, buf)
-		if crc != binary.LittleEndian.Uint32(cb) {
-			return nil, fmt.Errorf("binpazer: block at offset %d: %w", b.Offset(), ErrCRCMismatch)
+		if err := br.verifyCRC(b, crc); err != nil {
+			return nil, err
 		}
 	}
 	if err := br.skip(b.nextOffset() - br.off); err != nil {

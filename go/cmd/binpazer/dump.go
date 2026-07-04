@@ -32,12 +32,15 @@ func runDump(rs io.ReadSeeker, w io.Writer, only int) error {
 			n++
 			continue
 		}
-		p, err := br.ReadPayload(b)
-		if err != nil {
+		fmt.Fprintf(w, "block %d (type %d, %d bytes):\n", n, b.TypeID, b.PayloadLen)
+		d := hex.Dumper(w) // streams the dump; no whole-payload buffer
+		if _, err := br.WritePayloadTo(b, d); err != nil {
+			d.Close()
 			return err
 		}
-		fmt.Fprintf(w, "block %d (type %d, %d bytes):\n", n, b.TypeID, len(p))
-		fmt.Fprint(w, hex.Dump(p))
+		if err := d.Close(); err != nil {
+			return err
+		}
 		n++
 	}
 	return nil

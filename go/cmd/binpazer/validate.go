@@ -17,17 +17,11 @@ func isPredefined(id uint16) bool {
 // runValidate checks a file against the spec. It returns a list of problems
 // (empty means conformant) or a fatal structural error (bad magic/header/BTT).
 func runValidate(rs io.ReadSeeker) ([]string, error) {
-	size, err := rs.Seek(0, io.SeekEnd)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := rs.Seek(0, io.SeekStart); err != nil {
-		return nil, err
-	}
 	br, err := binpazer.NewReader(rs)
 	if err != nil {
 		return nil, err
 	}
+	size := br.InputSize() // rs is seekable, so the reader learned it
 
 	var problems []string
 	if br.FileLength != binpazer.FileLengthUnknown && int64(br.FileLength) != size {
@@ -46,7 +40,15 @@ func runValidate(rs io.ReadSeeker) ([]string, error) {
 		if !b.Known && !isPredefined(b.TypeID) {
 			problems = append(problems, fmt.Sprintf("block %d: type_id %d not in the block type table", n, b.TypeID))
 		}
-		if _, err := br.ReadPayload(b); err != nil { // verifies CRC when present
+		// A CRC-carrying block is streamed through the checksum in 64 KiB
+		// chunks; one without a CRC is skipped without reading its payload.
+		// Either way nothing is buffered and truncation still surfaces.
+		if b.Flags&binpazer.FlagHasCRC != 0 {
+			_, err = br.WritePayloadTo(b, io.Discard)
+		} else {
+			err = br.SkipPayload(b)
+		}
+		if err != nil {
 			problems = append(problems, fmt.Sprintf("block %d (type %d): %v", n, b.TypeID, err))
 			break
 		}
