@@ -30,10 +30,14 @@ func (m *memFile) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 func (m *memFile) Seek(off int64, whence int) (int64, error) {
-	if whence != io.SeekStart {
-		panic("only SeekStart used")
+	switch whence {
+	case io.SeekStart:
+		m.pos = off
+	case io.SeekCurrent:
+		m.pos += off
+	case io.SeekEnd:
+		m.pos = int64(len(m.buf)) + off
 	}
-	m.pos = off
 	m.grow(m.pos)
 	return m.pos, nil
 }
