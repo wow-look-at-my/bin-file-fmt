@@ -42,6 +42,11 @@ const (
 // u32 length field this raises the per-block cap to (2^32-1)*4096 (~16 TiB).
 const LargeUnit = 4096
 
+// ioBufSize is the buffer size for reader/writer buffering and for payload
+// streaming: large enough to collapse per-field reads and per-block writes
+// into few syscalls, small enough to keep peak memory flat.
+const ioBufSize = 64 << 10
+
 // GUID is a 16-byte block-type identifier, in canonical (RFC 4122) byte order.
 type GUID [16]byte
 

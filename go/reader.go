@@ -1,6 +1,7 @@
 package binpazer
 
 import (
+	"bufio"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -19,10 +20,17 @@ const DefaultMaxAlloc int64 = 1 << 30 // 1 GiB
 const minBTTEntrySize = 32
 
 // Reader parses a binpazer file from an io.Reader.
+//
+// Position bookkeeping: all reads go through the buffered r, so the
+// underlying input's position can be up to one buffer ahead of the logical
+// offset off. Every reposition therefore seeks to an absolute target derived
+// from off (never relative to the underlying position) and resets the buffer;
+// seekTo is the only place that does this.
 type Reader struct {
-	r      io.Reader
-	seeker io.Seeker // non-nil if r also implements io.Seeker
-	off    uint64
+	src    io.Reader     // the original input; seeks reposition it
+	r      *bufio.Reader // buffered view of src; all reads go through it
+	seeker io.Seeker     // non-nil if src also implements io.Seeker
+	off    uint64        // logical offset: bytes consumed through r
 
 	inputSize int64 // total input size in bytes; -1 when unknown (non-seekable)
 	maxAlloc  int64 // per-field allocation cap used when inputSize is unknown
@@ -120,6 +128,18 @@ func (br *Reader) read(p []byte) error {
 	return nil
 }
 
+// seekTo repositions the underlying input at the absolute offset abs, resets
+// the read buffer (which may hold bytes from the old position), and resyncs
+// the logical offset. Requires br.seeker != nil.
+func (br *Reader) seekTo(abs uint64) error {
+	if _, err := br.seeker.Seek(int64(abs), io.SeekStart); err != nil {
+		return err
+	}
+	br.r.Reset(br.src)
+	br.off = abs
+	return nil
+}
+
 // skip advances the reader n bytes. Seekable inputs seek instead of reading
 // through, bounded by the real input size so a truncated file still surfaces
 // ErrTruncated exactly like the read-through path; non-seekable inputs fall
@@ -132,21 +152,24 @@ func (br *Reader) skip(n uint64) error {
 		return fmt.Errorf("binpazer: cannot skip %d bytes: %w", n, ErrCapacityExceeded)
 	}
 	if br.seeker != nil && br.inputSize >= 0 {
+		if n <= uint64(br.r.Buffered()) {
+			// The bytes are already buffered: drop them without a syscall.
+			if _, err := br.r.Discard(int(n)); err != nil {
+				return err
+			}
+			br.off += n
+			return nil
+		}
 		target := br.off + n
 		if target > uint64(br.inputSize) {
 			// Mirror the read-through path: stop at end of input, then
 			// report the truncation.
-			if _, err := br.seeker.Seek(br.inputSize, io.SeekStart); err != nil {
+			if err := br.seekTo(uint64(br.inputSize)); err != nil {
 				return err
 			}
-			br.off = uint64(br.inputSize)
 			return br.wrapEOF(io.ErrUnexpectedEOF)
 		}
-		if _, err := br.seeker.Seek(int64(target), io.SeekStart); err != nil {
-			return err
-		}
-		br.off = target
-		return nil
+		return br.seekTo(target)
 	}
 	m, err := io.CopyN(io.Discard, br.r, int64(n))
 	br.off += uint64(m)
@@ -173,12 +196,14 @@ func NewReader(r io.Reader) (*Reader, error) {
 // For seekable inputs the actual input size is the (tighter) bound and
 // maxAlloc is not consulted.
 func NewReaderLimited(r io.Reader, maxAlloc int64) (*Reader, error) {
-	br := &Reader{r: r, inputSize: -1, maxAlloc: maxAlloc}
+	br := &Reader{src: r, r: bufio.NewReaderSize(r, ioBufSize), inputSize: -1, maxAlloc: maxAlloc}
 	if br.maxAlloc <= 0 {
 		br.maxAlloc = DefaultMaxAlloc
 	}
 	if s, ok := r.(io.Seeker); ok {
 		br.seeker = s
+		// Note: this probe seeks the raw input before anything is buffered,
+		// so no buffer resync is needed here.
 		// Learn the real input size so every untrusted length/count field can
 		// be bounds-checked before it sizes an allocation.
 		cur, err := s.Seek(0, io.SeekCurrent)
@@ -246,17 +271,16 @@ func NewReaderLimited(r io.Reader, maxAlloc int64) (*Reader, error) {
 	if br.seeker != nil && br.FileLength != FileLengthUnknown && br.FileLength >= 16 &&
 		br.inputSize >= 0 && br.FileLength <= uint64(br.inputSize) {
 		saved := br.off
-		if _, err := br.seeker.Seek(int64(br.FileLength-16), io.SeekStart); err == nil {
+		if err := br.seekTo(br.FileLength - 16); err == nil { // probe is opportunistic
 			ft := make([]byte, 16)
 			if _, err := io.ReadFull(br.r, ft); err == nil && string(ft[8:]) == footerMagic {
 				br.indexOffset = binary.LittleEndian.Uint64(ft[0:])
 				br.hasIndex = true
 			}
 		}
-		if _, err := br.seeker.Seek(int64(saved), io.SeekStart); err != nil {
+		if err := br.seekTo(saved); err != nil {
 			return br, err
 		}
-		br.off = saved
 	}
 	br.blocksEnd = br.FileLength
 	if br.hasIndex {
@@ -438,9 +462,7 @@ func (br *Reader) Find(typeID uint16) ([]uint64, error) {
 	}
 	saved := br.off
 	offsets, ferr := br.find(typeID)
-	if _, err := br.seeker.Seek(int64(saved), io.SeekStart); err == nil {
-		br.off = saved
-	}
+	_ = br.seekTo(saved) // best-effort restore; a find error takes precedence
 	if ferr != nil {
 		return nil, ferr
 	}
@@ -450,10 +472,9 @@ func (br *Reader) Find(typeID uint16) ([]uint64, error) {
 func (br *Reader) find(typeID uint16) ([]uint64, error) {
 	var offsets []uint64
 	if br.hasIndex {
-		if _, err := br.seeker.Seek(int64(br.indexOffset), io.SeekStart); err != nil {
+		if err := br.seekTo(br.indexOffset); err != nil {
 			return nil, err
 		}
-		br.off = br.indexOffset
 		bh := make([]byte, 8)
 		cc := make([]byte, 8)
 		if err := br.read(bh); err != nil {
@@ -476,10 +497,9 @@ func (br *Reader) find(typeID uint16) ([]uint64, error) {
 	}
 
 	// No index -- walk the file.
-	if _, err := br.seeker.Seek(int64(br.FirstBlockOffset), io.SeekStart); err != nil {
+	if err := br.seekTo(br.FirstBlockOffset); err != nil {
 		return nil, err
 	}
-	br.off = br.FirstBlockOffset
 	for br.blocksEnd == FileLengthUnknown || br.off < br.blocksEnd {
 		blkOff := br.off
 		bh := make([]byte, 8)
@@ -505,10 +525,9 @@ func (br *Reader) find(typeID uint16) ([]uint64, error) {
 			crc = 4
 		}
 		next := align8(blkOff + 8 + plen + crc)
-		if _, err := br.seeker.Seek(int64(next), io.SeekStart); err != nil {
+		if err := br.seekTo(next); err != nil {
 			return nil, err
 		}
-		br.off = next
 	}
 	return offsets, nil
 }
@@ -523,10 +542,9 @@ func (br *Reader) At(offset uint64) (*Block, error) {
 	if br.inputSize >= 0 && offset > uint64(br.inputSize) {
 		return nil, fmt.Errorf("binpazer: block offset %d is beyond the %d-byte input: %w", offset, br.inputSize, ErrTruncated)
 	}
-	if _, err := br.seeker.Seek(int64(offset), io.SeekStart); err != nil {
+	if err := br.seekTo(offset); err != nil {
 		return nil, err
 	}
-	br.off = offset
 	bh := make([]byte, 8)
 	if err := br.read(bh); err != nil {
 		return nil, err

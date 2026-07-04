@@ -1,6 +1,7 @@
 package binpazer
 
 import (
+	"bufio"
 	"encoding/binary"
 	"errors"
 	"hash/crc32"
@@ -9,8 +10,9 @@ import (
 
 // Writer serializes a binpazer file to an io.Writer.
 type Writer struct {
-	w           io.Writer
-	seeker      io.Seeker // non-nil if w also implements io.Seeker
+	dst         io.Writer     // the original destination (back-patch target)
+	w           *bufio.Writer // buffered view of dst; all sequential writes
+	seeker      io.Seeker     // non-nil if dst also implements io.Seeker
 	off         uint64
 	err         error
 	idx         []IndexEntry // recorded as blocks are written
@@ -66,7 +68,7 @@ func (bw *Writer) writeBTTEntry(typeID uint16, guid GUID, name string) {
 // Writer ready for Block calls. If w implements io.Seeker, the exact file length
 // is back-patched by End; otherwise the streaming sentinel is used.
 func NewWriter(w io.Writer, writerGUID GUID, name string, defs []TypeDef) (*Writer, error) {
-	bw := &Writer{w: w}
+	bw := &Writer{dst: w, w: bufio.NewWriterSize(w, ioBufSize)}
 	if s, ok := w.(io.Seeker); ok {
 		bw.seeker = s
 	}
@@ -201,8 +203,9 @@ func (bw *Writer) WriteIndex() error {
 	return bw.err
 }
 
-// End finishes the file: it writes the footer (if an index was written), then
-// back-patches file_length when the writer is seekable.
+// End finishes the file: it writes the footer (if an index was written),
+// flushes the write buffer, then back-patches file_length when the writer is
+// seekable.
 func (bw *Writer) End() error {
 	if bw.err != nil {
 		return bw.err
@@ -213,6 +216,14 @@ func (bw *Writer) End() error {
 		copy(ft[8:], footerMagic)
 		bw.write(ft[:])
 	}
+	// Everything buffered must reach dst before the back-patch seek moves the
+	// destination's position (and regardless, End is the finalizer).
+	if bw.err == nil {
+		bw.err = bw.w.Flush()
+	}
+	if bw.err != nil {
+		return bw.err
+	}
 	if bw.seeker != nil {
 		total := bw.off
 		if _, err := bw.seeker.Seek(32, io.SeekStart); err != nil {
@@ -221,7 +232,7 @@ func (bw *Writer) End() error {
 		}
 		var b [8]byte
 		binary.LittleEndian.PutUint64(b[:], total)
-		if _, err := bw.w.Write(b[:]); err != nil {
+		if _, err := bw.dst.Write(b[:]); err != nil {
 			bw.err = err
 			return bw.err
 		}
