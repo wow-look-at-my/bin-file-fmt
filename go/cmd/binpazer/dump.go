@@ -38,6 +38,9 @@ func runDump(br *binpazer.Reader, w io.Writer, only int) error {
 		}
 		n++
 	}
+	if only >= 0 && only >= n {
+		return fmt.Errorf("block index %d out of range: the file has %d block(s)", only, n)
+	}
 	return nil
 }
 

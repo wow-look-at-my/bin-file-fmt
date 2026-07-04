@@ -76,6 +76,28 @@ func TestCLIEndToEnd(t *testing.T) {
 	assert.Contains(t, o, "spec-conformant")
 }
 
+func TestVersionFlag(t *testing.T) {
+	out, err := execute("--version")
+	require.NoError(t, err)
+	assert.Contains(t, out, "binpazer version dev")
+	assert.Contains(t, versionString(), "dev")
+}
+
+func TestDumpBlockOutOfRange(t *testing.T) {
+	dir := t.TempDir()
+	path, _ := packSample(t, dir)
+
+	_, err := execute("dump", path, "--block", "99")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "block index 99 out of range")
+	assert.Contains(t, err.Error(), "4 block(s)") // 3 data blocks + the index
+
+	// The last valid index still works.
+	out, err := execute("dump", path, "--block", "3")
+	require.NoError(t, err)
+	assert.Contains(t, out, "block 3")
+}
+
 func TestValidateRejectsGarbage(t *testing.T) {
 	dir := t.TempDir()
 	bad := filepath.Join(dir, "bad.bin")
