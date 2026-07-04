@@ -157,7 +157,7 @@ follows the payload, before alignment padding.
 |---|---|---|
 | 0 | `critical` | If set and the reader does not know this `type_id`'s GUID, the file cannot be correctly processed -- the reader MUST stop. If clear (ancillary), an unknown block is safe to skip. |
 | 1 | `safe_to_copy` | If set, an editor that does not understand this block may copy it verbatim when rewriting the file. If clear, drop it on rewrite when not understood. |
-| 2 | `compressed` | Payload begins with a compression descriptor (see [Compression](#compression)). |
+| 2 | `compressed` | Payload is stored compressed, prefixed by a codec descriptor. Reserved -- no codec is implemented yet (see [Compression](#compression)). |
 | 3 | `has_crc` | A 4-byte CRC-32C trailer follows the payload. |
 | 4 | `large_mode` | `length` counts 4096-byte units instead of bytes (see [Block header](#block-header)). |
 | 5.. | reserved | must be 0; readers MUST ignore unknown bits |
@@ -285,6 +285,18 @@ is kept as a fixed-size struct.
 
 ### Compression
 
+> **Status: reserved -- not yet implemented.** No reference implementation
+> (C, C++, or Go) emits compressed blocks or interprets this flag. A reader
+> that encounters a block with `compressed` set walks it normally -- `length`
+> counts the payload bytes **as stored**, and a `has_crc` trailer covers the
+> stored bytes -- and delivers the payload verbatim (descriptor plus
+> compressed data), without decompressing and without error. An application
+> that needs such a block's content and cannot decompress it MUST treat the
+> block as not understood: stop if `critical` is set, skip it otherwise.
+> Generic tools that only move stored bytes (walking, copying, dumping) are
+> unaffected. Writers SHOULD NOT set `compressed` until a codec assignment is
+> finalized here.
+
 When `compressed` (bit 2) is set, the payload begins with:
 
 | Offset | Size | Field | Type | Notes |
@@ -339,7 +351,9 @@ Readers MUST ignore unknown flag bits and reserved fields.
 - `magic` and `signature` match exactly.
 - The first block is `type_id == 65534`.
 - No duplicate `type_id` in the Block Type Table; never `0` or `65535`.
-- Every block's `type_id` is present in the table.
+- Every block's `type_id` is present in the table. Predefined ids
+  (65530-65534) are implicitly defined by this spec and exempt -- writers MAY
+  emit predefined blocks (e.g. the Block Index) without a table entry.
 - Reserved fields and bits are 0 on write (ignored on read).
 - Blocks are 8-byte aligned; the final block ends at `file_length` (when not the
   streaming sentinel).
