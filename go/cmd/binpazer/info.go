@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -53,8 +54,61 @@ func runInfo(br *binpazer.Reader, w io.Writer, recurse bool) error {
 	return nil
 }
 
+// runInfoJSON emits the same information as runInfo as one JSON object.
+// has_index is recorded after the walk, so a stream that only discovers the
+// footer at the end still reports it.
+func runInfoJSON(br *binpazer.Reader, w io.Writer, recurse bool) error {
+	tt := newTypeTable(br)
+	out := infoJSON{
+		VersionMajor: br.VersionMajor,
+		VersionMinor: br.VersionMinor,
+		WriterName:   br.WriterName,
+		WriterGUID:   br.WriterGUID.String(),
+		Types:        make([]typeJSON, 0, len(br.Types)),
+		Blocks:       []blockJSON{},
+	}
+	if br.FileLength != binpazer.FileLengthUnknown {
+		fl := br.FileLength
+		out.FileLength = &fl
+	}
+	for _, t := range br.Types {
+		out.Types = append(out.Types, typeJSON{TypeID: t.TypeID, GUID: t.GUID.String(), Name: t.Name})
+	}
+	n := 0
+	for {
+		b, err := br.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		bj := topBlockJSON(tt, b, n)
+		if recurse && tt.isGroup(b.TypeID) {
+			payload, rerr := br.ReadPayload(b)
+			switch {
+			case rerr == nil:
+				bj.Children, bj.Error = childrenJSON(tt, payload, b.Offset()+8, 1, false)
+			case errors.Is(rerr, binpazer.ErrCRCMismatch):
+				bj.Error = rerr.Error()
+				if err := br.SkipPayload(b); err != nil {
+					return err
+				}
+			default:
+				return rerr
+			}
+		} else if err := br.SkipPayload(b); err != nil {
+			return err
+		}
+		out.Blocks = append(out.Blocks, bj)
+		n++
+	}
+	out.HasIndex = br.HasIndex()
+	return writeJSON(w, out)
+}
+
 func init() {
-	var recurse bool
+	var recurse, asJSON bool
 	var maxAlloc *int64
 	cmd := &cobra.Command{
 		Use:   "info <file.binpazer | ->",
@@ -68,11 +122,16 @@ func init() {
 			if c != nil {
 				defer c.Close()
 			}
+			if asJSON {
+				return runInfoJSON(br, cmd.OutOrStdout(), recurse)
+			}
 			return runInfo(br, cmd.OutOrStdout(), recurse)
 		},
 	}
 	cmd.Flags().BoolVar(&recurse, "recurse", false,
 		"descend into group blocks and list nested blocks indented")
+	cmd.Flags().BoolVar(&asJSON, "json", false,
+		"emit one machine-readable JSON object (nested blocks appear as children)")
 	maxAlloc = maxAllocFlag(cmd)
 	rootCmd.AddCommand(cmd)
 }
