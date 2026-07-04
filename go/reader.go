@@ -6,13 +6,26 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"math"
 )
+
+// DefaultMaxAlloc is the allocation cap NewReader applies to any single
+// length/count field when the total input size cannot be learned (the input is
+// not an io.Seeker). Use NewReaderLimited to choose a different cap.
+const DefaultMaxAlloc int64 = 1 << 30 // 1 GiB
+
+// minBTTEntrySize is the smallest on-disk Block Type Table entry: a 20-byte
+// header, a 4-byte name length, an empty name, and a NUL, padded to 8 bytes.
+const minBTTEntrySize = 32
 
 // Reader parses a binpazer file from an io.Reader.
 type Reader struct {
 	r      io.Reader
 	seeker io.Seeker // non-nil if r also implements io.Seeker
 	off    uint64
+
+	inputSize int64 // total input size in bytes; -1 when unknown (non-seekable)
+	maxAlloc  int64 // per-field allocation cap used when inputSize is unknown
 
 	VersionMajor     uint16
 	VersionMinor     uint16
@@ -48,11 +61,60 @@ func (b *Block) nextOffset() uint64 {
 	return align8(b.payloadOff + b.PayloadLen + crc)
 }
 
-func (br *Reader) read(p []byte) error {
-	if _, err := io.ReadFull(br.r, p); err != nil {
-		return err
+// decodePayloadLen converts the on-disk 32-bit length field to a byte count.
+// lf comes from a uint32, so the large-mode multiply cannot overflow uint64:
+// (2^32-1) * 4096 < 2^44.
+func decodePayloadLen(lf uint64, flags uint16) uint64 {
+	if flags&FlagLargeMode != 0 {
+		return lf * LargeUnit
 	}
-	br.off += uint64(len(p))
+	return lf
+}
+
+// payloadClaim is the byte cost a block header claims: the payload plus the
+// trailing CRC when present (saturating, so a hostile PayloadLen cannot wrap).
+func payloadClaim(payloadLen uint64, flags uint16) uint64 {
+	if flags&FlagHasCRC != 0 && payloadLen <= math.MaxUint64-4 {
+		return payloadLen + 4
+	}
+	return payloadLen
+}
+
+// wrapEOF converts an unexpected end-of-input into an ErrTruncated-wrapped
+// error; other errors pass through unchanged.
+func (br *Reader) wrapEOF(err error) error {
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return fmt.Errorf("binpazer: unexpected end of input at offset %d: %w", br.off, ErrTruncated)
+	}
+	return err
+}
+
+// claim verifies that a length/count field read from the file can plausibly be
+// satisfied, before any allocation is sized from it. When the total input size
+// is known the bound is the bytes remaining; otherwise maxAlloc caps it.
+func (br *Reader) claim(n uint64, what string) error {
+	if br.inputSize >= 0 {
+		rem := br.inputSize - int64(br.off)
+		if rem < 0 {
+			rem = 0
+		}
+		if n > uint64(rem) {
+			return fmt.Errorf("binpazer: %s claims %d bytes but only %d remain in the input: %w", what, n, rem, ErrTruncated)
+		}
+		return nil
+	}
+	if n > uint64(br.maxAlloc) {
+		return fmt.Errorf("binpazer: %s claims %d bytes, over the %d-byte cap for non-seekable input: %w", what, n, br.maxAlloc, ErrCapacityExceeded)
+	}
+	return nil
+}
+
+func (br *Reader) read(p []byte) error {
+	n, err := io.ReadFull(br.r, p)
+	br.off += uint64(n)
+	if err != nil {
+		return br.wrapEOF(err)
+	}
 	return nil
 }
 
@@ -60,16 +122,53 @@ func (br *Reader) skip(n uint64) error {
 	if n == 0 {
 		return nil
 	}
+	if n > math.MaxInt64 {
+		return fmt.Errorf("binpazer: cannot skip %d bytes: %w", n, ErrCapacityExceeded)
+	}
 	m, err := io.CopyN(io.Discard, br.r, int64(n))
 	br.off += uint64(m)
-	return err
+	if err != nil {
+		return br.wrapEOF(err)
+	}
+	return nil
 }
 
 // NewReader reads and validates the file header and Block Type Table.
+//
+// When r implements io.Seeker, the reader learns the real input size and
+// rejects any length/count field that promises more bytes than remain, before
+// allocating for it. Otherwise every such field is capped at DefaultMaxAlloc;
+// use NewReaderLimited to pick a different cap for streaming callers.
 func NewReader(r io.Reader) (*Reader, error) {
-	br := &Reader{r: r}
+	return NewReaderLimited(r, DefaultMaxAlloc)
+}
+
+// NewReaderLimited is NewReader with an explicit allocation cap for
+// non-seekable inputs. Any single length/count field claiming more than
+// maxAlloc bytes is rejected with ErrCapacityExceeded when the input size
+// cannot be learned by seeking. maxAlloc <= 0 selects DefaultMaxAlloc.
+// For seekable inputs the actual input size is the (tighter) bound and
+// maxAlloc is not consulted.
+func NewReaderLimited(r io.Reader, maxAlloc int64) (*Reader, error) {
+	br := &Reader{r: r, inputSize: -1, maxAlloc: maxAlloc}
+	if br.maxAlloc <= 0 {
+		br.maxAlloc = DefaultMaxAlloc
+	}
 	if s, ok := r.(io.Seeker); ok {
 		br.seeker = s
+		// Learn the real input size so every untrusted length/count field can
+		// be bounds-checked before it sizes an allocation.
+		cur, err := s.Seek(0, io.SeekCurrent)
+		if err == nil {
+			var end int64
+			if end, err = s.Seek(0, io.SeekEnd); err == nil {
+				br.inputSize = end
+				_, err = s.Seek(cur, io.SeekStart)
+			}
+		}
+		if err != nil {
+			return br, fmt.Errorf("binpazer: determining input size: %w", err)
+		}
 	}
 
 	hdr := make([]byte, 56)
@@ -77,10 +176,10 @@ func NewReader(r io.Reader) (*Reader, error) {
 		return br, err
 	}
 	if string(hdr[0:8]) != Magic {
-		return br, errors.New("binpazer: bad magic")
+		return br, ErrBadMagic
 	}
 	if hdr[8] != 0x0D || hdr[9] != 0x0A || hdr[10] != 0x1A || hdr[11] != 0x0A {
-		return br, errors.New("binpazer: bad signature")
+		return br, fmt.Errorf("binpazer: bad signature: %w", ErrBadMagic)
 	}
 	br.VersionMajor = binary.LittleEndian.Uint16(hdr[12:])
 	br.VersionMinor = binary.LittleEndian.Uint16(hdr[14:])
@@ -96,6 +195,9 @@ func NewReader(r io.Reader) (*Reader, error) {
 		return br, err
 	}
 	nameLen := uint64(binary.LittleEndian.Uint32(lp))
+	if err := br.claim(nameLen, "writer name"); err != nil {
+		return br, err
+	}
 	name := make([]byte, nameLen)
 	if err := br.read(name); err != nil {
 		return br, err
@@ -111,60 +213,15 @@ func NewReader(r io.Reader) (*Reader, error) {
 		return br, err
 	}
 
-	bh := make([]byte, 8)
-	if err := br.read(bh); err != nil {
-		return br, err
-	}
-	if binary.LittleEndian.Uint16(bh) != TypeBlockTypeTable {
-		return br, errors.New("binpazer: first block is not the block type table")
-	}
-	bttLen := uint64(binary.LittleEndian.Uint32(bh[4:]))
-
-	cc := make([]byte, 8)
-	if err := br.read(cc); err != nil {
-		return br, err
-	}
-	entryCount := binary.LittleEndian.Uint32(cc)
-	br.Types = make([]TypeEntry, 0, entryCount)
-	for i := uint32(0); i < entryCount; i++ {
-		eh := make([]byte, 20)
-		if err := br.read(eh); err != nil {
-			return br, err
-		}
-		var e TypeEntry
-		e.TypeID = binary.LittleEndian.Uint16(eh)
-		copy(e.GUID[:], eh[4:20])
-		lp2 := make([]byte, 4)
-		if err := br.read(lp2); err != nil {
-			return br, err
-		}
-		nlen := uint64(binary.LittleEndian.Uint32(lp2))
-		if nlen > 0 {
-			nb := make([]byte, nlen)
-			if err := br.read(nb); err != nil {
-				return br, err
-			}
-			e.Name = string(nb)
-		}
-		if err := br.skip(1); err != nil { // trailing NUL
-			return br, err
-		}
-		raw := 25 + nlen
-		if err := br.skip(align8(raw) - raw); err != nil { // entry pad
-			return br, err
-		}
-		br.Types = append(br.Types, e)
-	}
-	bttEnd := align8(br.FirstBlockOffset + 8 + bttLen)
-	if br.off > bttEnd {
-		return br, errors.New("binpazer: block type table overrun")
-	}
-	if err := br.skip(bttEnd - br.off); err != nil {
+	if err := br.readBTT(); err != nil {
 		return br, err
 	}
 
-	// Opportunistically locate a Block Index via the footer.
-	if br.seeker != nil && br.FileLength != FileLengthUnknown && br.FileLength >= 16 {
+	// Opportunistically locate a Block Index via the footer. The header's
+	// file_length is untrusted: only probe when it fits the real input size,
+	// so a bogus value degrades to "no footer" instead of a wild seek.
+	if br.seeker != nil && br.FileLength != FileLengthUnknown && br.FileLength >= 16 &&
+		br.inputSize >= 0 && br.FileLength <= uint64(br.inputSize) {
 		saved := br.off
 		if _, err := br.seeker.Seek(int64(br.FileLength-16), io.SeekStart); err == nil {
 			ft := make([]byte, 16)
@@ -185,6 +242,77 @@ func NewReader(r io.Reader) (*Reader, error) {
 	return br, nil
 }
 
+// readBTT parses the Block Type Table (the required first block) into
+// br.Types, bounds-checking every count and name length before allocating.
+func (br *Reader) readBTT() error {
+	bh := make([]byte, 8)
+	if err := br.read(bh); err != nil {
+		return err
+	}
+	if binary.LittleEndian.Uint16(bh) != TypeBlockTypeTable {
+		return errors.New("binpazer: first block is not the block type table")
+	}
+	bttLen := uint64(binary.LittleEndian.Uint32(bh[4:]))
+	if err := br.claim(bttLen, "block type table"); err != nil {
+		return err
+	}
+	bttEnd := align8(br.FirstBlockOffset + 8 + bttLen)
+
+	cc := make([]byte, 8)
+	if err := br.read(cc); err != nil {
+		return err
+	}
+	entryCount := binary.LittleEndian.Uint32(cc)
+	// Each entry occupies at least minBTTEntrySize bytes on disk, so a count
+	// the table's own payload cannot hold is structurally impossible.
+	maxEntries := uint64(0)
+	if bttLen >= 8 {
+		maxEntries = (bttLen - 8) / minBTTEntrySize
+	}
+	if uint64(entryCount) > maxEntries {
+		return fmt.Errorf("binpazer: block type table claims %d entries but its %d-byte payload holds at most %d: %w",
+			entryCount, bttLen, maxEntries, ErrCapacityExceeded)
+	}
+	br.Types = make([]TypeEntry, 0, entryCount)
+	for i := uint32(0); i < entryCount; i++ {
+		eh := make([]byte, 20)
+		if err := br.read(eh); err != nil {
+			return err
+		}
+		var e TypeEntry
+		e.TypeID = binary.LittleEndian.Uint16(eh)
+		copy(e.GUID[:], eh[4:20])
+		lp2 := make([]byte, 4)
+		if err := br.read(lp2); err != nil {
+			return err
+		}
+		nlen := uint64(binary.LittleEndian.Uint32(lp2))
+		if nlen > 0 {
+			if br.off >= bttEnd || nlen > bttEnd-br.off {
+				return fmt.Errorf("binpazer: block type table entry %d name (%d bytes) overruns the table: %w",
+					i, nlen, ErrCapacityExceeded)
+			}
+			nb := make([]byte, nlen)
+			if err := br.read(nb); err != nil {
+				return err
+			}
+			e.Name = string(nb)
+		}
+		if err := br.skip(1); err != nil { // trailing NUL
+			return err
+		}
+		raw := 25 + nlen
+		if err := br.skip(align8(raw) - raw); err != nil { // entry pad
+			return err
+		}
+		br.Types = append(br.Types, e)
+	}
+	if br.off > bttEnd {
+		return errors.New("binpazer: block type table overrun")
+	}
+	return br.skip(bttEnd - br.off)
+}
+
 // Next reads the next block header, resolving its GUID against the type table.
 // It returns io.EOF after the last block. The payload is not read.
 func (br *Reader) Next() (*Block, error) {
@@ -196,19 +324,17 @@ func (br *Reader) Next() (*Block, error) {
 	if n == 0 && err == io.EOF {
 		return nil, io.EOF
 	}
+	br.off += uint64(n)
 	if err != nil {
-		return nil, err
+		return nil, br.wrapEOF(err)
 	}
-	br.off += 8
 
 	b := &Block{}
 	b.TypeID = binary.LittleEndian.Uint16(bh)
 	b.Flags = binary.LittleEndian.Uint16(bh[2:])
-	lf := uint64(binary.LittleEndian.Uint32(bh[4:]))
-	if b.Flags&FlagLargeMode != 0 {
-		b.PayloadLen = lf * LargeUnit
-	} else {
-		b.PayloadLen = lf
+	b.PayloadLen = decodePayloadLen(uint64(binary.LittleEndian.Uint32(bh[4:])), b.Flags)
+	if err := br.claim(payloadClaim(b.PayloadLen, b.Flags), "block payload"); err != nil {
+		return nil, err
 	}
 	b.payloadOff = br.off
 	for _, e := range br.Types {
@@ -224,6 +350,9 @@ func (br *Reader) Next() (*Block, error) {
 // ReadPayload reads the current block's payload (verifying the CRC if present)
 // and advances to the next block.
 func (br *Reader) ReadPayload(b *Block) ([]byte, error) {
+	if err := br.claim(payloadClaim(b.PayloadLen, b.Flags), "block payload"); err != nil {
+		return nil, err
+	}
 	buf := make([]byte, b.PayloadLen)
 	if err := br.read(buf); err != nil {
 		return nil, err
@@ -246,7 +375,7 @@ func (br *Reader) ReadPayload(b *Block) ([]byte, error) {
 		crc := crc32.Update(0, crcTable, bh[:])
 		crc = crc32.Update(crc, crcTable, buf)
 		if crc != binary.LittleEndian.Uint32(cb) {
-			return nil, errors.New("binpazer: CRC mismatch")
+			return nil, fmt.Errorf("binpazer: block at offset %d: %w", b.Offset(), ErrCRCMismatch)
 		}
 	}
 	if err := br.skip(b.nextOffset() - br.off); err != nil {
@@ -265,6 +394,10 @@ func (br *Reader) HasIndex() bool { return br.hasIndex }
 
 // Offset returns the reader's current file offset.
 func (br *Reader) Offset() uint64 { return br.off }
+
+// InputSize returns the total input size learned by seeking, or -1 when the
+// input is not seekable.
+func (br *Reader) InputSize() int64 { return br.inputSize }
 
 // Find returns the file offsets of all blocks with the given type id. It uses
 // the Block Index when present (seeking straight to it) and otherwise walks the
@@ -324,16 +457,15 @@ func (br *Reader) find(typeID uint16) ([]uint64, error) {
 		if n == 0 && err == io.EOF {
 			break
 		}
+		br.off += uint64(n)
 		if err != nil {
-			return nil, err
+			return nil, br.wrapEOF(err)
 		}
-		br.off += 8
 		tid := binary.LittleEndian.Uint16(bh)
 		flags := binary.LittleEndian.Uint16(bh[2:])
-		lf := uint64(binary.LittleEndian.Uint32(bh[4:]))
-		plen := lf
-		if flags&FlagLargeMode != 0 {
-			plen = lf * LargeUnit
+		plen := decodePayloadLen(uint64(binary.LittleEndian.Uint32(bh[4:])), flags)
+		if err := br.claim(payloadClaim(plen, flags), "block payload"); err != nil {
+			return nil, err
 		}
 		if tid == typeID {
 			offsets = append(offsets, blkOff)
@@ -358,6 +490,9 @@ func (br *Reader) At(offset uint64) (*Block, error) {
 	if br.seeker == nil {
 		return nil, errors.New("binpazer: At requires a seekable reader")
 	}
+	if br.inputSize >= 0 && offset > uint64(br.inputSize) {
+		return nil, fmt.Errorf("binpazer: block offset %d is beyond the %d-byte input: %w", offset, br.inputSize, ErrTruncated)
+	}
 	if _, err := br.seeker.Seek(int64(offset), io.SeekStart); err != nil {
 		return nil, err
 	}
@@ -369,11 +504,9 @@ func (br *Reader) At(offset uint64) (*Block, error) {
 	b := &Block{}
 	b.TypeID = binary.LittleEndian.Uint16(bh)
 	b.Flags = binary.LittleEndian.Uint16(bh[2:])
-	lf := uint64(binary.LittleEndian.Uint32(bh[4:]))
-	if b.Flags&FlagLargeMode != 0 {
-		b.PayloadLen = lf * LargeUnit
-	} else {
-		b.PayloadLen = lf
+	b.PayloadLen = decodePayloadLen(uint64(binary.LittleEndian.Uint32(bh[4:])), b.Flags)
+	if err := br.claim(payloadClaim(b.PayloadLen, b.Flags), "block payload"); err != nil {
+		return nil, err
 	}
 	b.payloadOff = br.off
 	for _, e := range br.Types {

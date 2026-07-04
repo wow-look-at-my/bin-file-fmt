@@ -3,6 +3,13 @@
 //
 // It does no file IO and no mmap: the caller supplies an io.Writer (optionally
 // also an io.Seeker, to back-patch the exact file length) or an io.Reader.
+//
+// The reader defends against hostile inputs: every length and count field is
+// bounds-checked against the real input size (learned by seeking) -- or, for
+// non-seekable inputs, against a configurable cap (see NewReaderLimited) --
+// before any allocation is sized from it. Failures are reported through the
+// sentinel errors ErrBadMagic, ErrCRCMismatch, ErrTruncated, and
+// ErrCapacityExceeded (match with errors.Is).
 package binpazer
 
 import "hash/crc32"
