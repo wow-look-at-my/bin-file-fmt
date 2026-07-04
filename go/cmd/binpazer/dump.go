@@ -9,8 +9,11 @@ import (
 	binpazer "github.com/wow-look-at-my/bin-file-fmt/go"
 )
 
-// runDump hex-dumps block payloads. If only >= 0, only that block index is dumped.
-func runDump(br *binpazer.Reader, w io.Writer, only int) error {
+// runDump hex-dumps block payloads. If only >= 0, only that block index is
+// dumped. With recurse, group blocks are descended: their children are dumped
+// individually instead of the group payload appearing as one opaque blob.
+func runDump(br *binpazer.Reader, w io.Writer, only int, recurse bool) error {
+	tt := newTypeTable(br)
 	n := 0
 	for {
 		b, err := br.Next()
@@ -22,6 +25,14 @@ func runDump(br *binpazer.Reader, w io.Writer, only int) error {
 		}
 		if only >= 0 && n != only {
 			if err := br.SkipPayload(b); err != nil {
+				return err
+			}
+			n++
+			continue
+		}
+		if recurse && tt.isGroup(b.TypeID) {
+			fmt.Fprintf(w, "block %d (type %d, %d bytes): group\n", n, b.TypeID, b.PayloadLen)
+			if err := descendGroup(br, w, tt, b, fmt.Sprintf("%d", n), true); err != nil {
 				return err
 			}
 			n++
@@ -46,6 +57,7 @@ func runDump(br *binpazer.Reader, w io.Writer, only int) error {
 
 func init() {
 	var only int
+	var recurse bool
 	var maxAlloc *int64
 	cmd := &cobra.Command{
 		Use:   "dump <file.binpazer | ->",
@@ -59,10 +71,12 @@ func init() {
 			if c != nil {
 				defer c.Close()
 			}
-			return runDump(br, cmd.OutOrStdout(), only)
+			return runDump(br, cmd.OutOrStdout(), only, recurse)
 		},
 	}
 	cmd.Flags().IntVar(&only, "block", -1, "dump only this block index (default: all)")
+	cmd.Flags().BoolVar(&recurse, "recurse", false,
+		"descend into group blocks and dump nested blocks individually")
 	maxAlloc = maxAllocFlag(cmd)
 	rootCmd.AddCommand(cmd)
 }

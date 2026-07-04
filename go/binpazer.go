@@ -50,8 +50,15 @@ const ioBufSize = 64 << 10
 // GUID is a 16-byte block-type identifier, in canonical (RFC 4122) byte order.
 type GUID [16]byte
 
-// BlockTypeTableGUID is the well-known GUID of the Block Type Table.
-var BlockTypeTableGUID = GUID{0x62, 0x69, 0x6e, 0x70, 0x61, 0x7a, 0x65, 0x72, 0, 0, 0, 0, 0, 0, 0, 1}
+// The well-known GUIDs of the predefined block types (SPEC.md "Well-known
+// type ids and GUIDs"; the namespace's first 8 bytes spell "binpazer").
+var (
+	BlockTypeTableGUID = GUID{0x62, 0x69, 0x6e, 0x70, 0x61, 0x7a, 0x65, 0x72, 0, 0, 0, 0, 0, 0, 0, 1}
+	BlockIndexGUID     = GUID{0x62, 0x69, 0x6e, 0x70, 0x61, 0x7a, 0x65, 0x72, 0, 0, 0, 0, 0, 0, 0, 2}
+	WriterInfoGUID     = GUID{0x62, 0x69, 0x6e, 0x70, 0x61, 0x7a, 0x65, 0x72, 0, 0, 0, 0, 0, 0, 0, 3}
+	PaddingGUID        = GUID{0x62, 0x69, 0x6e, 0x70, 0x61, 0x7a, 0x65, 0x72, 0, 0, 0, 0, 0, 0, 0, 4}
+	GroupGUID          = GUID{0x62, 0x69, 0x6e, 0x70, 0x61, 0x7a, 0x65, 0x72, 0, 0, 0, 0, 0, 0, 0, 5}
+)
 
 var crcTable = crc32.MakeTable(crc32.Castagnoli)
 

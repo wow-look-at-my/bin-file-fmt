@@ -9,9 +9,10 @@ import (
 	binpazer "github.com/wow-look-at-my/bin-file-fmt/go"
 )
 
-// runInfo prints a human-readable summary: header, the block type table, and a
-// list of blocks with their flags, offsets, and sizes.
-func runInfo(br *binpazer.Reader, w io.Writer) error {
+// runInfo prints a human-readable summary: header, the block type table, and
+// a list of blocks with their flags, offsets, and sizes. With recurse, group
+// blocks are descended and their children listed indented.
+func runInfo(br *binpazer.Reader, w io.Writer, recurse bool) error {
 	fmt.Fprintf(w, "binpazer v%d.%d\n", br.VersionMajor, br.VersionMinor)
 	fmt.Fprintf(w, "writer:      %s (%s)\n", br.WriterName, br.WriterGUID)
 	if br.FileLength == binpazer.FileLengthUnknown {
@@ -21,10 +22,9 @@ func runInfo(br *binpazer.Reader, w io.Writer) error {
 	}
 	fmt.Fprintf(w, "has_index:   %v\n", br.HasIndex())
 
-	names := map[uint16]string{}
+	tt := newTypeTable(br)
 	fmt.Fprintf(w, "\nblock types (%d):\n", len(br.Types))
 	for _, t := range br.Types {
-		names[t.TypeID] = t.Name
 		fmt.Fprintf(w, "  %-6d %s  %s\n", t.TypeID, t.GUID, t.Name)
 	}
 
@@ -38,13 +38,14 @@ func runInfo(br *binpazer.Reader, w io.Writer) error {
 		if err != nil {
 			return err
 		}
-		name := names[b.TypeID]
-		if name == "" {
-			name = predefinedName(b.TypeID)
-		}
 		fmt.Fprintf(w, "  [%d] type=%-6d %-14s flags=[%s] offset=%d len=%d\n",
-			n, b.TypeID, name, strings.Join(flagNames(b.Flags), ","), b.Offset(), b.PayloadLen)
-		if err := br.SkipPayload(b); err != nil {
+			n, b.TypeID, tt.name(b.TypeID), strings.Join(flagNames(b.Flags), ","), b.Offset(), b.PayloadLen)
+		if recurse && tt.isGroup(b.TypeID) {
+			err = descendGroup(br, w, tt, b, fmt.Sprintf("%d", n), false)
+		} else {
+			err = br.SkipPayload(b)
+		}
+		if err != nil {
 			return err
 		}
 		n++
@@ -53,6 +54,7 @@ func runInfo(br *binpazer.Reader, w io.Writer) error {
 }
 
 func init() {
+	var recurse bool
 	var maxAlloc *int64
 	cmd := &cobra.Command{
 		Use:   "info <file.binpazer | ->",
@@ -66,9 +68,11 @@ func init() {
 			if c != nil {
 				defer c.Close()
 			}
-			return runInfo(br, cmd.OutOrStdout())
+			return runInfo(br, cmd.OutOrStdout(), recurse)
 		},
 	}
+	cmd.Flags().BoolVar(&recurse, "recurse", false,
+		"descend into group blocks and list nested blocks indented")
 	maxAlloc = maxAllocFlag(cmd)
 	rootCmd.AddCommand(cmd)
 }
