@@ -452,6 +452,10 @@ func (br *Reader) SkipPayload(b *Block) error {
 // HasIndex reports whether a Block Index was located via the footer.
 func (br *Reader) HasIndex() bool { return br.hasIndex }
 
+// IndexOffset returns the absolute offset of the Block Index block's header
+// as recorded in the footer, and whether a footer was found.
+func (br *Reader) IndexOffset() (uint64, bool) { return br.indexOffset, br.hasIndex }
+
 // Offset returns the reader's current file offset.
 func (br *Reader) Offset() uint64 { return br.off }
 

@@ -13,70 +13,91 @@ func isPredefined(id uint16) bool {
 	return id >= binpazer.TypeGroup && id <= binpazer.TypeBlockTypeTable
 }
 
-// runValidate checks a file against the spec. It returns a list of problems
-// (empty means conformant) or a fatal structural error (bad magic/header/BTT).
-func runValidate(br *binpazer.Reader) ([]string, error) {
-	size := br.InputSize() // -1 when the input is not seekable (piped stdin)
+// runValidate checks the input against every rule of SPEC.md's "Validation"
+// checklist. Structural parse failures become findings too, so the result is
+// always usable; rules that need a seekable input are reported as skipped on
+// streams instead of silently passing. Payloads are streamed, never buffered.
+func runValidate(r io.Reader, maxAlloc int64) *validateResult {
+	v := newValidator()
+	br, err := binpazer.NewReaderLimited(r, maxAlloc)
+	if err != nil {
+		v.fatalInit(err)
+		return v.finish()
+	}
 
-	var problems []string
-	if size >= 0 && br.FileLength != binpazer.FileLengthUnknown && int64(br.FileLength) != size {
-		problems = append(problems, fmt.Sprintf("file_length=%d but file is %d bytes", br.FileLength, size))
+	v.bttChecks(br)  // duplicate / invalid type ids in the table
+	v.utf8Checks(br) // string UTF-8 validity + first_block_offset alignment
+
+	if rs, ok := r.(io.ReadSeeker); ok && br.InputSize() >= 0 {
+		v.rawStructuralChecks(rs, br) // reserved fields + string terminators
+	} else {
+		v.skip(ruleStringTerm, "requires seekable input")
+		v.skip(ruleReservedZero, "header/table reserved fields require seekable input; block flag bits still checked")
+		v.skip(ruleIndex, "requires seekable input")
 	}
-	n := 0
-	for {
-		b, err := br.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			problems = append(problems, fmt.Sprintf("block %d: %v", n, err))
-			break
-		}
-		if !b.Known && !isPredefined(b.TypeID) {
-			problems = append(problems, fmt.Sprintf("block %d: type_id %d not in the block type table", n, b.TypeID))
-		}
-		// A CRC-carrying block is streamed through the checksum in 64 KiB
-		// chunks; one without a CRC is skipped without reading its payload.
-		// Either way nothing is buffered and truncation still surfaces.
-		if b.Flags&binpazer.FlagHasCRC != 0 {
-			_, err = br.WritePayloadTo(b, io.Discard)
-		} else {
-			err = br.SkipPayload(b)
-		}
-		if err != nil {
-			problems = append(problems, fmt.Sprintf("block %d (type %d): %v", n, b.TypeID, err))
-			break
-		}
-		n++
+
+	indexBlockSeen, clean := v.walk(br)
+	v.lengthChecks(br, clean)
+	if br.InputSize() >= 0 {
+		v.indexChecks(br, indexBlockSeen)
 	}
-	return problems, nil
+	return v.finish()
 }
 
 func init() {
+	var asJSON bool
 	var maxAlloc *int64
 	cmd := &cobra.Command{
 		Use:   "validate <file.binpazer | ->",
-		Short: "Check a file for spec conformance",
-		Args:  cobra.ExactArgs(1),
+		Short: "Check a file against the spec's validation checklist",
+		Long: `Check a file against every rule of SPEC.md's Validation checklist:
+magic/signature, first-block-is-BTT, duplicate or invalid type ids,
+unknown block types, reserved fields and flag bits, 8-byte alignment,
+file_length consistency, string NUL termination and UTF-8, CRC trailers,
+and footer/Block Index consistency.
+
+Each violation prints as one finding (rule id + offset + detail) and the
+exit status is nonzero when any finding exists. On non-seekable stdin,
+rules that need to revisit bytes are reported as skipped rather than
+silently passing. --json emits {ok, findings, rules} with a per-rule
+pass/fail/skipped status.`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			br, c, err := openReader(cmd, args[0], *maxAlloc)
+			r, c, err := inputReader(cmd, args[0])
 			if err != nil {
-				return fmt.Errorf("not a valid binpazer file: %w", err)
+				return err
 			}
 			if c != nil {
 				defer c.Close()
 			}
-			problems, err := runValidate(br)
-			if err != nil {
-				return fmt.Errorf("not a valid binpazer file: %w", err)
-			}
-			if len(problems) == 0 {
-				fmt.Fprintln(cmd.OutOrStdout(), "OK: file is spec-conformant")
+			res := runValidate(r, *maxAlloc)
+			w := cmd.OutOrStdout()
+			if asJSON {
+				if err := writeJSON(w, res); err != nil {
+					return err
+				}
+				if !res.OK {
+					return fmt.Errorf("validation failed: %d finding(s)", len(res.Findings))
+				}
 				return nil
 			}
-			return fmt.Errorf("%d problem(s):\n  %s", len(problems), strings.Join(problems, "\n  "))
+			for _, rs := range res.Rules {
+				if rs.Status == "skipped" && !strings.HasPrefix(rs.Reason, "not evaluated") {
+					fmt.Fprintf(w, "skipped: %s (%s)\n", rs.Rule, rs.Reason)
+				}
+			}
+			if res.OK {
+				fmt.Fprintln(w, "OK: file is spec-conformant")
+				return nil
+			}
+			lines := make([]string, len(res.Findings))
+			for i, f := range res.Findings {
+				lines[i] = fmt.Sprintf("rule=%s offset=%d: %s", f.Rule, f.Offset, f.Detail)
+			}
+			return fmt.Errorf("%d finding(s):\n  %s", len(res.Findings), strings.Join(lines, "\n  "))
 		},
 	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "emit machine-readable JSON ({ok, findings, rules})")
 	maxAlloc = maxAllocFlag(cmd)
 	rootCmd.AddCommand(cmd)
 }

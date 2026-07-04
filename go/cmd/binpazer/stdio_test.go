@@ -29,16 +29,21 @@ func TestStdinReadCommands(t *testing.T) {
 		require.NoError(t, err, cmd)
 		assert.Equal(t, want, got, "%s -: seekable stdin output differs", cmd)
 
-		// Non-seekable stdin: same result, except info's has_index (the
-		// footer is only discovered when the walk reaches it).
+		// Non-seekable stdin: info differs only in has_index (the footer is
+		// only discovered when the walk reaches it), validate reports its
+		// seek-dependent rules as skipped, dump is byte-identical.
 		got, _, err = executeIO(nonSeekable{bytes.NewReader(data)}, cmd, "-")
 		require.NoError(t, err, cmd)
-		if cmd == "info" {
-			assert.Contains(t, got, "has_index:   false")
+		switch cmd {
+		case "info":
 			assert.Equal(t,
 				strings.Replace(want, "has_index:   true", "has_index:   false", 1), got,
 				"info -: non-seekable output should differ only in has_index")
-		} else {
+		case "validate":
+			assert.Contains(t, got, "spec-conformant")
+			assert.Contains(t, got, "skipped:")
+			assert.Contains(t, got, "requires seekable input")
+		default:
 			assert.Equal(t, want, got, "%s -: non-seekable stdin output differs", cmd)
 		}
 	}
