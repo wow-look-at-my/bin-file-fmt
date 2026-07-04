@@ -333,3 +333,33 @@ func TestFindWithoutIndex(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []uint64{offA, offC}, got)
 }
+
+// TestDuplicateTypeIDFirstWins pins the duplicate-id resolution order: a block
+// whose type id appears twice in the table resolves to the FIRST entry, the
+// same answer the original linear scan gave (and the map lookup must keep).
+func TestDuplicateTypeIDFirstWins(t *testing.T) {
+	var m memFile
+	bw, err := NewWriter(&m, sampleWriter, "demo", []TypeDef{
+		{7, sampleMesh, "First"},
+		{7, sampleNote, "Second"}, // same id, different GUID
+	})
+	require.NoError(t, err)
+	off := bw.Offset()
+	require.NoError(t, bw.Block(7, 0, []byte("x")))
+	require.NoError(t, bw.End())
+
+	m.pos = 0
+	br, err := NewReader(&m)
+	require.NoError(t, err)
+	require.Len(t, br.Types, 3) // BTT's own entry + the two duplicates
+
+	b, err := br.Next()
+	require.NoError(t, err)
+	require.True(t, b.Known)
+	assert.Equal(t, sampleMesh, b.GUID, "Next must resolve the first table entry")
+
+	b, err = br.At(off)
+	require.NoError(t, err)
+	require.True(t, b.Known)
+	assert.Equal(t, sampleMesh, b.GUID, "At must resolve the first table entry")
+}

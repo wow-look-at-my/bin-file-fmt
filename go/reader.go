@@ -35,6 +35,8 @@ type Reader struct {
 	FirstBlockOffset uint64
 	Types            []TypeEntry
 
+	typeIdx map[uint16]int // type_id -> first index in Types, built by readBTT
+
 	hasIndex    bool
 	indexOffset uint64
 	blocksEnd   uint64 // end of the block stream (excludes a trailing footer)
@@ -295,6 +297,7 @@ func (br *Reader) readBTT() error {
 			entryCount, bttLen, maxEntries, ErrCapacityExceeded)
 	}
 	br.Types = make([]TypeEntry, 0, entryCount)
+	br.typeIdx = make(map[uint16]int, entryCount)
 	for i := uint32(0); i < entryCount; i++ {
 		eh := make([]byte, 20)
 		if err := br.read(eh); err != nil {
@@ -325,6 +328,9 @@ func (br *Reader) readBTT() error {
 		raw := 25 + nlen
 		if err := br.skip(align8(raw) - raw); err != nil { // entry pad
 			return err
+		}
+		if _, dup := br.typeIdx[e.TypeID]; !dup { // first entry with an id wins
+			br.typeIdx[e.TypeID] = len(br.Types)
 		}
 		br.Types = append(br.Types, e)
 	}
@@ -358,14 +364,17 @@ func (br *Reader) Next() (*Block, error) {
 		return nil, err
 	}
 	b.payloadOff = br.off
-	for _, e := range br.Types {
-		if e.TypeID == b.TypeID {
-			b.GUID = e.GUID
-			b.Known = true
-			break
-		}
-	}
+	br.resolveType(b)
 	return b, nil
+}
+
+// resolveType fills a block's GUID and Known from the type table. Duplicate
+// ids resolve to the table's first entry, matching the on-disk scan order.
+func (br *Reader) resolveType(b *Block) {
+	if i, ok := br.typeIdx[b.TypeID]; ok {
+		b.GUID = br.Types[i].GUID
+		b.Known = true
+	}
 }
 
 // ReadPayload reads the current block's payload (verifying the CRC if present)
@@ -530,12 +539,6 @@ func (br *Reader) At(offset uint64) (*Block, error) {
 		return nil, err
 	}
 	b.payloadOff = br.off
-	for _, e := range br.Types {
-		if e.TypeID == b.TypeID {
-			b.GUID = e.GUID
-			b.Known = true
-			break
-		}
-	}
+	br.resolveType(b)
 	return b, nil
 }
