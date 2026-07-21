@@ -39,6 +39,7 @@ jobs:
       id-token: write # mint the OIDC token buildhost trusts
       actions: read # download the go-build artifact from this run
       contents: read
+      checks: read # all-builds guard (embedded in buildhost-publish) scans this run's checks
     steps:
       - uses: wow-look-at-my/buildhost/.github/actions/buildhost-publish@master
 
