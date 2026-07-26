@@ -23,25 +23,34 @@ jobs:
           # including the c-cpp job's cross-impl byte-identity check -- via
           # the publish job below (same buildhost action, same naming).
           autorelease: false
-          upload-artifacts: true
 
-  # Publish the CLI matrix binaries from the go-build artifact to
-  # https://pazer.build. buildhost scopes a repo's OIDC token to the repo's
-  # own namespace, and the binary name (binpazer) differs from the repo
-  # name, so the action publishes it as the nested project
-  # "bin-file-fmt/binpazer" (auto-provisioned on first publish, git branch
-  # recorded on the release):
+  # Publish the CLI matrix binaries to https://pazer.build. buildhost scopes a
+  # repo's OIDC token to the repo's own namespace, and the binary name
+  # (binpazer) differs from the repo name, so the action publishes it as the
+  # nested project "bin-file-fmt/binpazer" (auto-provisioned on first publish,
+  # git branch recorded on the release):
   #   https://dl.pazer.build/bin-file-fmt/binpazer?branch=<branch>&os=<os>&arch=<arch>
   publish:
     runs-on: ubuntu-latest
     needs: [go, c-cpp]
     permissions:
       id-token: write # mint the OIDC token buildhost trusts
-      actions: read # download the go-build artifact from this run
       contents: read
-      checks: read # all-builds guard (embedded in buildhost-publish) scans this run's checks
+      deployments: write # buildhost-publish registers the publish as a GitHub Deployment
+      actions: read # all-builds guard (embedded in buildhost-publish) scans this run's jobs
+      checks: read # ... and the head commit's check runs
     steps:
+      # go-toolchain hands go/build off through the org cache, not a GHA
+      # artifact (org CI runs with artifact storage exhausted). It saves two
+      # hand-offs -- the per-job name plus the deprecated bare `go-build`
+      # alias -- so nameless discovery is ambiguous and the name is explicit.
+      - uses: wow-look-at-my/actions@cache-download#latest
+        with:
+          name: go-build-go
+          path: build
       - uses: wow-look-at-my/buildhost/.github/actions/buildhost-publish@master
+        with:
+          path: build
 
   c-cpp:
     runs-on: ubuntu-latest
