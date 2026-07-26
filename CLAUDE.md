@@ -59,7 +59,10 @@ plus a `publish` job gated on both that ships the CLI matrix binaries to
 https://pazer.build as project `bin-file-fmt/binpazer`. The project name is
 repo-derived because buildhost scopes a repo's OIDC token to the repo's own
 namespace (`bin-file-fmt` and `bin-file-fmt/<...>`); a `project: binpazer`
-override gets a 404 -- do not "fix" the name. Nothing merges red.
+override gets a 404 -- do not "fix" the name. `publish` gets the binaries from
+go-toolchain's `go-build-go` cache hand-off (org CI has no GHA artifacts) and
+needs `deployments: write` -- buildhost-publish registers a GitHub Deployment
+and fails without it. Nothing merges red.
 
 ## Layout
 
