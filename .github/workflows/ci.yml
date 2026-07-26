@@ -37,6 +37,7 @@ jobs:
       id-token: write # mint the OIDC token buildhost trusts
       contents: read
       deployments: write # buildhost-publish registers the publish as a GitHub Deployment
+      artifact-metadata: write # ... and records what buildhost stores on the org's linked artifacts page
       actions: read # all-builds guard (embedded in buildhost-publish) scans this run's jobs
       checks: read # ... and the head commit's check runs
     steps:
