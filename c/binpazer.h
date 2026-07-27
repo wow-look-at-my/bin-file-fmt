@@ -37,13 +37,33 @@ extern "C" {
  * raising the per-block cap from 4 GiB to (2^32-1)*4096 (~16 TiB). */
 #define BINPAZER_LARGE_UNIT 4096
 
-/* Block flag bits (the 16-bit `flags` field). Bit 2 is reserved, must be 0. */
+/* Block flag bits (the 16-bit `flags` field). */
 enum {
     BINPAZER_FLAG_CRITICAL     = 1u << 0,
     BINPAZER_FLAG_SAFE_TO_COPY = 1u << 1,
+    BINPAZER_FLAG_COMPRESSED   = 1u << 2,  /* payload is a Compression Envelope */
     BINPAZER_FLAG_HAS_CRC      = 1u << 3,
     BINPAZER_FLAG_LARGE_MODE   = 1u << 4
 };
+
+/* Minor version a file must declare once it holds a compressed block. */
+#define BINPAZER_VERSION_MINOR_COMPRESSION 1
+
+/* Codec ids from SPEC.md's registry. This library carries no codec code: it
+ * reads and writes the envelope, and the caller supplies the codec bytes. That
+ * is what keeps it dependency-free -- BINPAZER_CODEC_STORED needs no codec at
+ * all, so a well-formed compressed block is always writable from here. */
+enum {
+    BINPAZER_CODEC_INVALID = 0,
+    BINPAZER_CODEC_STORED  = 1,     /* identity: codec bytes are the payload */
+    BINPAZER_CODEC_DEFLATE = 2,     /* raw DEFLATE (RFC 1951) */
+    BINPAZER_CODEC_ZSTD    = 3,     /* zstd (RFC 8878) */
+    BINPAZER_CODEC_BY_GUID = 65535  /* codec identified by codec_guid */
+};
+
+/* Compression Envelope header sizes: fixed part, and with the GUID escape. */
+#define BINPAZER_ENVELOPE_FIXED_SIZE 16
+#define BINPAZER_ENVELOPE_GUID_SIZE  32
 
 typedef struct { uint8_t bytes[16]; } binpazer_guid;
 
@@ -84,6 +104,7 @@ typedef struct {
     int               err;    /* sticky error (binpazer_status) */
     uint64_t          index_offset; /* offset of the Block Index block, once written */
     int               wrote_index;
+    int               used_compression; /* a compressed block was written: file is 1.1 */
 } binpazer_writer;
 
 /* One block-type-table entry supplied by the caller. Use user ids (1, 2, ...);
@@ -109,8 +130,43 @@ binpazer_status binpazer_writer_block(
     binpazer_writer *w, uint16_t type_id, uint16_t flags,
     const void *payload, uint64_t payload_len);
 
+/* ---- Compression (SPEC.md "Compression", 1.1) ---- */
+
+/* A block's Compression Envelope: what codec produced the stored bytes, and
+ * how many bytes they decode to. */
+typedef struct {
+    uint16_t      codec_id;            /* BINPAZER_CODEC_*; 0 is invalid */
+    binpazer_guid codec_guid;          /* only when codec_id == BY_GUID */
+    uint64_t      uncompressed_length; /* authoritative decoded size */
+    uint64_t      stored_length;       /* codec bytes, i.e. payload - header */
+    uint32_t      header_size;         /* FIXED_SIZE, or GUID_SIZE for BY_GUID */
+} binpazer_compression;
+
+/* Writes one block whose payload is a Compression Envelope wrapping
+ * `stored`/`stored_len` -- bytes the CALLER has already encoded with the named
+ * codec (for BINPAZER_CODEC_STORED they are the payload itself). The
+ * BINPAZER_FLAG_COMPRESSED flag is added to `flags`. `codec_guid` is used only
+ * when codec_id is BINPAZER_CODEC_BY_GUID and may otherwise be NULL.
+ *
+ * A compressed block makes the file 1.1, and the header was already written,
+ * so this requires a seek callback to back-patch version_minor in
+ * binpazer_writer_end; without one it returns BINPAZER_ERR_NOSEEK. */
+binpazer_status binpazer_writer_block_compressed(
+    binpazer_writer *w, uint16_t type_id, uint16_t flags,
+    uint16_t codec_id, const binpazer_guid *codec_guid,
+    const void *stored, uint64_t stored_len, uint64_t uncompressed_len);
+
+/* Parses a Compression Envelope from the front of a payload the caller has
+ * already read (the library does no IO). `payload_len` is the block's whole
+ * stored payload length. Returns BINPAZER_ERR_FORMAT for an invalid codec id,
+ * a set reserved field, or a payload too short to hold the header. The codec
+ * bytes are at (const uint8_t *)payload + out->header_size. */
+binpazer_status binpazer_compression_parse(
+    const void *payload, uint64_t payload_len, binpazer_compression *out);
+
 /* Finishes the file. Patches file_length when a seek callback is available;
- * otherwise file_length stays the streaming sentinel. */
+ * otherwise file_length stays the streaming sentinel. When a compressed block
+ * was written, version_minor is patched to 1.1 at the same time. */
 binpazer_status binpazer_writer_end(binpazer_writer *w);
 
 /* ---- Reading ---- */

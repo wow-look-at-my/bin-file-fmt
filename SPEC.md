@@ -113,6 +113,19 @@ up to `first_block_offset`.
 The fixed part is 56 bytes. `first_block_offset` lets a reader jump straight to
 the blocks without parsing `writer_name`.
 
+### Versions
+
+| Version | Change |
+|---|---|
+| 1.0 | initial format |
+| 1.1 | [Compression](#compression): block flag bit 2 and the Compression Envelope |
+
+A minor bump is a backward-compatible addition: a 1.0 reader walks a 1.1 file
+correctly, because every 1.1 addition is announced by a flag bit or a block type
+it already knows how to skip. A writer emits the lowest `version_minor` its
+content requires, so a file using no 1.1 feature still declares 1.0 and is
+byte-identical to what a 1.0 writer produced.
+
 `signature` (`0D 0A 1A 0A`) catches the common transport corruptions: CRLF/LF
 translation, 7-bit stripping, and Ctrl-Z (`1A`) halting output on legacy DOS
 `type`.
@@ -157,7 +170,7 @@ follows the payload, before alignment padding.
 |---|---|---|
 | 0 | `critical` | If set and the reader does not know this `type_id`'s GUID, the file cannot be correctly processed -- the reader MUST stop. If clear (ancillary), an unknown block is safe to skip. |
 | 1 | `safe_to_copy` | If set, an editor that does not understand this block may copy it verbatim when rewriting the file. If clear, drop it on rewrite when not understood. |
-| 2 | reserved | must be 0 (see [Compression](#compression)) |
+| 2 | `compressed` | The stored payload is a [Compression Envelope](#compression), not the block's logical bytes. |
 | 3 | `has_crc` | A 4-byte CRC-32C trailer follows the payload. |
 | 4 | `large_mode` | `length` counts 4096-byte units instead of bytes (see [Block header](#block-header)). |
 | 5.. | reserved | must be 0; readers MUST ignore unknown bits |
@@ -285,12 +298,60 @@ is kept as a fixed-size struct.
 
 ### Compression
 
-Deliberately absent from this version: every payload is stored bytes, and
-block flag bit 2 (once earmarked for a `compressed` flag) is reserved, must
-be 0. A single flag bit cannot carry codec identity -- there is more than one
-compression codec in the real world -- so a boolean flag would be a dead end.
-A future revision that adds compression will define a codec-identifying
-mechanism instead.
+*Added in 1.1.* A block whose `compressed` flag (bit 2) is set stores a
+**Compression Envelope** in place of its logical payload. The flag only
+announces the envelope; codec **identity** lives inside it, so the format is
+not tied to one codec.
+
+| Offset | Size | Field | Type | Notes |
+|---|---|---|---|---|
+| 0 | 2 | `codec_id` | u16 | see the registry below; `0` is invalid |
+| 2 | 2 | `codec_flags` | u16 | reserved, must be 0 |
+| 4 | 4 | `reserved` | u32 | must be 0 |
+| 8 | 8 | `uncompressed_length` | u64 | exact size of the decoded payload |
+| 16 | 16 | `codec_guid` | guid | **only when `codec_id == 65535`** |
+| 16 (or 32) | var | `codec_data` | u8[] | the codec's own bytes |
+
+The fixed part is 16 bytes (32 with the GUID escape), 8-byte aligned and
+naturally aligned field by field, so it casts to a `struct` like every other
+header in this format.
+
+| `codec_id` | Codec |
+|---|---|
+| 0 | invalid |
+| 1 | `stored` -- identity; `codec_data` is the payload verbatim |
+| 2 | `deflate` -- raw DEFLATE (RFC 1951), no zlib/gzip wrapper |
+| 3 | `zstd` (RFC 8878) |
+| 4..65534 | unassigned; a future revision of this document assigns them |
+| 65535 | codec identified by `codec_guid`, for codecs outside this registry |
+
+`stored` exists so every implementation can write and read a well-formed
+envelope with no external dependency, and so a writer can decide per block not
+to compress without changing the block's shape.
+
+Rules:
+
+- The block's `length` field always describes the **stored** bytes -- the
+  envelope, whole -- so block walking, skipping, `large_mode`, the Block Index
+  and the next-block formula are all unaffected by compression. A reader that
+  does not implement compression still traverses the file correctly.
+- `has_crc` covers the stored bytes (the envelope), not the decoded payload:
+  the CRC verifies what is on disk, before any codec runs.
+- `uncompressed_length` is authoritative. A reader MUST treat a decode that
+  yields a different length as corruption, and SHOULD use the field to bound
+  its allocation *before* decoding (a decoder is otherwise an unbounded
+  allocator driven by untrusted bytes).
+- A reader that does not implement a block's `codec_id` MUST NOT interpret its
+  payload; it may still skip the block, copy it verbatim when `safe_to_copy` is
+  set, and report the codec. The same applies to a pre-1.1 reader, which sees
+  bit 2 as a reserved bit: it walks and skips correctly but must not read the
+  payload of a block whose flag bits it does not all understand.
+- Compression is per block. Mixing compressed and uncompressed blocks in one
+  file is normal and expected; the [Block Type Table](#block-type-table),
+  [Block Index](#block-index) and [footer](#footer) are never compressed, so
+  the structural path stays directly mappable.
+- Nothing about an uncompressed block changes in 1.1. A file with no
+  compressed block is byte-identical to the 1.0 file with the same content.
 
 ### Footer
 
@@ -317,6 +378,8 @@ the Block Index block's 8-byte header.
    - Unknown GUID, `critical` set: stop -- the file needs a feature you lack.
    - Unknown GUID, `critical` clear: skip it.
    - If `has_crc`, optionally verify before trusting the payload.
+   - If `compressed`, the payload is a [Compression Envelope](#compression):
+     decode it with the envelope's codec, or leave the block uninterpreted.
    - Advance using the next-block formula in [Block header](#block-header).
 6. Stop at `file_length` (or EOF when `file_length` is the unknown sentinel).
 
@@ -344,6 +407,11 @@ Readers MUST ignore unknown flag bits and reserved fields.
 - Blocks are 8-byte aligned; the final block ends at `file_length` (when not the
   streaming sentinel).
 - A `string`'s `byte_length` bytes are followed by `0x00`.
+- A block with the `compressed` flag carries a whole [Compression
+  Envelope](#compression): its stored payload is at least the fixed 16 bytes (32
+  with the GUID escape), `codec_id` is not 0, and `codec_flags`/`reserved` are 0.
+  An unassigned `codec_id` is not a validation failure -- it is a file from a
+  later revision -- but a validator SHOULD report it.
 
 ## Example
 

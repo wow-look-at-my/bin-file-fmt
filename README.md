@@ -198,3 +198,11 @@ hello, file!
 - `length` is a byte count, or -- with the `large_mode` flag -- a count of
   4096-byte (page) units, for payloads over 4 GiB and up to ~16 TiB.
 - Strings are length-prefixed **and** null-terminated.
+- An optional **Block Index** plus a 16-byte footer let a reader seek straight
+  to a block instead of walking it -- random access, which a `.tar.gz` has no
+  way to offer.
+- Payloads may be **compressed per block** (1.1): a Compression Envelope names
+  the codec (`stored`, `deflate`, `zstd`, or a GUID for anything else), so one
+  member decodes without touching the others. `length` still counts stored
+  bytes, so older readers keep walking such files correctly, and a file that
+  compresses nothing is byte-identical to a 1.0 file.

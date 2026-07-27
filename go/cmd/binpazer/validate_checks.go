@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +28,7 @@ const (
 	ruleStringUTF8     = "string_utf8"           // string data is valid UTF-8
 	ruleCRC            = "crc"                   // stored CRC-32C trailers match
 	ruleIndex          = "index"                 // the footer and Block Index point at real blocks of the claimed types
+	ruleEnvelope       = "compression_envelope"  // a compressed block carries a whole, well-formed Compression Envelope
 	ruleStructure      = "structure"             // the input parses: no truncation, capacity, or version problems
 )
 
@@ -34,13 +36,14 @@ const (
 var allRules = []string{
 	ruleMagic, ruleFirstBlockBTT, ruleBTTDupID, ruleBTTInvalidID,
 	ruleBlockInvalidID, ruleUnknownTypeID, ruleReservedZero, ruleAlignment,
-	ruleLength, ruleStringTerm, ruleStringUTF8, ruleCRC, ruleIndex, ruleStructure,
+	ruleLength, ruleStringTerm, ruleStringUTF8, ruleCRC, ruleIndex, ruleEnvelope,
+	ruleStructure,
 }
 
-// knownFlagsMask covers the four defined block flag bits; the rest -- including
-// bit 2, the removed `compressed` flag -- are reserved and must be 0.
+// knownFlagsMask covers the five defined block flag bits (bit 2 is
+// `compressed`, defined in 1.1); the rest are reserved and must be 0.
 const knownFlagsMask = binpazer.FlagCritical | binpazer.FlagSafeToCopy |
-	binpazer.FlagHasCRC | binpazer.FlagLargeMode
+	binpazer.FlagCompressed | binpazer.FlagHasCRC | binpazer.FlagLargeMode
 
 // finding is one concrete rule violation.
 type finding struct {
@@ -182,10 +185,23 @@ func (v *validator) walk(br *binpazer.Reader) (indexBlockSeen, clean bool) {
 		if b.TypeID == binpazer.TypeBlockIndex {
 			indexBlockSeen = true
 		}
+		// A compressed block must carry a whole, well-formed envelope. Only the
+		// envelope HEADER is inspected: validation is about the file's
+		// structure, and decoding would need a codec this build may not have.
+		// The header rides along with the payload stream, so a compressed
+		// block costs one pass whether or not it also carries a CRC.
+		var env *headCapture
+		if b.Flags&binpazer.FlagCompressed != 0 {
+			env = &headCapture{}
+		}
 		// Stream CRC-carrying payloads through the checksum in 64 KiB
 		// chunks; skip the rest without reading. Nothing is buffered.
-		if b.Flags&binpazer.FlagHasCRC != 0 {
-			_, err = br.WritePayloadTo(b, io.Discard)
+		if b.Flags&binpazer.FlagHasCRC != 0 || env != nil {
+			var sink io.Writer = io.Discard
+			if env != nil {
+				sink = env
+			}
+			_, err = br.WritePayloadTo(b, sink)
 			if err != nil && errors.Is(err, binpazer.ErrCRCMismatch) {
 				v.add(ruleCRC, off, "block %d (type %d): %v", n, b.TypeID, err)
 				err = br.SkipPayload(b) // realign past the pad and keep walking
@@ -193,11 +209,55 @@ func (v *validator) walk(br *binpazer.Reader) (indexBlockSeen, clean bool) {
 		} else {
 			err = br.SkipPayload(b)
 		}
+		if env != nil {
+			v.envelopeChecks(b, n, env.head[:env.n])
+		}
 		if err != nil {
 			v.add(ruleStructure, br.Offset(), "block %d (type %d): %v", n, b.TypeID, err)
 			return indexBlockSeen, false
 		}
 		n++
+	}
+}
+
+// headCapture keeps the first bytes written through it and discards the rest,
+// so a payload can be streamed (for the CRC) while its envelope header is
+// captured, with nothing buffered.
+type headCapture struct {
+	head [32]byte
+	n    int
+}
+
+func (h *headCapture) Write(p []byte) (int, error) {
+	if h.n < len(h.head) {
+		h.n += copy(h.head[h.n:], p)
+	}
+	return len(p), nil
+}
+
+// envelopeChecks validates a compressed block's Compression Envelope header
+// against SPEC.md: a whole header must be present, the codec id must not be 0,
+// and the envelope's reserved fields must be 0. An unassigned codec id is a
+// file from a later revision, not a violation -- and is deliberately not
+// reported as one.
+func (v *validator) envelopeChecks(b *binpazer.Block, n int, head []byte) {
+	off := b.Offset()
+	if len(head) < 16 {
+		v.add(ruleEnvelope, off, "block %d is compressed but its payload holds %d bytes; the envelope header needs 16", n, len(head))
+		return
+	}
+	codec := binary.LittleEndian.Uint16(head[0:])
+	if codec == binpazer.CodecInvalid {
+		v.add(ruleEnvelope, off, "block %d: compression envelope codec id is 0 (invalid)", n)
+	}
+	if cf := binary.LittleEndian.Uint16(head[2:]); cf != 0 {
+		v.add(ruleEnvelope, off, "block %d: compression envelope codec_flags = %#x (must be 0)", n, cf)
+	}
+	if rv := binary.LittleEndian.Uint32(head[4:]); rv != 0 {
+		v.add(ruleEnvelope, off, "block %d: compression envelope reserved field = %#x (must be 0)", n, rv)
+	}
+	if codec == binpazer.CodecByGUID && (b.PayloadLen < 32 || len(head) < 32) {
+		v.add(ruleEnvelope, off, "block %d: GUID-identified codec needs a 32-byte envelope header, payload holds %d bytes", n, b.PayloadLen)
 	}
 }
 

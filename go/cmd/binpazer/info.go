@@ -39,8 +39,19 @@ func runInfo(br *binpazer.Reader, w io.Writer, recurse bool) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(w, "  [%d] type=%-6d %-14s flags=[%s] offset=%d len=%d\n",
-			n, b.TypeID, tt.name(b.TypeID), strings.Join(flagNames(b.Flags), ","), b.Offset(), b.PayloadLen)
+		// The envelope header sits at the front of the payload; reading it does
+		// not disturb the walk (SkipPayload realigns from absolute offsets),
+		// and without it a compressed block would report only its stored size
+		// -- not the size of anything the caller asked about.
+		codec := ""
+		if b.Flags&binpazer.FlagCompressed != 0 {
+			if c, cerr := br.Compression(b); cerr == nil {
+				codec = fmt.Sprintf(" codec=%s ulen=%d", codecName(c.CodecID), c.UncompressedLen)
+			}
+		}
+		fmt.Fprintf(w, "  [%d] type=%-6d %-14s flags=[%s] offset=%d len=%d%s\n",
+			n, b.TypeID, tt.name(b.TypeID), strings.Join(displayFlagNames(b.Flags), ","),
+			b.Offset(), b.PayloadLen, codec)
 		if recurse && tt.isGroup(b.TypeID) {
 			err = descendGroup(br, w, tt, b, fmt.Sprintf("%d", n), false)
 		} else {

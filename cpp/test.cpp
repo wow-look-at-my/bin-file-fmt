@@ -197,6 +197,74 @@ int main() {
         CHECK(p.size() == 4096 && std::memcmp(p.data(), big4.data(), 4096) == 0, "large: payload");
     }
 
+    // Compression (SPEC.md 1.1). Like the C core, the wrapper carries no codec:
+    // it writes and parses the envelope around bytes the caller encoded, so this
+    // uses codec `stored` (identity) and the GUID escape.
+    {
+        std::vector<uint8_t> cbuf;
+        size_t cp = 0;
+        auto cwrite = [&](const void *b, size_t n) -> size_t {
+            if (cp + n > cbuf.size()) cbuf.resize(cp + n);
+            std::memcpy(cbuf.data() + cp, b, n);
+            cp += n;
+            return n;
+        };
+        auto cseek = [&](uint64_t o) -> bool {
+            if (o > cbuf.size()) cbuf.resize(static_cast<size_t>(o));
+            cp = static_cast<size_t>(o);
+            return true;
+        };
+        binpazer::Guid g_codec{{0xc0,0xde,0xc0,0xde,0,0,0,0,0,0,0,0,0,0,0,7}};
+        std::vector<binpazer::TypeDef> d = {{2, g_note, "Note"}};
+        const char *plain = "plain block";          // 11
+        const char *comp  = "compressed, sort of";  // 19
+        const char *gcod  = "guid-codec payload";   // 18
+        {
+            binpazer::Writer w(cwrite, writer, "demo", d, cseek);
+            CHECK(w.block(2, 0, std::string_view(plain, 11)) == binpazer::Status::Ok, "compress: plain");
+            CHECK(w.compressed_block(2, binpazer::flag::HasCrc, binpazer::codec::Stored,
+                                     std::string_view(comp, 19), 19) == binpazer::Status::Ok,
+                  "compress: stored block");
+            CHECK(w.compressed_block(2, 0, binpazer::codec::ByGuid,
+                                     std::string_view(gcod, 18), 18, &g_codec) == binpazer::Status::Ok,
+                  "compress: guid-codec block");
+            CHECK(w.end() == binpazer::Status::Ok, "compress: end");
+        }
+
+        cp = 0;
+        auto cread = [&](void *b, size_t n) -> size_t {
+            size_t av = cbuf.size() - cp, c = n < av ? n : av;
+            std::memcpy(b, cbuf.data() + cp, c); cp += c; return c;
+        };
+        binpazer::Reader r(cread, cseek);
+
+        auto b0 = r.next();
+        CHECK(b0.has_value() && (b0->flags & binpazer::flag::Compressed) == 0, "compress: block 0 plain");
+        auto p0 = r.read_payload(*b0);
+        CHECK(p0.size() == 11 && std::memcmp(p0.data(), plain, 11) == 0, "compress: block 0 payload");
+
+        auto b1 = r.next();
+        CHECK(b1.has_value() && (b1->flags & binpazer::flag::Compressed) != 0, "compress: block 1 compressed");
+        auto p1 = r.read_payload(*b1);
+        auto c1 = binpazer::parse_compression(p1.data(), p1.size());
+        CHECK(c1.has_value(), "compress: block 1 envelope parses");
+        CHECK(c1 && c1->codec_id == binpazer::codec::Stored, "compress: block 1 codec");
+        CHECK(c1 && c1->uncompressed_length == 19 && c1->stored_length == 19, "compress: block 1 lengths");
+        CHECK(c1 && std::memcmp(p1.data() + c1->header_size, comp, 19) == 0, "compress: block 1 bytes");
+
+        auto b2 = r.next();
+        CHECK(b2.has_value(), "compress: block 2 present");
+        auto p2 = r.read_payload(*b2);
+        auto c2 = binpazer::parse_compression(p2.data(), p2.size());
+        CHECK(c2 && c2->codec_id == binpazer::codec::ByGuid, "compress: block 2 codec is the GUID escape");
+        CHECK(c2 && std::memcmp(c2->codec_guid.bytes, g_codec.bytes, 16) == 0, "compress: block 2 codec guid");
+        CHECK(c2 && std::memcmp(p2.data() + c2->header_size, gcod, 18) == 0, "compress: block 2 bytes");
+
+        // An envelope with codec id 0 is corruption, not an empty payload.
+        uint8_t bad[BINPAZER_ENVELOPE_FIXED_SIZE] = {0};
+        CHECK(!binpazer::parse_compression(bad, sizeof bad).has_value(), "compress: codec id 0 rejected");
+    }
+
     if (failures == 0) { std::printf("OK: all C++ round-trip checks passed\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failures);
     return 1;

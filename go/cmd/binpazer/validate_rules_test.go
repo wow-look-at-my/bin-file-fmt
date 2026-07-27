@@ -178,11 +178,12 @@ func TestValidateRuleReservedZero(t *testing.T) {
 		assert.Contains(t, findRule(res, ruleReservedZero)[0].Detail, "reserved flag bits")
 	})
 
-	// Bit 2 -- the removed `compressed` flag -- is reserved now. Patch it into
-	// the has_crc block of an otherwise valid file, re-sealing the CRC the way
-	// a writer that set the bit would have (the CRC-32C covers the 8-byte
-	// header): the ONLY finding must be the reserved bit, not a CRC mismatch.
-	t.Run("removed_compressed_bit", func(t *testing.T) {
+	// Bit 5 is the lowest STILL-reserved flag bit (bit 2 became `compressed` in
+	// 1.1). Patch it into the has_crc block of an otherwise valid file,
+	// re-sealing the CRC the way a writer that set the bit would have (the
+	// CRC-32C covers the 8-byte header): the ONLY finding must be the reserved
+	// bit, not a CRC mismatch.
+	t.Run("reserved_flag_bit", func(t *testing.T) {
 		data := validArchive(t, false)
 		br, err := binpazer.NewReader(bytes.NewReader(data))
 		require.NoError(t, err)
@@ -191,7 +192,7 @@ func TestValidateRuleReservedZero(t *testing.T) {
 		require.EqualValues(t, 1, b.TypeID, "first walked block must be the has_crc mesh block")
 		require.NotZero(t, b.Flags&binpazer.FlagHasCRC)
 		off := b.Offset()
-		data[off+2] |= 1 << 2
+		data[off+2] |= 1 << 5
 		end := off + 8 + b.PayloadLen
 		crc := crc32.Checksum(data[off:end], crc32.MakeTable(crc32.Castagnoli))
 		binary.LittleEndian.PutUint32(data[end:], crc)
@@ -199,7 +200,7 @@ func TestValidateRuleReservedZero(t *testing.T) {
 		res, err := validateJSON(t, data)
 		assertFails(t, res, err, ruleReservedZero)
 		require.Len(t, res.Findings, 1, "the reserved bit must be the only finding: %+v", res.Findings)
-		assert.Contains(t, res.Findings[0].Detail, "reserved flag bits 0x0004")
+		assert.Contains(t, res.Findings[0].Detail, "reserved flag bits 0x0020")
 	})
 
 	t.Run("index_reserved", func(t *testing.T) {
@@ -284,6 +285,91 @@ func TestValidateRuleCRC(t *testing.T) {
 	assert.Equal(t, "pass", ruleStatusOf(t, res, ruleStructure).Status,
 		"the walk must continue past a CRC mismatch")
 	assert.Equal(t, "pass", ruleStatusOf(t, res, ruleLength).Status)
+}
+
+// compressedArchive builds a conformant file whose second block is compressed
+// (codec `stored`, so no codec dependency), for the envelope corruption tests.
+func compressedArchive(t *testing.T) []byte {
+	t.Helper()
+	_, data := writeArchive(t, t.TempDir(), "compressed.binpazer", func(bw *binpazer.Writer) {
+		require.NoError(t, bw.Block(1, binpazer.FlagHasCRC, []byte("mesh-data")))
+		require.NoError(t, bw.CompressedBlock(2, 0, binpazer.CodecStored, []byte("compressed note")))
+	})
+	return data
+}
+
+// envelopeOffsetOf returns the file offset of the compressed block's envelope
+// header (i.e. the start of its payload).
+func envelopeOffsetOf(t *testing.T, data []byte) uint64 {
+	t.Helper()
+	br, err := binpazer.NewReader(bytes.NewReader(data))
+	require.NoError(t, err)
+	for {
+		b, err := br.Next()
+		require.NoError(t, err)
+		if b.Flags&binpazer.FlagCompressed != 0 {
+			return b.Offset() + 8
+		}
+		require.NoError(t, br.SkipPayload(b))
+	}
+}
+
+func TestValidateRuleCompressionEnvelope(t *testing.T) {
+	// A conformant compressed file passes every rule, including the new one.
+	t.Run("conformant", func(t *testing.T) {
+		res, err := validateJSON(t, compressedArchive(t))
+		require.NoError(t, err)
+		assert.True(t, res.OK, "findings: %+v", res.Findings)
+		assert.Equal(t, "pass", ruleStatusOf(t, res, ruleEnvelope).Status)
+		assert.Equal(t, "pass", ruleStatusOf(t, res, ruleReservedZero).Status,
+			"bit 2 is `compressed` in 1.1, not a reserved bit")
+	})
+
+	t.Run("codec_id_zero", func(t *testing.T) {
+		data := compressedArchive(t)
+		env := envelopeOffsetOf(t, data)
+		data[env], data[env+1] = 0, 0
+		res, err := validateJSON(t, data)
+		assertFails(t, res, err, ruleEnvelope)
+		assert.Contains(t, findRule(res, ruleEnvelope)[0].Detail, "codec id is 0")
+	})
+
+	t.Run("codec_flags_reserved", func(t *testing.T) {
+		data := compressedArchive(t)
+		env := envelopeOffsetOf(t, data)
+		data[env+2] |= 1
+		res, err := validateJSON(t, data)
+		assertFails(t, res, err, ruleEnvelope)
+		assert.Contains(t, findRule(res, ruleEnvelope)[0].Detail, "codec_flags")
+	})
+
+	t.Run("envelope_reserved_u32", func(t *testing.T) {
+		data := compressedArchive(t)
+		env := envelopeOffsetOf(t, data)
+		data[env+4] |= 1
+		res, err := validateJSON(t, data)
+		assertFails(t, res, err, ruleEnvelope)
+		assert.Contains(t, findRule(res, ruleEnvelope)[0].Detail, "reserved field")
+	})
+
+	// A compressed flag on a payload too short to hold an envelope header:
+	// the file walks, and the envelope rule is what catches it.
+	t.Run("payload_too_short_for_header", func(t *testing.T) {
+		data := validArchive(t, false)
+		br, err := binpazer.NewReader(bytes.NewReader(data))
+		require.NoError(t, err)
+		b, err := br.Next()
+		require.NoError(t, err)
+		off := b.Offset()
+		data[off+2] |= byte(binpazer.FlagCompressed)
+		end := off + 8 + b.PayloadLen
+		crc := crc32.Checksum(data[off:end], crc32.MakeTable(crc32.Castagnoli))
+		binary.LittleEndian.PutUint32(data[end:], crc)
+
+		res, err := validateJSON(t, data)
+		assertFails(t, res, err, ruleEnvelope)
+		assert.Contains(t, findRule(res, ruleEnvelope)[0].Detail, "envelope header needs 16")
+	})
 }
 
 func TestValidateRuleIndex(t *testing.T) {

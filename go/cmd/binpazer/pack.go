@@ -62,6 +62,18 @@ func runPack(m *Manifest, baseDir string, w io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("block %d: %w", i, err)
 		}
+		// A `codec` compresses the block; the manifest always holds the block's
+		// logical bytes, so pack is what produces the Compression Envelope.
+		if blk.Codec != "" {
+			codec, err := parseCodec(blk.Codec)
+			if err != nil {
+				return fmt.Errorf("block %d: %w", i, err)
+			}
+			if err := bw.CompressedBlock(blk.TypeID, flags, codec, p); err != nil {
+				return fmt.Errorf("block %d: %w", i, err)
+			}
+			continue
+		}
 		if err := bw.Block(blk.TypeID, flags, p); err != nil {
 			return fmt.Errorf("block %d: %w", i, err)
 		}

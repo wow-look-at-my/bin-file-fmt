@@ -12,8 +12,39 @@
 static size_t file_write(void *ctx, const void *b, size_t n) { return fwrite(b, 1, n, (FILE *)ctx); }
 static int    file_seek(void *ctx, uint64_t off) { return fseek((FILE *)ctx, (long)off, SEEK_SET); }
 
+/* The compressed fixture uses codec `stored` (identity) deliberately: it is the
+ * one codec every implementation can produce with no dependency, so all three
+ * write these exact bytes and what gets compared is the envelope itself. */
+static int gen_compressed(const char *path) {
+    FILE *f = fopen(path, "wb");
+    if (!f) { perror("fopen"); return 1; }
+
+    binpazer_guid writer  = {{0xaa,0xbb,0xcc,0xdd,0,0,0,0,0,0,0,0,0,0,0,1}};
+    binpazer_guid g_note  = {{0xde,0xad,0xbe,0xef,0,0,0,0,0,0,0,0,0,0,0,0}};
+    binpazer_guid g_codec = {{0xc0,0xde,0xc0,0xde,0,0,0,0,0,0,0,0,0,0,0,7}};
+    binpazer_type_def defs[1] = { {2, {{0}}, "Note"} };
+    defs[0].guid = g_note;
+
+    binpazer_writer w;
+    binpazer_writer_begin(&w, file_write, file_seek, f, &writer, "demo", defs, 1);
+    binpazer_writer_block(&w, 2, 0, "plain block", 11);
+    binpazer_writer_block_compressed(&w, 2, BINPAZER_FLAG_HAS_CRC,
+                                     BINPAZER_CODEC_STORED, NULL,
+                                     "compressed, sort of", 19, 19);
+    binpazer_writer_block_compressed(&w, 2, 0, BINPAZER_CODEC_BY_GUID, &g_codec,
+                                     "guid-codec payload", 18, 18);
+    binpazer_writer_end(&w);
+
+    fclose(f);
+    if (w.err != BINPAZER_OK) { fprintf(stderr, "compressed write error %d\n", w.err); return 1; }
+    return 0;
+}
+
 int main(int argc, char **argv) {
-    if (argc != 2) { fprintf(stderr, "usage: %s <out>\n", argv[0]); return 2; }
+    if (argc != 2 && argc != 3) {
+        fprintf(stderr, "usage: %s <out> [compressed-out]\n", argv[0]);
+        return 2;
+    }
     FILE *f = fopen(argv[1], "wb");
     if (!f) { perror("fopen"); return 1; }
 
@@ -32,5 +63,7 @@ int main(int argc, char **argv) {
 
     fclose(f);
     if (w.err != BINPAZER_OK) { fprintf(stderr, "write error %d\n", w.err); return 1; }
+
+    if (argc == 3) return gen_compressed(argv[2]);
     return 0;
 }

@@ -197,6 +197,88 @@ binpazer_status binpazer_writer_index(
     return w_pad(w, align8(w->offset) - w->offset);
 }
 
+/* Writes a block whose payload is a Compression Envelope around already-encoded
+ * codec bytes. The envelope header is emitted here; the codec bytes come from
+ * the caller, which is what keeps this library codec-free. */
+binpazer_status binpazer_writer_block_compressed(
+    binpazer_writer *w, uint16_t type_id, uint16_t flags,
+    uint16_t codec_id, const binpazer_guid *codec_guid,
+    const void *stored, uint64_t stored_len, uint64_t uncompressed_len)
+{
+    if (w->err) return (binpazer_status)w->err;
+    if (codec_id == BINPAZER_CODEC_INVALID) return (binpazer_status)(w->err = BINPAZER_ERR_RANGE);
+    if (codec_id == BINPAZER_CODEC_BY_GUID && !codec_guid) return (binpazer_status)(w->err = BINPAZER_ERR_RANGE);
+    /* version_minor was written before the content was known, so declaring 1.1
+     * needs a back-patch -- and that needs a seek callback. */
+    if (!w->seek) return (binpazer_status)(w->err = BINPAZER_ERR_NOSEEK);
+
+    uint32_t hdr_size = (codec_id == BINPAZER_CODEC_BY_GUID)
+                            ? BINPAZER_ENVELOPE_GUID_SIZE : BINPAZER_ENVELOPE_FIXED_SIZE;
+    uint64_t payload_len = (uint64_t)hdr_size + stored_len;
+
+    uint32_t length_field;
+    if (flags & BINPAZER_FLAG_LARGE_MODE) {
+        if (payload_len % BINPAZER_LARGE_UNIT != 0) return (binpazer_status)(w->err = BINPAZER_ERR_RANGE);
+        uint64_t units = payload_len / BINPAZER_LARGE_UNIT;
+        if (units > 0xFFFFFFFFu) return (binpazer_status)(w->err = BINPAZER_ERR_RANGE);
+        length_field = (uint32_t)units;
+    } else {
+        if (payload_len > 0xFFFFFFFFu) return (binpazer_status)(w->err = BINPAZER_ERR_RANGE);
+        length_field = (uint32_t)payload_len;
+    }
+    flags |= BINPAZER_FLAG_COMPRESSED;
+
+    uint8_t bh[8];
+    put_u16(bh + 0, type_id);
+    put_u16(bh + 2, flags);
+    put_u32(bh + 4, length_field);
+
+    uint8_t env[BINPAZER_ENVELOPE_GUID_SIZE];
+    memset(env, 0, sizeof env);
+    put_u16(env + 0, codec_id);
+    /* 2: codec_flags, 4: reserved -- zero */
+    put_u64(env + 8, uncompressed_len);
+    if (codec_id == BINPAZER_CODEC_BY_GUID) memcpy(env + 16, codec_guid->bytes, 16);
+
+    uint32_t crc = 0;
+    if (flags & BINPAZER_FLAG_HAS_CRC) {
+        crc = binpazer_crc32c(0, bh, 8);
+        crc = binpazer_crc32c(crc, env, hdr_size);
+        if (stored_len) crc = binpazer_crc32c(crc, stored, (size_t)stored_len);
+    }
+    if (w_raw(w, bh, 8)) return (binpazer_status)w->err;
+    if (w_raw(w, env, hdr_size)) return (binpazer_status)w->err;
+    if (stored_len && w_raw(w, stored, (size_t)stored_len)) return (binpazer_status)w->err;
+    if (flags & BINPAZER_FLAG_HAS_CRC) {
+        uint8_t cb[4]; put_u32(cb, crc);
+        if (w_raw(w, cb, 4)) return (binpazer_status)w->err;
+    }
+    w->used_compression = 1;
+    return w_pad(w, align8(w->offset) - w->offset);
+}
+
+binpazer_status binpazer_compression_parse(
+    const void *payload, uint64_t payload_len, binpazer_compression *out)
+{
+    const uint8_t *p = (const uint8_t *)payload;
+    if (!p || !out) return BINPAZER_ERR_FORMAT;
+    if (payload_len < BINPAZER_ENVELOPE_FIXED_SIZE) return BINPAZER_ERR_FORMAT;
+
+    memset(out, 0, sizeof *out);
+    out->codec_id = get_u16(p);
+    if (out->codec_id == BINPAZER_CODEC_INVALID) return BINPAZER_ERR_FORMAT;
+    if (get_u16(p + 2) != 0 || get_u32(p + 4) != 0) return BINPAZER_ERR_FORMAT;
+    out->uncompressed_length = get_u64(p + 8);
+    out->header_size = BINPAZER_ENVELOPE_FIXED_SIZE;
+    if (out->codec_id == BINPAZER_CODEC_BY_GUID) {
+        if (payload_len < BINPAZER_ENVELOPE_GUID_SIZE) return BINPAZER_ERR_FORMAT;
+        memcpy(out->codec_guid.bytes, p + 16, 16);
+        out->header_size = BINPAZER_ENVELOPE_GUID_SIZE;
+    }
+    out->stored_length = payload_len - out->header_size;
+    return BINPAZER_OK;
+}
+
 binpazer_status binpazer_writer_end(binpazer_writer *w) {
     if (w->err) return (binpazer_status)w->err;
     if (w->wrote_index) {
@@ -206,6 +288,13 @@ binpazer_status binpazer_writer_end(binpazer_writer *w) {
         if (w_raw(w, ft, 16)) return (binpazer_status)w->err;
     }
     if (w->seek) {
+        /* A compressed block makes the file 1.1; the header claimed 1.0,
+         * having been written before the content was known. */
+        if (w->used_compression) {
+            if (w->seek(w->ctx, 14) != 0) return (binpazer_status)(w->err = BINPAZER_ERR_IO);
+            uint8_t v[2]; put_u16(v, BINPAZER_VERSION_MINOR_COMPRESSION);
+            if (w->write(w->ctx, v, 2) != 2) return (binpazer_status)(w->err = BINPAZER_ERR_IO);
+        }
         uint64_t total = w->offset;
         if (w->seek(w->ctx, 32) != 0) return (binpazer_status)(w->err = BINPAZER_ERR_IO);
         uint8_t b[8]; put_u64(b, total);

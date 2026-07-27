@@ -18,6 +18,12 @@ type Writer struct {
 	idx         []IndexEntry // recorded as blocks are written
 	indexOffset uint64
 	wroteIndex  bool
+	// versionMinor is what the header declares; usedCompression records that
+	// the content has outgrown it. A file declares the lowest minor version its
+	// content requires, so a file with no 1.1 feature stays byte-identical to
+	// what a 1.0 writer produced.
+	versionMinor    uint16
+	usedCompression bool
 }
 
 var zeros [8]byte
@@ -67,8 +73,19 @@ func (bw *Writer) writeBTTEntry(typeID uint16, guid GUID, name string) {
 // NewWriter writes the file header and the Block Type Table, then returns a
 // Writer ready for Block calls. If w implements io.Seeker, the exact file length
 // is back-patched by End; otherwise the streaming sentinel is used.
+//
+// The header declares version 1.0. Writing a compressed block raises it to 1.1,
+// back-patched by End; a non-seekable destination cannot be back-patched, so
+// there the version must be declared up front with NewWriterVersion.
 func NewWriter(w io.Writer, writerGUID GUID, name string, defs []TypeDef) (*Writer, error) {
-	bw := &Writer{dst: w, w: bufio.NewWriterSize(w, ioBufSize)}
+	return NewWriterVersion(w, writerGUID, name, defs, VersionMinor)
+}
+
+// NewWriterVersion is NewWriter with an explicit header version_minor, for a
+// non-seekable destination whose content will use a feature from a later minor
+// revision (compressed blocks: VersionMinorCompression).
+func NewWriterVersion(w io.Writer, writerGUID GUID, name string, defs []TypeDef, versionMinor uint16) (*Writer, error) {
+	bw := &Writer{dst: w, w: bufio.NewWriterSize(w, ioBufSize), versionMinor: versionMinor}
 	if s, ok := w.(io.Seeker); ok {
 		bw.seeker = s
 	}
@@ -80,7 +97,7 @@ func NewWriter(w io.Writer, writerGUID GUID, name string, defs []TypeDef) (*Writ
 	copy(hdr[0:8], Magic)
 	hdr[8], hdr[9], hdr[10], hdr[11] = 0x0D, 0x0A, 0x1A, 0x0A
 	binary.LittleEndian.PutUint16(hdr[12:], VersionMajor)
-	binary.LittleEndian.PutUint16(hdr[14:], VersionMinor)
+	binary.LittleEndian.PutUint16(hdr[14:], bw.versionMinor)
 	copy(hdr[16:32], writerGUID[:])
 	binary.LittleEndian.PutUint64(hdr[32:], FileLengthUnknown)
 	binary.LittleEndian.PutUint64(hdr[40:], firstBlock)
@@ -225,6 +242,21 @@ func (bw *Writer) End() error {
 		return bw.err
 	}
 	if bw.seeker != nil {
+		// Raise the declared version first: a compressed block makes the file
+		// 1.1, and the header was written before the content was known.
+		if bw.usedCompression && bw.versionMinor < VersionMinorCompression {
+			if _, err := bw.seeker.Seek(14, io.SeekStart); err != nil {
+				bw.err = err
+				return bw.err
+			}
+			var v [2]byte
+			binary.LittleEndian.PutUint16(v[:], VersionMinorCompression)
+			if _, err := bw.dst.Write(v[:]); err != nil {
+				bw.err = err
+				return bw.err
+			}
+			bw.versionMinor = VersionMinorCompression
+		}
 		total := bw.off
 		if _, err := bw.seeker.Seek(32, io.SeekStart); err != nil {
 			bw.err = err

@@ -40,10 +40,32 @@ namespace flag {
 enum : uint16_t {
     Critical   = BINPAZER_FLAG_CRITICAL,
     SafeToCopy = BINPAZER_FLAG_SAFE_TO_COPY,
+    Compressed = BINPAZER_FLAG_COMPRESSED,
     HasCrc     = BINPAZER_FLAG_HAS_CRC,
     LargeMode  = BINPAZER_FLAG_LARGE_MODE,
 };
 } // namespace flag
+
+// Codec ids from SPEC.md's registry. Like the C core, this wrapper carries no
+// codec code: it reads and writes the Compression Envelope and the caller
+// supplies the codec bytes (Stored needs none).
+namespace codec {
+enum : uint16_t {
+    Stored  = BINPAZER_CODEC_STORED,
+    Deflate = BINPAZER_CODEC_DEFLATE,
+    Zstd    = BINPAZER_CODEC_ZSTD,
+    ByGuid  = BINPAZER_CODEC_BY_GUID,
+};
+} // namespace codec
+
+using Compression = binpazer_compression;
+
+// Parses a Compression Envelope from the front of a payload already read.
+inline std::optional<Compression> parse_compression(const void *payload, uint64_t payload_len) {
+    Compression c{};
+    if (binpazer_compression_parse(payload, payload_len, &c) != BINPAZER_OK) return std::nullopt;
+    return c;
+}
 
 // IO callbacks. read/write return bytes transferred (fread/fwrite style); seek
 // returns true on success. An empty `SeekFn` means no seek capability.
@@ -99,6 +121,22 @@ public:
     }
     Status block(uint16_t type_id, uint16_t flags, std::string_view payload) {
         return block(type_id, flags, payload.data(), payload.size());
+    }
+    // Writes a block whose payload is a Compression Envelope around `stored` --
+    // bytes the caller has already encoded with `codec_id` (for codec::Stored
+    // they are the payload itself).
+    Status compressed_block(uint16_t type_id, uint16_t flags, uint16_t codec_id,
+                            const void *stored, uint64_t stored_len, uint64_t uncompressed_len,
+                            const Guid *codec_guid = nullptr) {
+        idx_.push_back(binpazer_index_entry{type_id, w_.offset}); // record for the index
+        return static_cast<Status>(binpazer_writer_block_compressed(
+            &w_, type_id, flags, codec_id, codec_guid, stored, stored_len, uncompressed_len));
+    }
+    Status compressed_block(uint16_t type_id, uint16_t flags, uint16_t codec_id,
+                            std::string_view stored, uint64_t uncompressed_len,
+                            const Guid *codec_guid = nullptr) {
+        return compressed_block(type_id, flags, codec_id, stored.data(), stored.size(),
+                                uncompressed_len, codec_guid);
     }
     // Writes a Block Index covering every block written so far. Call before end();
     // end() then emits the footer that locates it.

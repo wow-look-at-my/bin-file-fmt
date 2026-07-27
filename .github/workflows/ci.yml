@@ -69,8 +69,11 @@ jobs:
         run: |
           c++ -std=c++17 -Wall -Wextra -O1 -fsanitize=address,undefined -fno-sanitize-recover=all -Ic cpp/test.cpp c/binpazer.c -o /tmp/test_cpp_san
           /tmp/test_cpp_san
-      - name: Cross-impl fixture is reproducible
+      - name: Cross-impl fixtures are reproducible
         run: |
           cc -std=c11 -O2 c/binpazer.c c/gen.c -o /tmp/binpazer_gen
-          /tmp/binpazer_gen /tmp/sample.binpazer
+          /tmp/binpazer_gen /tmp/sample.binpazer /tmp/sample-compressed.binpazer
           cmp /tmp/sample.binpazer go/testdata/sample.binpazer
+          # The compressed fixture pins the Compression Envelope's bytes across
+          # all three implementations, the way the plain one pins block bytes.
+          cmp /tmp/sample-compressed.binpazer go/testdata/sample-compressed.binpazer

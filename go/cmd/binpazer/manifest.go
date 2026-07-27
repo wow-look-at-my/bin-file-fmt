@@ -24,15 +24,21 @@ type ManifestType struct {
 }
 
 // ManifestBlock is one block; its content comes from exactly one of data,
-// data_base64, or file (a path, relative to the manifest, to embed).
+// data_base64, or file (a path, relative to the manifest, to embed). Content is
+// always the block's LOGICAL payload: `codec` names what pack should compress
+// it with, and unpack records the codec it decompressed.
 type ManifestBlock struct {
 	TypeID     uint16   `json:"type_id"`
 	Flags      []string `json:"flags,omitempty"`
+	Codec      string   `json:"codec,omitempty"`
 	Data       string   `json:"data,omitempty"`
 	DataBase64 string   `json:"data_base64,omitempty"`
 	File       string   `json:"file,omitempty"`
 }
 
+// The `compressed` flag is deliberately absent from this table: it is implied
+// by `codec`, so a manifest cannot claim compression without naming what
+// produced the bytes.
 var flagOrder = []string{"critical", "safe_to_copy", "has_crc", "large_mode"}
 
 var flagBits = map[string]uint16{
@@ -40,6 +46,46 @@ var flagBits = map[string]uint16{
 	"safe_to_copy": binpazer.FlagSafeToCopy,
 	"has_crc":      binpazer.FlagHasCRC,
 	"large_mode":   binpazer.FlagLargeMode,
+}
+
+// codecIDs maps the manifest's codec names to SPEC.md's registry ids.
+var codecIDs = map[string]uint16{
+	"stored":  binpazer.CodecStored,
+	"deflate": binpazer.CodecDeflate,
+	"zstd":    binpazer.CodecZstd,
+}
+
+// codecName is the reverse of codecIDs. An id outside the registry renders as
+// "codec<id>", so a file from a later revision still reports something exact.
+func codecName(id uint16) string {
+	for n, v := range codecIDs {
+		if v == id {
+			return n
+		}
+	}
+	if id == binpazer.CodecByGUID {
+		return "guid"
+	}
+	return fmt.Sprintf("codec%d", id)
+}
+
+// displayFlagNames is flagNames plus `compressed`, for commands that SHOW a
+// block rather than describe it for pack (where compression is carried by
+// `codec` instead).
+func displayFlagNames(f uint16) []string {
+	names := flagNames(f)
+	if f&binpazer.FlagCompressed != 0 {
+		names = append(names, "compressed")
+	}
+	return names
+}
+
+func parseCodec(name string) (uint16, error) {
+	id, ok := codecIDs[strings.ToLower(name)]
+	if !ok {
+		return 0, fmt.Errorf("unknown codec %q (known: stored, deflate, zstd)", name)
+	}
+	return id, nil
 }
 
 func parseFlags(names []string) (uint16, error) {

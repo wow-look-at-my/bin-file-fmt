@@ -167,6 +167,94 @@ static void test_btt_capacity(void) {
           "btt-cap: entries intact");
 }
 
+/* Compression (SPEC.md 1.1): the library writes and parses the envelope but
+ * carries no codec, so this exercises codec `stored` (identity) and the GUID
+ * escape -- the two a dependency-free implementation can produce. */
+static void test_compression(void) {
+    static uint8_t buf[65536];
+    membuf m = { buf, sizeof buf, 0, 0 };
+
+    binpazer_guid writer  = {{0xaa,0xbb,0xcc,0xdd,0,0,0,0,0,0,0,0,0,0,0,1}};
+    binpazer_guid g_note  = {{0xde,0xad,0xbe,0xef,0,0,0,0,0,0,0,0,0,0,0,0}};
+    binpazer_guid g_codec = {{0xc0,0xde,0xc0,0xde,0,0,0,0,0,0,0,0,0,0,0,7}};
+    binpazer_type_def defs[1] = { { 2, {{0}}, "Note" } };
+    defs[0].guid = g_note;
+
+    const char *plain      = "plain block";           /* 11 bytes */
+    const char *compressed = "compressed, sort of";   /* 19 bytes */
+    const char *guidcodec  = "guid-codec payload";    /* 18 bytes */
+
+    binpazer_writer w;
+    CHECK(binpazer_writer_begin(&w, mem_write, mem_seek, &m, &writer, "demo",
+                                defs, 1) == BINPAZER_OK, "compress: begin");
+    CHECK(binpazer_writer_block(&w, 2, 0, plain, 11) == BINPAZER_OK, "compress: plain block");
+    CHECK(binpazer_writer_block_compressed(&w, 2, BINPAZER_FLAG_HAS_CRC,
+                                           BINPAZER_CODEC_STORED, NULL,
+                                           compressed, 19, 19) == BINPAZER_OK,
+          "compress: stored block");
+    CHECK(binpazer_writer_block_compressed(&w, 2, 0, BINPAZER_CODEC_BY_GUID, &g_codec,
+                                           guidcodec, 18, 18) == BINPAZER_OK,
+          "compress: guid-codec block");
+    CHECK(binpazer_writer_end(&w) == BINPAZER_OK, "compress: end");
+
+    /* ---- read back ---- */
+    m.pos = 0;
+    binpazer_reader r;
+    binpazer_type_entry entries[8];
+    size_t nent = 0;
+    CHECK(binpazer_reader_begin(&r, mem_read, mem_seek, &m, NULL, 0,
+                                entries, 8, &nent) == BINPAZER_OK, "compress: reader_begin");
+    /* A compressed block makes the file 1.1, back-patched by writer_end. */
+    CHECK(r.version_minor == BINPAZER_VERSION_MINOR_COMPRESSION, "compress: version_minor is 1.1");
+
+    binpazer_block b;
+    uint8_t payload[256];
+
+    CHECK(binpazer_reader_next(&r, entries, nent, &b) == BINPAZER_OK, "compress: block 0");
+    CHECK((b.flags & BINPAZER_FLAG_COMPRESSED) == 0, "compress: block 0 is not compressed");
+    CHECK(binpazer_reader_read_payload(&r, &b, payload, sizeof payload) == BINPAZER_OK, "compress: read 0");
+    CHECK(memcmp(payload, plain, 11) == 0, "compress: block 0 payload");
+
+    binpazer_compression c;
+    CHECK(binpazer_reader_next(&r, entries, nent, &b) == BINPAZER_OK, "compress: block 1");
+    CHECK((b.flags & BINPAZER_FLAG_COMPRESSED) != 0, "compress: block 1 is compressed");
+    CHECK(binpazer_reader_read_payload(&r, &b, payload, sizeof payload) == BINPAZER_OK, "compress: read 1");
+    CHECK(binpazer_compression_parse(payload, b.payload_len, &c) == BINPAZER_OK, "compress: parse 1");
+    CHECK(c.codec_id == BINPAZER_CODEC_STORED, "compress: block 1 codec is stored");
+    CHECK(c.uncompressed_length == 19, "compress: block 1 uncompressed_length");
+    CHECK(c.stored_length == 19, "compress: block 1 stored_length");
+    CHECK(c.header_size == BINPAZER_ENVELOPE_FIXED_SIZE, "compress: block 1 header size");
+    CHECK(memcmp(payload + c.header_size, compressed, 19) == 0, "compress: block 1 codec bytes");
+
+    CHECK(binpazer_reader_next(&r, entries, nent, &b) == BINPAZER_OK, "compress: block 2");
+    CHECK(binpazer_reader_read_payload(&r, &b, payload, sizeof payload) == BINPAZER_OK, "compress: read 2");
+    CHECK(binpazer_compression_parse(payload, b.payload_len, &c) == BINPAZER_OK, "compress: parse 2");
+    CHECK(c.codec_id == BINPAZER_CODEC_BY_GUID, "compress: block 2 codec is the GUID escape");
+    CHECK(c.header_size == BINPAZER_ENVELOPE_GUID_SIZE, "compress: block 2 header size");
+    CHECK(memcmp(c.codec_guid.bytes, g_codec.bytes, 16) == 0, "compress: block 2 codec guid");
+    CHECK(memcmp(payload + c.header_size, guidcodec, 18) == 0, "compress: block 2 codec bytes");
+
+    /* Envelope validation: codec id 0, set reserved fields, and a payload too
+     * short to hold the header are all corruption. */
+    uint8_t bad[BINPAZER_ENVELOPE_FIXED_SIZE] = {0};
+    CHECK(binpazer_compression_parse(bad, sizeof bad, &c) == BINPAZER_ERR_FORMAT, "compress: codec id 0 rejected");
+    bad[0] = BINPAZER_CODEC_STORED; bad[2] = 1;
+    CHECK(binpazer_compression_parse(bad, sizeof bad, &c) == BINPAZER_ERR_FORMAT, "compress: codec_flags rejected");
+    bad[2] = 0; bad[4] = 1;
+    CHECK(binpazer_compression_parse(bad, sizeof bad, &c) == BINPAZER_ERR_FORMAT, "compress: reserved rejected");
+    bad[4] = 0;
+    CHECK(binpazer_compression_parse(bad, 8, &c) == BINPAZER_ERR_FORMAT, "compress: short payload rejected");
+
+    /* A compressed block needs a seekable writer: version_minor is back-patched. */
+    membuf m2 = { buf, sizeof buf, 0, 0 };
+    binpazer_writer w2;
+    CHECK(binpazer_writer_begin(&w2, mem_write, NULL, &m2, &writer, "demo",
+                                defs, 1) == BINPAZER_OK, "compress: begin without seek");
+    CHECK(binpazer_writer_block_compressed(&w2, 2, 0, BINPAZER_CODEC_STORED, NULL,
+                                           compressed, 19, 19) == BINPAZER_ERR_NOSEEK,
+          "compress: non-seekable writer refuses a compressed block");
+}
+
 int main(void) {
     static uint8_t storage[65536];
     membuf m = { storage, sizeof storage, 0, 0 };
@@ -260,6 +348,7 @@ int main(void) {
     test_index();
     test_large();
     test_btt_capacity();
+    test_compression();
 
     if (failures == 0) { printf("OK: all C round-trip checks passed\n"); return 0; }
     printf("%d FAILURE(S)\n", failures);
