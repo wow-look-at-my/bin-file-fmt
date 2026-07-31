@@ -258,6 +258,22 @@ binpazer_status binpazer_reader_read_payload(
 binpazer_status binpazer_reader_skip_payload(
     binpazer_reader *r, const binpazer_block *blk);
 
+/* Receives one chunk of a streamed payload. Returning anything but
+ * BINPAZER_OK aborts the stream with that status. */
+typedef binpazer_status (*binpazer_sink_fn)(void *ctx, const void *buf, size_t n);
+
+/* Streams the current block's payload through `sink` in pieces of at most
+ * `scratch_cap` bytes, verifying the CRC as it goes, then advances past the
+ * block. Peak memory is the scratch buffer, NOT the payload -- which is how a
+ * caller reads a payload bigger than memory (large_mode blocks reach ~16 TiB).
+ * Use binpazer_reader_read_payload when the whole payload fits and a single
+ * buffer is simpler. A CRC failure is reported only after the last chunk has
+ * been handed over, since it cannot be known before then. */
+binpazer_status binpazer_reader_stream_payload(
+    binpazer_reader *r, const binpazer_block *blk,
+    void *scratch, size_t scratch_cap,
+    binpazer_sink_fn sink, void *sink_ctx);
+
 /* ---- Group blocks (nesting, predefined type 65530) ---- */
 
 /* One nested block inside a Group block's payload. `payload` points INTO the
@@ -313,6 +329,19 @@ binpazer_status binpazer_reader_find(
 binpazer_status binpazer_reader_at(
     binpazer_reader *r, const binpazer_type_entry *entries, size_t entries_count,
     uint64_t offset, binpazer_block *blk);
+
+/* ---- GUIDs ---- */
+
+/* Bytes needed for a canonical GUID string, including the NUL. */
+#define BINPAZER_GUID_STRING_SIZE 37
+
+/* Formats `g` as a canonical UUID (8-4-4-4-12, lowercase hex) into `buf`,
+ * NUL-terminated. `cap` must be at least BINPAZER_GUID_STRING_SIZE. */
+binpazer_status binpazer_guid_format(const binpazer_guid *g, char *buf, size_t cap);
+
+/* Parses a canonical UUID string into `out`. Hyphens are optional and may sit
+ * anywhere; exactly 32 hex digits must be present. */
+binpazer_status binpazer_guid_parse(const char *s, binpazer_guid *out);
 
 /* CRC-32C (Castagnoli), the algorithm used by the has_crc flag. Call with
  * crc = binpazer_crc32c(0, NULL, 0) to start, feed chunks, use the result. */

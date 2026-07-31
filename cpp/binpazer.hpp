@@ -103,6 +103,21 @@ inline std::optional<std::vector<uint8_t>> decompress(const Compression &c, cons
     return out;
 }
 
+// Canonical UUID text for a GUID (8-4-4-4-12, lowercase hex).
+inline std::string to_string(const Guid &g) {
+    char buf[BINPAZER_GUID_STRING_SIZE];
+    if (binpazer_guid_format(&g, buf, sizeof buf) != BINPAZER_OK) return {};
+    return std::string(buf);
+}
+
+// Parses canonical UUID text; hyphens optional. nullopt when it is not 32 hex
+// digits.
+inline std::optional<Guid> parse_guid(std::string_view s) {
+    Guid g{};
+    if (binpazer_guid_parse(std::string(s).c_str(), &g) != BINPAZER_OK) return std::nullopt;
+    return g;
+}
+
 using GroupChild = binpazer_group_child;
 
 // Parses a Group block's payload into its nested blocks. Each child's
@@ -304,6 +319,19 @@ public:
     }
     Status skip_payload(const Block &b) {
         return static_cast<Status>(binpazer_reader_skip_payload(&r_, &b));
+    }
+    // Streams the payload through `sink` in `chunk`-sized pieces (return false
+    // to abort), verifying the CRC, then advances past the block. Peak memory
+    // is `chunk`, not the payload -- for blocks too big to hold at once.
+    using SinkFn = std::function<bool(const void *buf, size_t n)>;
+    Status stream_payload(const Block &b, const SinkFn &sink, size_t chunk = 64 * 1024) {
+        std::vector<uint8_t> scratch(chunk ? chunk : 1);
+        auto tramp = [](void *ctx, const void *buf, size_t n) -> binpazer_status {
+            return (*static_cast<SinkFn *>(ctx))(buf, n) ? BINPAZER_OK : BINPAZER_ERR_IO;
+        };
+        return static_cast<Status>(binpazer_reader_stream_payload(
+            &r_, &b, scratch.data(), scratch.size(), tramp,
+            const_cast<SinkFn *>(&sink)));
     }
     // Reads the current block's payload, decompressing it when the block
     // carries a Compression Envelope, and advances past it. An uncompressed

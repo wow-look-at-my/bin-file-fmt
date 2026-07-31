@@ -79,6 +79,28 @@ library at the package root -- `compress.go` for the envelope and codecs,
 `go/cmd/binpazer/` (one command per file). `go/testdata/sample.binpazer` is
 the shared 280-byte fixture.
 
+## Parity across implementations
+
+Anything one implementation can express, all three must -- a file none of the
+others can read is the bug this rule exists to prevent. Whole-surface pairs to
+keep in step when adding to any of them:
+
+| Capability | Go | C / C++ |
+|---|---|---|
+| every registry codec | built in | `binpazer_codec.c` (link it) |
+| caller-buffer codec API | `CompressInto`/`DecompressInto`/`CompressBound` | `binpazer_compress`/`_decompress`/`_compress_bound` |
+| compress a block from logical bytes | `CompressedBlock` | `binpazer_writer_block_compress` / `Writer::compress_block` |
+| read a block, decoding it | `ReadDecompressedPayload` | `binpazer_reader_read_payload_decompressed` |
+| stream a payload bigger than memory | `PayloadReader`/`WritePayloadTo` | `binpazer_reader_stream_payload` / `Reader::stream_payload` |
+| nested blocks in a Group | `ParseGroupPayload` | `binpazer_group_parse` / `parse_group` |
+| declare 1.1 up front (streaming writer) | `NewWriterVersion` | `binpazer_writer_begin_version` / `Writer(..., version_minor)` |
+| GUID <-> canonical text | `ParseGUID` / `GUID.String` | `binpazer_guid_parse` / `_format` / `to_string` |
+
+Known and deliberate differences: Go's `NewReaderLimited` allocation cap has no
+C counterpart because C allocates nothing -- every buffer is the caller's, so
+the cap is theirs already. The CLI is Go-only; `c/interop.c` is a test harness,
+not a tool.
+
 ## IO-injection seam (deliberate -- do not add mmap)
 
 The libraries do **no file IO and no mmap**; the caller injects IO. C/C++ take

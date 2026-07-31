@@ -303,6 +303,63 @@ int main() {
         CHECK(sbuf[14] == BINPAZER_VERSION_MINOR_COMPRESSION, "streaming: header declares 1.1");
     }
 
+    // Streaming a payload in pieces smaller than the payload, and GUID text.
+    {
+        std::vector<uint8_t> sbuf;
+        size_t spos = 0;
+        auto swrite = [&](const void *b, size_t n) -> size_t {
+            if (spos + n > sbuf.size()) sbuf.resize(spos + n);
+            std::memcpy(sbuf.data() + spos, b, n);
+            spos += n;
+            return n;
+        };
+        auto sseek = [&](uint64_t o) -> bool {
+            if (o > sbuf.size()) sbuf.resize(static_cast<size_t>(o));
+            spos = static_cast<size_t>(o);
+            return true;
+        };
+        std::vector<uint8_t> payload(1000);
+        for (size_t i = 0; i < payload.size(); i++) payload[i] = static_cast<uint8_t>(i * 7 + 3);
+        {
+            binpazer::Writer w(swrite, writer, "stream", defs, sseek);
+            w.block(1, binpazer::flag::HasCrc, payload);
+            w.end();
+        }
+        spos = 0;
+        binpazer::Reader r2([&](void *b, size_t n) -> size_t {
+                                size_t avail = sbuf.size() - spos;
+                                size_t c = n < avail ? n : avail;
+                                std::memcpy(b, sbuf.data() + spos, c);
+                                spos += c;
+                                return c;
+                            },
+                            sseek);
+        auto b = r2.next();
+        CHECK(b.has_value(), "stream: block present");
+        std::vector<uint8_t> got;
+        size_t chunks = 0;
+        binpazer::Status st = b ? r2.stream_payload(*b,
+                                                    [&](const void *buf, size_t n) {
+                                                        const auto *p8 = static_cast<const uint8_t *>(buf);
+                                                        got.insert(got.end(), p8, p8 + n);
+                                                        ++chunks;
+                                                        return true;
+                                                    },
+                                                    64)
+                                : binpazer::Status::ErrIo;
+        CHECK(st == binpazer::Status::Ok, "stream: streamed ok");
+        CHECK(got == payload, "stream: bytes reassembled");
+        CHECK(chunks == (payload.size() + 63) / 64, "stream: chunked at the requested size");
+    }
+
+    {
+        binpazer::Guid g{{0xaa,0xbb,0xcc,0xdd,0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b}};
+        CHECK(binpazer::to_string(g) == "aabbccdd-0001-0203-0405-060708090a0b", "guid: canonical text");
+        auto back = binpazer::parse_guid("aabbccdd-0001-0203-0405-060708090a0b");
+        CHECK(back && std::memcmp(back->bytes, g.bytes, 16) == 0, "guid: round-trip");
+        CHECK(!binpazer::parse_guid("nope").has_value(), "guid: junk rejected");
+    }
+
     if (failures == 0) { std::printf("OK: all C++ round-trip checks passed\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failures);
     return 1;

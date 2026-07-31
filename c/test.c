@@ -266,6 +266,103 @@ static void test_streaming_compressed(void) {
           "streaming: 1.0 header + no seek is still refused");
 }
 
+/* Streaming a payload: peak memory is the scratch buffer, not the payload, and
+ * the CRC is still verified. */
+typedef struct { uint8_t *dst; size_t cap, len; size_t chunks; } sink_ctx;
+
+static binpazer_status collect(void *ctx, const void *buf, size_t n) {
+    sink_ctx *s = (sink_ctx *)ctx;
+    if (s->len + n > s->cap) return BINPAZER_ERR_CAPACITY;
+    memcpy(s->dst + s->len, buf, n);
+    s->len += n;
+    s->chunks++;
+    return BINPAZER_OK;
+}
+
+static binpazer_status refuse(void *ctx, const void *buf, size_t n) {
+    (void)ctx; (void)buf; (void)n;
+    return BINPAZER_ERR_IO;
+}
+
+static void test_stream_payload(void) {
+    static uint8_t fbuf[8192];
+    membuf m = { fbuf, sizeof fbuf, 0, 0 };
+    binpazer_guid wg = {{0x01}};
+    binpazer_type_def defs[1] = { {1, {{0x11}}, "P"} };
+
+    uint8_t big[1000];
+    for (size_t i = 0; i < sizeof big; i++) big[i] = (uint8_t)(i * 7 + 3);
+
+    binpazer_writer w;
+    binpazer_writer_begin(&w, mem_write, mem_seek, &m, &wg, "stream", defs, 1);
+    binpazer_writer_block(&w, 1, BINPAZER_FLAG_HAS_CRC, big, sizeof big);
+    binpazer_writer_block(&w, 1, 0, "tail", 4);
+    binpazer_writer_end(&w);
+
+    m.pos = 0;
+    binpazer_reader r; char nm[32]; binpazer_type_entry te[4]; size_t nte = 0;
+    binpazer_reader_begin(&r, mem_read, mem_seek, &m, nm, sizeof nm, te, 4, &nte);
+
+    binpazer_block blk;
+    CHECK(binpazer_reader_next(&r, te, nte, &blk) == BINPAZER_OK, "stream: next");
+
+    uint8_t out[2048];
+    uint8_t scratch[64];   /* far smaller than the payload -- the whole point */
+    sink_ctx sc = { out, sizeof out, 0, 0 };
+    CHECK(binpazer_reader_stream_payload(&r, &blk, scratch, sizeof scratch, collect, &sc) == BINPAZER_OK,
+          "stream: payload streamed");
+    CHECK(sc.len == sizeof big && memcmp(out, big, sizeof big) == 0, "stream: bytes reassembled");
+    CHECK(sc.chunks == (sizeof big + 63) / 64, "stream: chunked at the scratch size");
+
+    /* The reader is positioned on the next block afterwards. */
+    CHECK(binpazer_reader_next(&r, te, nte, &blk) == BINPAZER_OK, "stream: advanced past the block");
+    CHECK(blk.payload_len == 4, "stream: next block reached");
+
+    /* A sink that refuses aborts with its own status. */
+    m.pos = 0;
+    binpazer_reader r2; size_t nte2 = 0;
+    binpazer_reader_begin(&r2, mem_read, mem_seek, &m, nm, sizeof nm, te, 4, &nte2);
+    binpazer_reader_next(&r2, te, nte2, &blk);
+    CHECK(binpazer_reader_stream_payload(&r2, &blk, scratch, sizeof scratch, refuse, NULL) == BINPAZER_ERR_IO,
+          "stream: sink refusal propagates");
+
+    /* A corrupted payload is caught by the CRC, after the fact. */
+    fbuf[blk.payload_offset + 10] ^= 0xFF;
+    m.pos = 0;
+    binpazer_reader r3; size_t nte3 = 0;
+    binpazer_reader_begin(&r3, mem_read, mem_seek, &m, nm, sizeof nm, te, 4, &nte3);
+    binpazer_reader_next(&r3, te, nte3, &blk);
+    sc.len = 0; sc.chunks = 0;
+    CHECK(binpazer_reader_stream_payload(&r3, &blk, scratch, sizeof scratch, collect, &sc) == BINPAZER_ERR_CRC,
+          "stream: corrupted payload fails the CRC");
+}
+
+/* GUID text, matching the Go library's canonical 8-4-4-4-12 form. */
+static void test_guid_text(void) {
+    binpazer_guid g = {{0xaa,0xbb,0xcc,0xdd, 0x00,0x01, 0x02,0x03, 0x04,0x05,
+                        0x06,0x07,0x08,0x09,0x0a,0x0b}};
+    char buf[BINPAZER_GUID_STRING_SIZE];
+    CHECK(binpazer_guid_format(&g, buf, sizeof buf) == BINPAZER_OK, "guid: format");
+    CHECK(strcmp(buf, "aabbccdd-0001-0203-0405-060708090a0b") == 0, "guid: canonical text");
+
+    char small[8];
+    CHECK(binpazer_guid_format(&g, small, sizeof small) == BINPAZER_ERR_CAPACITY, "guid: short buffer refused");
+
+    binpazer_guid back;
+    CHECK(binpazer_guid_parse(buf, &back) == BINPAZER_OK, "guid: parse");
+    CHECK(memcmp(back.bytes, g.bytes, 16) == 0, "guid: round-trip");
+
+    /* Hyphens are separators, not data. */
+    CHECK(binpazer_guid_parse("aabbccdd0001020304050607" "08090a0b", &back) == BINPAZER_OK, "guid: parse unhyphenated");
+    CHECK(memcmp(back.bytes, g.bytes, 16) == 0, "guid: unhyphenated round-trip");
+
+    CHECK(binpazer_guid_parse("aabb", &back) == BINPAZER_ERR_FORMAT, "guid: too short rejected");
+    CHECK(binpazer_guid_parse("zzbbccdd-0001-0203-0405-060708090a0b", &back) == BINPAZER_ERR_FORMAT,
+          "guid: non-hex rejected");
+    CHECK(binpazer_guid_parse("aabbccdd-0001-0203-0405-060708090a0b0", &back) == BINPAZER_ERR_FORMAT,
+          "guid: too long rejected");
+}
+
 static void test_compression(void) {
     static uint8_t buf[65536];
     membuf m = { buf, sizeof buf, 0, 0 };
@@ -447,6 +544,8 @@ int main(void) {
     test_compression();
     test_group_parse();
     test_streaming_compressed();
+    test_stream_payload();
+    test_guid_text();
 
     if (failures == 0) { printf("OK: all C round-trip checks passed\n"); return 0; }
     printf("%d FAILURE(S)\n", failures);

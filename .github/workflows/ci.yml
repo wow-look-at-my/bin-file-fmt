@@ -56,13 +56,16 @@ jobs:
             // The hand-off carries the whole publish matrix, and its layout is
             // go-toolchain's to change -- so find this runner's binary rather
             // than hard-coding where it lands.
-            const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => {
-              const p = path.join(d, e.name);
-              return e.isDirectory() ? walk(p) : [p];
-            });
-            const built = fs.existsSync('go/build') ? walk('go/build') : [];
-            const bp = built.find((f) => path.basename(f) === 'binpazer')
-              ?? built.find((f) => /binpazer.*linux.*amd64/.test(path.basename(f)));
+            // Annotated because the action type-checks with strict: true, and a
+            // recursive arrow cannot infer its own return type.
+            const walk = (d: string): string[] =>
+              fs.readdirSync(d, { withFileTypes: true }).flatMap((e): string[] => {
+                const p = path.join(d, e.name);
+                return e.isDirectory() ? walk(p) : [p];
+              });
+            const built: string[] = fs.existsSync('go/build') ? walk('go/build') : [];
+            const bp = built.find((f: string) => path.basename(f) === 'binpazer')
+              ?? built.find((f: string) => /binpazer.*linux.*amd64/.test(path.basename(f)));
             if (!bp) {
               core.setFailed(`no linux/amd64 binpazer in the build hand-off (found: ${built.join(', ') || 'nothing'})`);
               return;
