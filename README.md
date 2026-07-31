@@ -31,6 +31,24 @@ encoder, so implementations agree on what a file *means* rather than on the
 bytes their compressors emit. CI checks that directly, by having each
 implementation decode files the other wrote with every codec.
 
+The Go library also ships a convenience layer for the shape most binpazer files
+take -- content blocks, a directory naming where they landed, then the index --
+so building one is not twenty lines of bookkeeping:
+
+```go
+off, _ := w.PutCompressed(typeFile, binpazer.FlagHasCRC, binpazer.CodecZstd, body)
+dir.Entries[name] = off                       // Put* reports where the block landed
+w.PutJSON(typeDir, binpazer.FlagCritical, binpazer.CodecZstd, dir)
+w.Finish()                                    // Block Index + footer
+
+r, _ := binpazer.NewReaderAt(blob, size)      // mmap, file, or []byte
+r.DecodeJSONLast(typeDir, &dir)               // newest directory wins
+body, _, _ := r.OpenAt(dir.Entries[name], typeFile)   // seek + type check + decode
+```
+
+It composes the primitives and adds no format feature, so these files are
+ordinary binpazer files that the C and C++ implementations read as-is.
+
 The readers are hardened against hostile input: every length/count field is
 bounded against the real input size (or an explicit cap for non-seekable
 streams) *before* anything is allocated, failure modes are typed sentinel

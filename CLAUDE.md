@@ -131,6 +131,14 @@ seeker, not through new IO paths.
   and `PayloadReader` (bounded reader, `SkipPayload` realigns afterwards). The
   CLI never buffers whole payloads; keep it that way (RSS stays ~3 MB on 1 GiB
   files).
+- `container.go` -- convenience layer for the shape most files take (content
+  blocks + a directory naming their offsets + index/footer): `NewReaderAt`,
+  `FindFirst`/`FindLast`, `BlockAt`/`OpenAt` (offset + type check),
+  `DecodeJSON`/`DecodeJSONLast`, `Put`/`PutCompressed`/`PutJSON` (write and
+  report the offset), `Finish` (WriteIndex + End). Pure composition of the
+  primitives -- it adds no format feature, so files it writes are ordinary
+  binpazer files C and C++ already read, and it is exempt from the parity
+  table for that reason. New sugar belongs here, not in reader.go/writer.go.
 - `writer.go` -- buffered writer + index/footer emission; `group.go` --
   `ParseGroupPayload` for nested blocks (`binpazer_group_parse` in C,
   `binpazer::parse_group` in C++ -- same tolerance for a damaged group: the
