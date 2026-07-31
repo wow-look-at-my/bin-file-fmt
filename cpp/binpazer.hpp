@@ -2,11 +2,17 @@
 // Header-only. Links against the C core (binpazer.c); no file IO, no mmap --
 // the caller injects IO via std::function callbacks.
 //
-// Requires C++17. Depends only on the standard library and binpazer.h.
+// Requires C++17. Depends only on the standard library, binpazer.h and
+// binpazer_codec.h. The codec entry points (compress, decompress,
+// Writer::compress_block, Reader::read_payload_decompressed) additionally need
+// binpazer_codec.c and its libraries at LINK time -- and only if you call
+// them: they are inline, so a program that never compresses links the core
+// alone, exactly as before.
 #ifndef BINPAZER_HPP
 #define BINPAZER_HPP
 
 #include "binpazer.h"
+#include "binpazer_codec.h"
 
 #include <cstdint>
 #include <cstddef>
@@ -40,10 +46,97 @@ namespace flag {
 enum : uint16_t {
     Critical   = BINPAZER_FLAG_CRITICAL,
     SafeToCopy = BINPAZER_FLAG_SAFE_TO_COPY,
+    Compressed = BINPAZER_FLAG_COMPRESSED,
     HasCrc     = BINPAZER_FLAG_HAS_CRC,
     LargeMode  = BINPAZER_FLAG_LARGE_MODE,
 };
 } // namespace flag
+
+// Codec ids from SPEC.md's registry. Every one of them is implemented (via the
+// C codec layer), so this wrapper reads and writes any compressed file any
+// binpazer implementation can produce. ByGuid is the escape for codecs the
+// registry does not name; register one with binpazer_codec_register_guid.
+namespace codec {
+enum : uint16_t {
+    Stored  = BINPAZER_CODEC_STORED,
+    Deflate = BINPAZER_CODEC_DEFLATE,
+    Zstd    = BINPAZER_CODEC_ZSTD,
+    Lz4     = BINPAZER_CODEC_LZ4,
+    ByGuid  = BINPAZER_CODEC_BY_GUID,
+};
+} // namespace codec
+
+using Compression = binpazer_compression;
+
+// Parses a Compression Envelope from the front of a payload already read.
+inline std::optional<Compression> parse_compression(const void *payload, uint64_t payload_len) {
+    Compression c{};
+    if (binpazer_compression_parse(payload, payload_len, &c) != BINPAZER_OK) return std::nullopt;
+    return c;
+}
+
+// Encodes `src` with a codec, sizing the result from the codec's own bound.
+// Returns nullopt when the codec is unavailable or the encode fails.
+inline std::optional<std::vector<uint8_t>> compress(uint16_t codec_id, const void *src, uint64_t len,
+                                                    const Guid *codec_guid = nullptr) {
+    uint64_t cap = binpazer_compress_bound(codec_id, codec_guid, len);
+    if (cap == 0 && len != 0) return std::nullopt;
+    std::vector<uint8_t> out(static_cast<size_t>(cap));
+    uint64_t n = cap;
+    if (binpazer_compress(codec_id, codec_guid, src, len, out.data(), &n) != BINPAZER_OK)
+        return std::nullopt;
+    out.resize(static_cast<size_t>(n));
+    return out;
+}
+
+inline std::optional<std::vector<uint8_t>> compress(uint16_t codec_id, const std::vector<uint8_t> &src,
+                                                    const Guid *codec_guid = nullptr) {
+    return compress(codec_id, src.data(), src.size(), codec_guid);
+}
+
+// Decodes an envelope's codec bytes. `stored` points at the codec bytes, i.e.
+// the payload advanced by c.header_size. The envelope's uncompressed_length is
+// authoritative: a decode of any other length fails rather than truncating.
+inline std::optional<std::vector<uint8_t>> decompress(const Compression &c, const void *stored) {
+    std::vector<uint8_t> out(static_cast<size_t>(c.uncompressed_length));
+    if (binpazer_decompress(&c, stored, out.data(), out.size()) != BINPAZER_OK) return std::nullopt;
+    return out;
+}
+
+// Canonical UUID text for a GUID (8-4-4-4-12, lowercase hex).
+inline std::string to_string(const Guid &g) {
+    char buf[BINPAZER_GUID_STRING_SIZE];
+    if (binpazer_guid_format(&g, buf, sizeof buf) != BINPAZER_OK) return {};
+    return std::string(buf);
+}
+
+// Parses canonical UUID text; hyphens optional. nullopt when it is not 32 hex
+// digits.
+inline std::optional<Guid> parse_guid(std::string_view s) {
+    Guid g{};
+    if (binpazer_guid_parse(std::string(s).c_str(), &g) != BINPAZER_OK) return std::nullopt;
+    return g;
+}
+
+using GroupChild = binpazer_group_child;
+
+// Parses a Group block's payload into its nested blocks. Each child's
+// `payload` points INTO the buffer passed in, so keep it alive. A structural
+// error yields the intact prefix, matching the C and Go parsers -- check
+// `ok` to tell a clean parse from a truncated one.
+inline std::vector<GroupChild> parse_group(const void *payload, uint64_t len, bool *ok = nullptr) {
+    size_t n = 0;
+    binpazer_group_parse(payload, len, nullptr, 0, &n);
+    std::vector<GroupChild> out(n);
+    binpazer_status s = binpazer_group_parse(payload, len, out.data(), out.size(), &n);
+    out.resize(n < out.size() ? n : out.size());
+    if (ok) *ok = (s == BINPAZER_OK);
+    return out;
+}
+
+inline std::vector<GroupChild> parse_group(const std::vector<uint8_t> &payload, bool *ok = nullptr) {
+    return parse_group(payload.data(), payload.size(), ok);
+}
 
 // IO callbacks. read/write return bytes transferred (fread/fwrite style); seek
 // returns true on success. An empty `SeekFn` means no seek capability.
@@ -68,8 +161,15 @@ class Writer {
 public:
     // Writes the file header and Block Type Table immediately. Do not include
     // type id 65534 in `defs`; the table entry is added automatically.
+    //
+    // `version_minor` declares a minor version in the header up front. The one
+    // reason to set it: a compressed block normally raises the version by
+    // back-patching the header at end(), which needs a seek callback -- pass
+    // BINPAZER_VERSION_MINOR_COMPRESSION and a STREAMING writer can compress
+    // too.
     Writer(WriteFn write, const Guid &writer_guid, std::string_view name,
-           const std::vector<TypeDef> &defs, SeekFn seek = {}) {
+           const std::vector<TypeDef> &defs, SeekFn seek = {},
+           uint16_t version_minor = BINPAZER_VERSION_MINOR) {
         io_.write = std::move(write);
         io_.seek  = std::move(seek);
         name_     = std::string(name);
@@ -79,10 +179,10 @@ public:
         for (const auto &d : defs)
             cdefs.push_back(binpazer_type_def{d.type_id, d.guid, d.name.c_str()});
 
-        binpazer_writer_begin(&w_, detail::tramp_write,
-                              io_.seek ? detail::tramp_seek : nullptr, &io_,
-                              &writer_guid, name_.c_str(),
-                              cdefs.data(), cdefs.size());
+        binpazer_writer_begin_version(&w_, detail::tramp_write,
+                                      io_.seek ? detail::tramp_seek : nullptr, &io_,
+                                      &writer_guid, name_.c_str(),
+                                      cdefs.data(), cdefs.size(), version_minor);
     }
 
     Writer(const Writer &) = delete;
@@ -99,6 +199,40 @@ public:
     }
     Status block(uint16_t type_id, uint16_t flags, std::string_view payload) {
         return block(type_id, flags, payload.data(), payload.size());
+    }
+    // Writes a block whose payload is a Compression Envelope around `stored` --
+    // bytes the caller has already encoded with `codec_id` (for codec::Stored
+    // they are the payload itself).
+    Status compressed_block(uint16_t type_id, uint16_t flags, uint16_t codec_id,
+                            const void *stored, uint64_t stored_len, uint64_t uncompressed_len,
+                            const Guid *codec_guid = nullptr) {
+        idx_.push_back(binpazer_index_entry{type_id, w_.offset}); // record for the index
+        return static_cast<Status>(binpazer_writer_block_compressed(
+            &w_, type_id, flags, codec_id, codec_guid, stored, stored_len, uncompressed_len));
+    }
+    Status compressed_block(uint16_t type_id, uint16_t flags, uint16_t codec_id,
+                            std::string_view stored, uint64_t uncompressed_len,
+                            const Guid *codec_guid = nullptr) {
+        return compressed_block(type_id, flags, codec_id, stored.data(), stored.size(),
+                                uncompressed_len, codec_guid);
+    }
+    // Writes a block from its LOGICAL payload, compressing it with `codec_id`
+    // -- the counterpart of compressed_block, which takes bytes the caller
+    // already encoded. Needs binpazer_codec.c at link time.
+    Status compress_block(uint16_t type_id, uint16_t flags, uint16_t codec_id,
+                          const void *payload, uint64_t len,
+                          const Guid *codec_guid = nullptr) {
+        auto enc = binpazer::compress(codec_id, payload, len, codec_guid);
+        if (!enc) return Status::ErrRange;
+        return compressed_block(type_id, flags, codec_id, enc->data(), enc->size(), len, codec_guid);
+    }
+    Status compress_block(uint16_t type_id, uint16_t flags, uint16_t codec_id,
+                          const std::vector<uint8_t> &payload, const Guid *codec_guid = nullptr) {
+        return compress_block(type_id, flags, codec_id, payload.data(), payload.size(), codec_guid);
+    }
+    Status compress_block(uint16_t type_id, uint16_t flags, uint16_t codec_id,
+                          std::string_view payload, const Guid *codec_guid = nullptr) {
+        return compress_block(type_id, flags, codec_id, payload.data(), payload.size(), codec_guid);
     }
     // Writes a Block Index covering every block written so far. Call before end();
     // end() then emits the footer that locates it.
@@ -185,6 +319,33 @@ public:
     }
     Status skip_payload(const Block &b) {
         return static_cast<Status>(binpazer_reader_skip_payload(&r_, &b));
+    }
+    // Streams the payload through `sink` in `chunk`-sized pieces (return false
+    // to abort), verifying the CRC, then advances past the block. Peak memory
+    // is `chunk`, not the payload -- for blocks too big to hold at once.
+    using SinkFn = std::function<bool(const void *buf, size_t n)>;
+    Status stream_payload(const Block &b, const SinkFn &sink, size_t chunk = 64 * 1024) {
+        std::vector<uint8_t> scratch(chunk ? chunk : 1);
+        auto tramp = [](void *ctx, const void *buf, size_t n) -> binpazer_status {
+            return (*static_cast<SinkFn *>(ctx))(buf, n) ? BINPAZER_OK : BINPAZER_ERR_IO;
+        };
+        return static_cast<Status>(binpazer_reader_stream_payload(
+            &r_, &b, scratch.data(), scratch.size(), tramp,
+            const_cast<SinkFn *>(&sink)));
+    }
+    // Reads the current block's payload, decompressing it when the block
+    // carries a Compression Envelope, and advances past it. An uncompressed
+    // block comes back unchanged, so one call reads a whole file's blocks
+    // whether or not they are compressed. nullopt on error.
+    std::optional<std::vector<uint8_t>> read_payload_decompressed(const Block &b) {
+        std::vector<uint8_t> raw(static_cast<size_t>(b.payload_len));
+        if (binpazer_reader_read_payload(&r_, &b, raw.data(), raw.size()) != BINPAZER_OK)
+            return std::nullopt;
+        if ((b.flags & BINPAZER_FLAG_COMPRESSED) == 0) return raw;
+        Compression c{};
+        if (binpazer_compression_parse(raw.data(), b.payload_len, &c) != BINPAZER_OK)
+            return std::nullopt;
+        return binpazer::decompress(c, raw.data() + c.header_size);
     }
 
     bool     has_index() const { return r_.has_index != 0; }

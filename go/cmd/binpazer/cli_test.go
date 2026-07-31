@@ -76,6 +76,77 @@ func TestCLIEndToEnd(t *testing.T) {
 	assert.Contains(t, o, "spec-conformant")
 }
 
+// TestCLICompressedRoundTrip covers compression end to end through the CLI:
+// pack compresses, info reports the codec and the DECODED size, unpack writes
+// the decoded payload plus the codec that produced it, and re-packing that
+// manifest reproduces the file byte for byte.
+func TestCLICompressedRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	payload := bytes.Repeat([]byte("compress me. "), 200)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "payload.bin"), payload, 0o644))
+
+	m := &Manifest{
+		WriterGUID: "aabbccdd-0000-0000-0000-000000000001",
+		WriterName: "demo",
+		Types:      []ManifestType{{TypeID: 1, GUID: "11223344-5566-7788-99aa-bbccddeeff00", Name: "Data"}},
+		Blocks: []ManifestBlock{
+			{TypeID: 1, Flags: []string{"has_crc"}, Codec: "deflate", File: "payload.bin"},
+			{TypeID: 1, Codec: "stored", Data: "stored payload"},
+			{TypeID: 1, Data: "plain payload"},
+		},
+		Index: true,
+	}
+	raw, err := json.MarshalIndent(m, "", "  ")
+	require.NoError(t, err)
+	manifestPath := filepath.Join(dir, "manifest.json")
+	require.NoError(t, os.WriteFile(manifestPath, raw, 0o644))
+
+	out := filepath.Join(dir, "out.binpazer")
+	_, err = execute("pack", manifestPath, "-o", out)
+	require.NoError(t, err)
+
+	// Compression actually happened: the file is smaller than the payload alone.
+	st, err := os.Stat(out)
+	require.NoError(t, err)
+	assert.Less(t, st.Size(), int64(len(payload)), "deflate must shrink a repetitive payload")
+
+	o, err := execute("validate", out)
+	require.NoError(t, err)
+	assert.Contains(t, o, "spec-conformant")
+
+	o, err = execute("info", out)
+	require.NoError(t, err)
+	assert.Contains(t, o, "binpazer v1.1", "a compressed block makes the file 1.1")
+	assert.Contains(t, o, "codec=deflate")
+	assert.Contains(t, o, "ulen=2600", "info reports the DECODED size")
+
+	udir := filepath.Join(dir, "unpacked")
+	_, err = execute("unpack", out, "-d", udir)
+	require.NoError(t, err)
+	got, err := os.ReadFile(filepath.Join(udir, "block0.bin"))
+	require.NoError(t, err)
+	assert.True(t, bytes.Equal(got, payload), "unpack writes the DECODED payload, not envelope bytes")
+
+	var um Manifest
+	uraw, err := os.ReadFile(filepath.Join(udir, "manifest.json"))
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(uraw, &um))
+	require.Len(t, um.Blocks, 3)
+	assert.Equal(t, "deflate", um.Blocks[0].Codec)
+	assert.Equal(t, "stored", um.Blocks[1].Codec)
+	assert.Empty(t, um.Blocks[2].Codec, "an uncompressed block records no codec")
+	assert.NotContains(t, um.Blocks[0].Flags, "compressed", "compression is carried by codec, not a flag name")
+
+	out2 := filepath.Join(dir, "out2.binpazer")
+	_, err = execute("pack", filepath.Join(udir, "manifest.json"), "-o", out2)
+	require.NoError(t, err)
+	a, err := os.ReadFile(out)
+	require.NoError(t, err)
+	b, err := os.ReadFile(out2)
+	require.NoError(t, err)
+	assert.True(t, bytes.Equal(a, b), "unpack -> pack must reproduce the file exactly")
+}
+
 func TestVersionFlag(t *testing.T) {
 	out, err := execute("--version")
 	require.NoError(t, err)

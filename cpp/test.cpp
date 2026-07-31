@@ -197,6 +197,169 @@ int main() {
         CHECK(p.size() == 4096 && std::memcmp(p.data(), big4.data(), 4096) == 0, "large: payload");
     }
 
+    // Compression (SPEC.md 1.1). Like the C core, the wrapper carries no codec:
+    // it writes and parses the envelope around bytes the caller encoded, so this
+    // uses codec `stored` (identity) and the GUID escape.
+    {
+        std::vector<uint8_t> cbuf;
+        size_t cp = 0;
+        auto cwrite = [&](const void *b, size_t n) -> size_t {
+            if (cp + n > cbuf.size()) cbuf.resize(cp + n);
+            std::memcpy(cbuf.data() + cp, b, n);
+            cp += n;
+            return n;
+        };
+        auto cseek = [&](uint64_t o) -> bool {
+            if (o > cbuf.size()) cbuf.resize(static_cast<size_t>(o));
+            cp = static_cast<size_t>(o);
+            return true;
+        };
+        binpazer::Guid g_codec{{0xc0,0xde,0xc0,0xde,0,0,0,0,0,0,0,0,0,0,0,7}};
+        std::vector<binpazer::TypeDef> d = {{2, g_note, "Note"}};
+        const char *plain = "plain block";          // 11
+        const char *comp  = "compressed, sort of";  // 19
+        const char *gcod  = "guid-codec payload";   // 18
+        {
+            binpazer::Writer w(cwrite, writer, "demo", d, cseek);
+            CHECK(w.block(2, 0, std::string_view(plain, 11)) == binpazer::Status::Ok, "compress: plain");
+            CHECK(w.compressed_block(2, binpazer::flag::HasCrc, binpazer::codec::Stored,
+                                     std::string_view(comp, 19), 19) == binpazer::Status::Ok,
+                  "compress: stored block");
+            CHECK(w.compressed_block(2, 0, binpazer::codec::ByGuid,
+                                     std::string_view(gcod, 18), 18, &g_codec) == binpazer::Status::Ok,
+                  "compress: guid-codec block");
+            CHECK(w.end() == binpazer::Status::Ok, "compress: end");
+        }
+
+        cp = 0;
+        auto cread = [&](void *b, size_t n) -> size_t {
+            size_t av = cbuf.size() - cp, c = n < av ? n : av;
+            std::memcpy(b, cbuf.data() + cp, c); cp += c; return c;
+        };
+        binpazer::Reader r(cread, cseek);
+
+        auto b0 = r.next();
+        CHECK(b0.has_value() && (b0->flags & binpazer::flag::Compressed) == 0, "compress: block 0 plain");
+        auto p0 = r.read_payload(*b0);
+        CHECK(p0.size() == 11 && std::memcmp(p0.data(), plain, 11) == 0, "compress: block 0 payload");
+
+        auto b1 = r.next();
+        CHECK(b1.has_value() && (b1->flags & binpazer::flag::Compressed) != 0, "compress: block 1 compressed");
+        auto p1 = r.read_payload(*b1);
+        auto c1 = binpazer::parse_compression(p1.data(), p1.size());
+        CHECK(c1.has_value(), "compress: block 1 envelope parses");
+        CHECK(c1 && c1->codec_id == binpazer::codec::Stored, "compress: block 1 codec");
+        CHECK(c1 && c1->uncompressed_length == 19 && c1->stored_length == 19, "compress: block 1 lengths");
+        CHECK(c1 && std::memcmp(p1.data() + c1->header_size, comp, 19) == 0, "compress: block 1 bytes");
+
+        auto b2 = r.next();
+        CHECK(b2.has_value(), "compress: block 2 present");
+        auto p2 = r.read_payload(*b2);
+        auto c2 = binpazer::parse_compression(p2.data(), p2.size());
+        CHECK(c2 && c2->codec_id == binpazer::codec::ByGuid, "compress: block 2 codec is the GUID escape");
+        CHECK(c2 && std::memcmp(c2->codec_guid.bytes, g_codec.bytes, 16) == 0, "compress: block 2 codec guid");
+        CHECK(c2 && std::memcmp(p2.data() + c2->header_size, gcod, 18) == 0, "compress: block 2 bytes");
+
+        // An envelope with codec id 0 is corruption, not an empty payload.
+        uint8_t bad[BINPAZER_ENVELOPE_FIXED_SIZE] = {0};
+        CHECK(!binpazer::parse_compression(bad, sizeof bad).has_value(), "compress: codec id 0 rejected");
+    }
+
+    // Group blocks: the wrapper parses nested blocks out of one payload, and
+    // a child's payload aliases the buffer rather than being copied.
+    {
+        std::vector<uint8_t> g(32, 0);
+        auto put16 = [&](size_t at, uint16_t v) { g[at] = uint8_t(v); g[at+1] = uint8_t(v >> 8); };
+        auto put32 = [&](size_t at, uint32_t v) { for (int i = 0; i < 4; i++) g[at+i] = uint8_t(v >> (8*i)); };
+        put16(0, 1); put16(2, 0); put32(4, 4); std::memcpy(g.data() + 8, "abcd", 4);
+        put16(16, 2); put16(18, 0); put32(20, 2); std::memcpy(g.data() + 24, "xy", 2);
+
+        bool ok = false;
+        auto kids = binpazer::parse_group(g, &ok);
+        CHECK(ok, "group: clean parse");
+        CHECK(kids.size() == 2, "group: two children");
+        CHECK(kids.size() == 2 && kids[0].type_id == 1 && kids[0].payload_len == 4, "group: child 0");
+        CHECK(kids.size() == 2 && std::memcmp(kids[0].payload, "abcd", 4) == 0, "group: child 0 payload");
+        CHECK(kids.size() == 2 && kids[1].type_id == 2 && kids[1].offset == 16, "group: child 1");
+        CHECK(kids.size() == 2 && kids[0].payload == g.data() + 8, "group: payload aliases the buffer");
+    }
+
+    // A streaming writer (no seek) can compress once it declares 1.1 up front.
+    {
+        std::vector<uint8_t> sbuf;
+        size_t spos = 0;
+        auto swrite = [&](const void *b, size_t n) -> size_t {
+            if (spos + n > sbuf.size()) sbuf.resize(spos + n);
+            std::memcpy(sbuf.data() + spos, b, n);
+            spos += n;
+            return n;
+        };
+        binpazer::Writer w(swrite, writer, "stream", defs, {}, BINPAZER_VERSION_MINOR_COMPRESSION);
+        CHECK(w.ok(), "streaming: writer constructed");
+        CHECK(w.compressed_block(1, 0, binpazer::codec::Stored, std::string_view("payload"), 7) ==
+                  binpazer::Status::Ok,
+              "streaming: compressed block with no seek callback");
+        CHECK(w.end() == binpazer::Status::Ok, "streaming: end");
+        CHECK(sbuf[14] == BINPAZER_VERSION_MINOR_COMPRESSION, "streaming: header declares 1.1");
+    }
+
+    // Streaming a payload in pieces smaller than the payload, and GUID text.
+    {
+        std::vector<uint8_t> sbuf;
+        size_t spos = 0;
+        auto swrite = [&](const void *b, size_t n) -> size_t {
+            if (spos + n > sbuf.size()) sbuf.resize(spos + n);
+            std::memcpy(sbuf.data() + spos, b, n);
+            spos += n;
+            return n;
+        };
+        auto sseek = [&](uint64_t o) -> bool {
+            if (o > sbuf.size()) sbuf.resize(static_cast<size_t>(o));
+            spos = static_cast<size_t>(o);
+            return true;
+        };
+        std::vector<uint8_t> payload(1000);
+        for (size_t i = 0; i < payload.size(); i++) payload[i] = static_cast<uint8_t>(i * 7 + 3);
+        {
+            binpazer::Writer w(swrite, writer, "stream", defs, sseek);
+            w.block(1, binpazer::flag::HasCrc, payload);
+            w.end();
+        }
+        spos = 0;
+        binpazer::Reader r2([&](void *b, size_t n) -> size_t {
+                                size_t avail = sbuf.size() - spos;
+                                size_t c = n < avail ? n : avail;
+                                std::memcpy(b, sbuf.data() + spos, c);
+                                spos += c;
+                                return c;
+                            },
+                            sseek);
+        auto b = r2.next();
+        CHECK(b.has_value(), "stream: block present");
+        std::vector<uint8_t> got;
+        size_t chunks = 0;
+        binpazer::Status st = b ? r2.stream_payload(*b,
+                                                    [&](const void *buf, size_t n) {
+                                                        const auto *p8 = static_cast<const uint8_t *>(buf);
+                                                        got.insert(got.end(), p8, p8 + n);
+                                                        ++chunks;
+                                                        return true;
+                                                    },
+                                                    64)
+                                : binpazer::Status::ErrIo;
+        CHECK(st == binpazer::Status::Ok, "stream: streamed ok");
+        CHECK(got == payload, "stream: bytes reassembled");
+        CHECK(chunks == (payload.size() + 63) / 64, "stream: chunked at the requested size");
+    }
+
+    {
+        binpazer::Guid g{{0xaa,0xbb,0xcc,0xdd,0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b}};
+        CHECK(binpazer::to_string(g) == "aabbccdd-0001-0203-0405-060708090a0b", "guid: canonical text");
+        auto back = binpazer::parse_guid("aabbccdd-0001-0203-0405-060708090a0b");
+        CHECK(back && std::memcmp(back->bytes, g.bytes, 16) == 0, "guid: round-trip");
+        CHECK(!binpazer::parse_guid("nope").has_value(), "guid: junk rejected");
+    }
+
     if (failures == 0) { std::printf("OK: all C++ round-trip checks passed\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failures);
     return 1;

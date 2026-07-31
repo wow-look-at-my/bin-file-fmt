@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -127,4 +128,44 @@ func TestFindListsMatches(t *testing.T) {
 	_, err = execute("find", path, "--type", "9")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no blocks of type 9")
+}
+
+// A compressed block's payload is decoded on the way out -- the bytes a caller
+// asked for, whichever codec produced them -- while --stored yields the
+// Compression Envelope verbatim, which is strictly larger and starts with the
+// codec id.
+func TestExtractDecodesCompressedBlocks(t *testing.T) {
+	for _, codec := range []string{"stored", "deflate", "zstd", "lz4"} {
+		t.Run(codec, func(t *testing.T) {
+			dir := t.TempDir()
+			payload := strings.Repeat("binpazer extract decodes on the way out. ", 200)
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "payload.bin"), []byte(payload), 0o644))
+
+			m := &Manifest{
+				WriterGUID: "aabbccdd-0000-0000-0000-000000000001",
+				WriterName: "demo",
+				Types:      []ManifestType{{TypeID: 1, GUID: "11223344-5566-7788-99aa-bbccddeeff00", Name: "Payload"}},
+				Blocks:     []ManifestBlock{{TypeID: 1, Flags: []string{"has_crc"}, Codec: codec, File: "payload.bin"}},
+			}
+			raw, err := json.MarshalIndent(m, "", "  ")
+			require.NoError(t, err)
+			mp := filepath.Join(dir, "manifest.json")
+			require.NoError(t, os.WriteFile(mp, raw, 0o644))
+
+			archive := filepath.Join(dir, "out.binpazer")
+			_, err = execute("pack", mp, "-o", archive)
+			require.NoError(t, err)
+
+			stdout, _, err := executeIO(nil, "extract", archive, "--type", "1")
+			require.NoError(t, err)
+			assert.Equal(t, payload, stdout)
+
+			stored, _, err := executeIO(nil, "extract", archive, "--type", "1", "--stored")
+			require.NoError(t, err)
+			assert.NotEqual(t, payload, stored, "--stored must not decode")
+			// The envelope header precedes the codec bytes, so the stored form
+			// is longer than the codec output whatever the codec achieved.
+			assert.GreaterOrEqual(t, len(stored), 16)
+		})
+	}
 }

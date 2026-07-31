@@ -1,8 +1,10 @@
 module github.com/wow-look-at-my/bin-file-fmt/go
 
-go 1.21
+go 1.24
 
 require (
+	github.com/klauspost/compress v1.19.1
+	github.com/pierrec/lz4/v4 v4.1.27
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.9
 	github.com/stretchr/testify v1.11.1

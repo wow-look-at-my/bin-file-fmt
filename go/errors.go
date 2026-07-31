@@ -22,4 +22,22 @@ var (
 	// than the table's own byte length can hold, or a claim larger than the
 	// allocation cap for non-seekable input (see NewReaderLimited).
 	ErrCapacityExceeded = errors.New("binpazer: capacity exceeded")
+
+	// ErrBadEnvelope means a compressed block's Compression Envelope is
+	// malformed: an invalid codec id, a set reserved field, a payload too short
+	// to hold the header, or a decode whose length disagrees with the
+	// envelope's uncompressed_length.
+	ErrBadEnvelope = errors.New("binpazer: bad compression envelope")
+
+	// ErrShortBuffer means a caller-supplied destination is too small for the
+	// bytes a codec produced. Size a compression destination with
+	// CompressBound and a decompression destination with the envelope's
+	// UncompressedLen.
+	ErrShortBuffer = errors.New("binpazer: destination buffer too small")
+
+	// ErrCodecUnavailable means a compressed block names a codec this build
+	// does not have. The block can still be walked, skipped and copied
+	// verbatim; only its payload is uninterpretable. Register the codec with
+	// RegisterCodec.
+	ErrCodecUnavailable = errors.New("binpazer: codec unavailable")
 )

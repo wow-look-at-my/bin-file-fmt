@@ -16,11 +16,20 @@ injects IO via callbacks (C/C++) or `io.Reader`/`io.Writer` (Go).
 |---|---|---|---|
 | [`c/`](./c) | C11, allocation-free | `read`/`write` (+ optional `seek`) function pointers | `make -C c test` |
 | [`cpp/`](./cpp) | C++17, header-only convenience wrapper over the C core | `std::function` callbacks | `make -C cpp test` |
-| [`go/`](./go) | pure Go, stdlib-only library (the CLI uses cobra) | `io.Reader` / `io.Writer` (`io.Seeker` optional) | `go-toolchain` (in `go/`) |
+| [`go/`](./go) | pure Go library (the CLI uses cobra) | `io.Reader` / `io.Writer` (`io.Seeker` optional) | `go-toolchain` (in `go/`) |
+
+All three implement **every codec the format defines**, so no implementation
+can write a file another cannot read. In C and C++ the codecs are a second file
+you link (`c/binpazer_codec.c`, over zlib/libzstd/liblz4); the core links
+nothing but libc, and keeps a test binary that proves it.
 
 All three write byte-identical files; the Go tests verify this against a
 C-generated fixture ([`go/testdata/sample.binpazer`](./go/testdata)), and CI
-regenerates the fixture from C and `cmp`s it on every push.
+regenerates the fixture from C and `cmp`s it on every push. Compressed blocks
+are the deliberate exception: a codec id names a decodable format, not one
+encoder, so implementations agree on what a file *means* rather than on the
+bytes their compressors emit. CI checks that directly, by having each
+implementation decode files the other wrote with every codec.
 
 The readers are hardened against hostile input: every length/count field is
 bounded against the real input size (or an explicit cap for non-seekable
@@ -94,6 +103,12 @@ binpazer pack manifest.json -o demo.binpazer
   `critical`, `safe_to_copy`, `has_crc`, `large_mode`), and
   exactly one content source: `data` (UTF-8 text), `data_base64`, or `file`
   (a path relative to the manifest).
+- `codec` on a block -- `stored`, `deflate`, `zstd` or `lz4` -- compresses that
+  block's payload (SPEC.md "Compression"). The manifest always holds the
+  block's LOGICAL bytes, so `unpack` writes decoded payloads and records the
+  codec that produced them; re-packing reproduces the file exactly. There is no
+  `compressed` flag name: compression is named by its codec or it does not
+  happen.
 - `"index": true` -- append a Block Index + footer so readers can jump by type.
 
 `pack - -o -` reads the manifest from stdin and writes the archive to stdout
@@ -166,8 +181,9 @@ into Groups, `--json` swaps the hex for `payload_base64`.
 
 The format's headline feature: with a Block Index + footer, a reader seeks
 straight to a block instead of walking the file. `find` lists the matches,
-`extract` (alias `cat`) streams one payload -- CRC-verified -- to `--out` or
-stdout:
+`extract` (alias `cat`) streams one payload -- CRC-verified, and decoded when
+the block is compressed -- to `--out` or stdout (`--stored` emits the
+Compression Envelope and codec bytes as they sit in the file instead):
 
 ```sh
 $ binpazer find demo.binpazer --type 1
@@ -198,3 +214,11 @@ hello, file!
 - `length` is a byte count, or -- with the `large_mode` flag -- a count of
   4096-byte (page) units, for payloads over 4 GiB and up to ~16 TiB.
 - Strings are length-prefixed **and** null-terminated.
+- An optional **Block Index** plus a 16-byte footer let a reader seek straight
+  to a block instead of walking it -- random access, which a `.tar.gz` has no
+  way to offer.
+- Payloads may be **compressed per block** (1.1): a Compression Envelope names
+  the codec (`stored`, `deflate`, `zstd`, `lz4`, or a GUID for anything else),
+  so one member decodes without touching the others. `length` still counts
+  stored bytes, so older readers keep walking such files correctly, and a file
+  that compresses nothing is byte-identical to a 1.0 file.

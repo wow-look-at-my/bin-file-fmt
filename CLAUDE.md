@@ -25,10 +25,12 @@ without the others.
 ## Build & test
 
 ```sh
-make -C c test               # C11 round-trip tests
-make -C cpp test             # C++17 round-trip tests
+make -C c test               # C11 round-trip tests (core, then codecs)
+make -C cpp test             # C++17 round-trip tests (core, then codecs)
 cd go && go-toolchain        # tidy + vet + tests + coverage gate + go/build/binpazer
 ```
+
+The codec targets need `zlib1g-dev libzstd-dev liblz4-dev`; nothing else does.
 
 ASan+UBSan variants (exactly what CI runs):
 
@@ -53,7 +55,8 @@ Go rules:
   cd go && /usr/local/go/bin/go test -fuzz=FuzzReader -fuzztime=60s .
   ```
 
-CI (`.github/workflows/ci.yml`): a `go` job (`wow-look-at-my/go-toolchain@v1`)
+CI (`.github/workflows/ci.yml`): a `go` job (`wow-look-at-my/go-toolchain@v1`,
+then the C<->Go codec interop check, which needs the CLI that job just built)
 and a `c-cpp` job (make tests, both ASan builds, the fixture `cmp` above),
 plus a `publish` job gated on both that ships the CLI matrix binaries to
 https://pazer.build as project `bin-file-fmt/binpazer`. The project name is
@@ -67,11 +70,37 @@ and fails without it. Nothing merges red.
 ## Layout
 
 `SPEC.md` is the format spec; `c/` is the allocation-free C11 reference
-(`binpazer.h`/`binpazer.c`, tests in `test.c`, fixture generator `gen.c`);
-`cpp/` is a header-only C++17 wrapper over the C core (`binpazer.hpp`); `go/`
-is a pure-Go stdlib-only library at the package root plus the cobra CLI in
+(`binpazer.h`/`binpazer.c`, tests in `test.c`, fixture generator `gen.c`) plus
+the codec layer (`binpazer_codec.h`/`.c`, tests in `test_codec.c`) and the
+cross-impl harness `interop.c`; `cpp/` is a header-only C++17 wrapper over both
+(`binpazer.hpp`, tests in `test.cpp` and `test_codec.cpp`); `go/` is a pure-Go
+library at the package root -- `compress.go` for the envelope and codecs,
+`codecbuf.go` for the caller-buffer layer -- plus the cobra CLI in
 `go/cmd/binpazer/` (one command per file). `go/testdata/sample.binpazer` is
 the shared 280-byte fixture.
+
+## Parity across implementations
+
+Anything one implementation can express, all three must -- a file none of the
+others can read is the bug this rule exists to prevent. Whole-surface pairs to
+keep in step when adding to any of them:
+
+| Capability | Go | C / C++ |
+|---|---|---|
+| every registry codec | built in | `binpazer_codec.c` (link it) |
+| caller-buffer codec API | `CompressInto`/`DecompressInto`/`CompressBound` | `binpazer_compress`/`_decompress`/`_compress_bound` |
+| compress a block from logical bytes | `CompressedBlock` | `binpazer_writer_block_compress` / `Writer::compress_block` |
+| read a block, decoding it | `ReadDecompressedPayload` | `binpazer_reader_read_payload_decompressed` |
+| stream a payload bigger than memory | `PayloadReader`/`WritePayloadTo` | `binpazer_reader_stream_payload` / `Reader::stream_payload` |
+| nested blocks in a Group | `ParseGroupPayload` | `binpazer_group_parse` / `parse_group` |
+| declare 1.1 up front (streaming writer) | `NewWriterVersion` | `binpazer_writer_begin_version` / `Writer(..., version_minor)` |
+| GUID <-> canonical text | `ParseGUID` / `GUID.String` | `binpazer_guid_parse` / `_format` / `to_string` |
+| is a codec available? | `LookupCodec` / `LookupCodecGUID` | `binpazer_codec_lookup` |
+
+Known and deliberate differences: Go's `NewReaderLimited` allocation cap has no
+C counterpart because C allocates nothing -- every buffer is the caller's, so
+the cap is theirs already. The CLI is Go-only; `c/interop.c` is a test harness,
+not a tool.
 
 ## IO-injection seam (deliberate -- do not add mmap)
 
@@ -103,7 +132,9 @@ seeker, not through new IO paths.
   CLI never buffers whole payloads; keep it that way (RSS stays ~3 MB on 1 GiB
   files).
 - `writer.go` -- buffered writer + index/footer emission; `group.go` --
-  `ParseGroupPayload` for nested blocks; `guid.go` -- GUID parse/format.
+  `ParseGroupPayload` for nested blocks (`binpazer_group_parse` in C,
+  `binpazer::parse_group` in C++ -- same tolerance for a damaged group: the
+  intact prefix comes back with the error); `guid.go` -- GUID parse/format.
 - All reads go through a `bufio.Reader`, so the raw input position can be
   ahead of the logical offset: reposition **only** via `seekTo(abs)` (never a
   raw relative seek).
@@ -140,9 +171,64 @@ Decision to preserve: the `unknown_type_id` rule **exempts predefined ids
 would flag every indexed file. Teaching the writer to add the entry instead
 would change output bytes in all three implementations plus the fixture.
 
-The `compressed` flag was **removed entirely** (2026-07-04): block flag bit 2
-is reserved, must be 0, and `validate` reports it under `reserved_nonzero`.
-A boolean flag cannot carry codec identity (there is more than one codec in
-the real world), so future compression support means a codec-identifying
-mechanism designed into SPEC.md -- do not reintroduce a boolean flag, and do
-not bolt a codec onto one implementation; it lands in all three or not at all.
+## Compression (1.1)
+
+Block flag bit 2 is `compressed`: the stored payload is a **Compression
+Envelope** (codec id + reserved + `uncompressed_length`, plus a 16-byte GUID
+for the `65535` escape), so codec identity lives in the format, not in a
+boolean. The earlier `compressed` flag was removed for exactly that reason;
+this is the codec-identifying mechanism SPEC.md said would replace it.
+
+Invariants worth knowing before touching it:
+
+- **All three implementations carry every codec the registry names** --
+  `stored`, `deflate`, `zstd`, `lz4`. Go uses klauspost/compress and
+  pierrec/lz4; C and C++ use zlib, libzstd and liblz4 through
+  `c/binpazer_codec.c`. No implementation may write a file another cannot read,
+  so a codec added to one is added to all three or it is not added.
+  `RegisterCodec`/`RegisterCodecGUID` (Go) and
+  `binpazer_codec_register`/`_register_guid` (C) are for codecs OUTSIDE the
+  registry (the GUID escape) or to override a built-in.
+- **Parity means DECODE-compatibility, not identical bytes.** A real codec's
+  encoder output is implementation-defined -- zlib and klauspost/compress are
+  under no obligation to agree, and do not. The byte-identity fixtures cover
+  the uncompressed and `stored` cases, where agreement IS required; everything
+  else is covered by the interop check in the `go` CI job, which has C write a
+  file per codec for the Go CLI to decode and the Go CLI pack one per codec for
+  `c/interop.c` to decode. Never "fix" a size difference between
+  implementations -- it is not a defect.
+- **The C core stays dependency-free; codecs are a SECOND translation unit.**
+  `binpazer.c` links nothing but libc and knows only the envelope
+  (`binpazer_writer_block_compressed` takes bytes the caller already encoded);
+  `binpazer_codec.c` adds the codecs and links `-lz -lzstd -llz4`. `make -C c
+  test` builds both `test_c` (core alone, no codec library) and `test_codec`,
+  so dependency-freedom is a CHECK, not a claim -- same split in C++
+  (`test_cpp` / `test_cpp_codec`). The codec entry points in `binpazer.hpp` are
+  inline, so including the header never forces the link.
+- **The caller-buffer API is the base layer everywhere**, and the allocating
+  forms are thin wrappers over it: `binpazer_compress`/`binpazer_decompress`
+  and Go's `CompressInto`/`DecompressInto` write into a destination the caller
+  owns and allocate nothing. Size it with
+  `binpazer_compress_bound`/`CompressBound` -- which is why a bound is a
+  required member of Go's `Codec` interface and a required function pointer in
+  `binpazer_codec`. It must never under-report: too small a bound turns
+  incompressible input into `ErrShortBuffer`, so
+  `TestCompressBoundCoversIncompressibleInput` pins it against random data.
+- `stored` (id 1) is the codec every implementation can run with nothing
+  linked, which is why the cross-impl byte-identity fixture uses it.
+- **`length` still counts STORED bytes**, so walking, skipping, `large_mode`,
+  the Block Index and CRCs are untouched, and a 1.0 reader traverses a 1.1 file
+  correctly. `has_crc` covers the stored bytes, before any codec runs.
+- **A file with no compressed block is byte-identical to a 1.0 file** and still
+  declares 1.0. `version_minor` is raised to 1 only when a compressed block is
+  written, back-patched by `writer_end`/`End` -- which is why a compressed
+  block needs a seekable writer, OR an up-front declaration: Go's
+  `NewWriterVersion`, C's `binpazer_writer_begin_version`, and the C++ `Writer`
+  constructor's trailing `version_minor` argument all exist for streaming
+  callers. Without one, a non-seekable writer refuses the block
+  (`BINPAZER_ERR_NOSEEK`).
+- `go/testdata/sample-compressed.binpazer` is the second cross-impl fixture,
+  generated by `gen <out> <compressed-out>` and `cmp`'d in CI like the first.
+- The CLI carries compression through `codec` in the pack/unpack manifest --
+  never a `compressed` flag name -- so a manifest cannot claim compression
+  without naming what produced the bytes. `unpack` writes DECODED payloads.
