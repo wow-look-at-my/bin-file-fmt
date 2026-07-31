@@ -54,6 +54,7 @@ enum : uint16_t {
     Stored  = BINPAZER_CODEC_STORED,
     Deflate = BINPAZER_CODEC_DEFLATE,
     Zstd    = BINPAZER_CODEC_ZSTD,
+    Lz4     = BINPAZER_CODEC_LZ4,
     ByGuid  = BINPAZER_CODEC_BY_GUID,
 };
 } // namespace codec

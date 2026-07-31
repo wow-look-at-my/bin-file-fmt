@@ -69,7 +69,7 @@ and fails without it. Nothing merges red.
 `SPEC.md` is the format spec; `c/` is the allocation-free C11 reference
 (`binpazer.h`/`binpazer.c`, tests in `test.c`, fixture generator `gen.c`);
 `cpp/` is a header-only C++17 wrapper over the C core (`binpazer.hpp`); `go/`
-is a pure-Go stdlib-only library at the package root plus the cobra CLI in
+is a pure-Go library at the package root plus the cobra CLI in
 `go/cmd/binpazer/` (one command per file). `go/testdata/sample.binpazer` is
 the shared 280-byte fixture.
 
@@ -150,12 +150,17 @@ this is the codec-identifying mechanism SPEC.md said would replace it.
 
 Invariants worth knowing before touching it:
 
-- **No implementation carries a codec.** C/C++ write and parse the envelope
-  around bytes the CALLER encoded (`binpazer_writer_block_compressed`,
-  `binpazer_compression_parse`); Go ships only what the standard library
-  provides -- `stored` (identity) and `deflate` -- and anything else, zstd
-  included, arrives through `RegisterCodec`/`RegisterCodecGUID`. Do not add a
-  codec dependency to any of the three.
+- **Go implements every codec the registry names** -- `stored`, `deflate`,
+  `zstd` (klauspost/compress), `lz4` (pierrec/lz4). A caller should not have to
+  supply a codec the format itself names; that only guarantees files this
+  library writes are files it cannot read.
+  `RegisterCodec`/`RegisterCodecGUID` are for codecs OUTSIDE the registry (the
+  GUID escape) or to override a built-in.
+- **C and C++ carry no codec**, by contract: they do no allocation and no IO,
+  so they write and parse the envelope around bytes the CALLER encoded
+  (`binpazer_writer_block_compressed`, `binpazer_compression_parse`). Do not add
+  a codec dependency to either -- the asymmetry is deliberate, and `stored`
+  keeps a well-formed envelope writable from them with nothing linked in.
 - `stored` (id 1) exists so every implementation can produce a well-formed
   envelope with no dependency; it is what the cross-impl fixture uses.
 - **`length` still counts STORED bytes**, so walking, skipping, `large_mode`,

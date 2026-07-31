@@ -6,10 +6,16 @@ package binpazer
 // length field still describes the STORED bytes, so walking, skipping,
 // large_mode, the Block Index and CRCs are all untouched by compression.
 //
-// The library ships only the codecs the standard library can provide (stored
-// and deflate). Anything else -- zstd, and any codec behind the GUID escape --
-// is registered by the caller through RegisterCodec, so this package keeps its
-// stdlib-only dependency set.
+// Every codec in SPEC.md's registry is built in: stored, deflate, zstd and
+// lz4. A caller should not have to supply an implementation of a codec the
+// format itself names -- that only guarantees files this library writes are
+// files it cannot read. RegisterCodec remains for codecs OUTSIDE the registry
+// (the GUID escape) and for overriding a built-in.
+//
+// The C and C++ implementations stay codec-free by contract: they do no
+// allocation and no IO, so they hand the caller the envelope and its bytes.
+// That asymmetry is deliberate -- it is the Go library that is used as a
+// library.
 
 import (
 	"compress/flate"
@@ -18,6 +24,9 @@ import (
 	"fmt"
 	"io"
 	"sync"
+
+	"github.com/klauspost/compress/zstd"
+	"github.com/pierrec/lz4/v4"
 )
 
 // FlagCompressed (block flag bit 2) marks a payload as a Compression Envelope.
@@ -34,6 +43,7 @@ const (
 	CodecStored  uint16 = 1
 	CodecDeflate uint16 = 2
 	CodecZstd    uint16 = 3
+	CodecLZ4     uint16 = 4
 	CodecByGUID  uint16 = 65535
 )
 
@@ -81,14 +91,17 @@ var (
 	codecs  = map[uint16]Codec{
 		CodecStored:  storedCodec{},
 		CodecDeflate: deflateCodec{},
+		CodecZstd:    zstdCodec{},
+		CodecLZ4:     lz4Codec{},
 	}
 	guidCodecs = map[GUID]Codec{}
 )
 
-// RegisterCodec registers a codec for a SPEC registry id. It is how a caller
-// adds zstd (CodecZstd) or any other codec this package does not implement
-// itself. Registering CodecStored or an id of 0 is refused; re-registering an
-// id replaces it.
+// RegisterCodec registers a codec for a registry id. Every id SPEC.md assigns
+// is already built in, so this is for a codec the registry does not name (a
+// later revision's, ahead of an upgrade) or to override a built-in with a
+// differently-tuned encoder. An id of 0 is refused; re-registering an id
+// replaces it.
 func RegisterCodec(id uint16, c Codec) error {
 	if id == CodecInvalid {
 		return errors.New("binpazer: codec id 0 is invalid")
@@ -159,6 +172,36 @@ func (deflateCodec) NewReader(r io.Reader) (io.ReadCloser, error) {
 
 func (deflateCodec) NewWriter(w io.Writer) (io.WriteCloser, error) {
 	return flate.NewWriter(w, flate.DefaultCompression)
+}
+
+// zstdCodec is zstd (RFC 8878, SPEC registry id 3), the codec worth reaching
+// for by default: deflate's ratio at several times its speed.
+type zstdCodec struct{}
+
+func (zstdCodec) NewReader(r io.Reader) (io.ReadCloser, error) {
+	zr, err := zstd.NewReader(r)
+	if err != nil {
+		return nil, err
+	}
+	// IOReadCloser's Close releases the decoder's goroutines without closing r,
+	// which is what the Codec contract requires.
+	return zr.IOReadCloser(), nil
+}
+
+func (zstdCodec) NewWriter(w io.Writer) (io.WriteCloser, error) {
+	return zstd.NewWriter(w)
+}
+
+// lz4Codec is LZ4 (frame format, SPEC registry id 4): a weaker ratio than
+// zstd, for content read far more often than it is written.
+type lz4Codec struct{}
+
+func (lz4Codec) NewReader(r io.Reader) (io.ReadCloser, error) {
+	return io.NopCloser(lz4.NewReader(r)), nil
+}
+
+func (lz4Codec) NewWriter(w io.Writer) (io.WriteCloser, error) {
+	return lz4.NewWriter(w), nil
 }
 
 // encodeEnvelopeHeader serializes the fixed envelope header.

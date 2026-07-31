@@ -71,6 +71,7 @@ enum {
     BINPAZER_CODEC_STORED  = 1,     /* identity: codec bytes are the payload */
     BINPAZER_CODEC_DEFLATE = 2,     /* raw DEFLATE (RFC 1951) */
     BINPAZER_CODEC_ZSTD    = 3,     /* zstd (RFC 8878) */
+    BINPAZER_CODEC_LZ4     = 4,     /* LZ4 frame format */
     BINPAZER_CODEC_BY_GUID = 65535  /* codec identified by codec_guid */
 };
 

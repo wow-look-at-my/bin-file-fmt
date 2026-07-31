@@ -16,7 +16,7 @@ injects IO via callbacks (C/C++) or `io.Reader`/`io.Writer` (Go).
 |---|---|---|---|
 | [`c/`](./c) | C11, allocation-free | `read`/`write` (+ optional `seek`) function pointers | `make -C c test` |
 | [`cpp/`](./cpp) | C++17, header-only convenience wrapper over the C core | `std::function` callbacks | `make -C cpp test` |
-| [`go/`](./go) | pure Go, stdlib-only library (the CLI uses cobra) | `io.Reader` / `io.Writer` (`io.Seeker` optional) | `go-toolchain` (in `go/`) |
+| [`go/`](./go) | pure Go library; every registry codec built in (the CLI uses cobra) | `io.Reader` / `io.Writer` (`io.Seeker` optional) | `go-toolchain` (in `go/`) |
 
 All three write byte-identical files; the Go tests verify this against a
 C-generated fixture ([`go/testdata/sample.binpazer`](./go/testdata)), and CI

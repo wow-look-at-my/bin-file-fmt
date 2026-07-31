@@ -52,6 +52,8 @@ func TestCompressedRoundTrip(t *testing.T) {
 	}{
 		{"stored", CodecStored},
 		{"deflate", CodecDeflate},
+		{"zstd", CodecZstd},
+		{"lz4", CodecLZ4},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			file := writeTo(t, compressDefs, func(w *Writer) {
@@ -72,8 +74,10 @@ func TestCompressedRoundTrip(t *testing.T) {
 
 			require.True(t, bytes.Equal(got, payload))
 
-			// deflate must actually shrink this input; stored must not grow it.
-			require.False(t, tc.codec == CodecDeflate && len(file) >= len(payload))
+			// Every real codec must shrink this input; `stored` is identity
+			// and only has to not grow it.
+			require.False(t, tc.codec != CodecStored && len(file) >= len(payload),
+				"%s produced a %d-byte file for a %d-byte payload", tc.name, len(file), len(payload))
 
 		})
 	}

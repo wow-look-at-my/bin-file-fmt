@@ -53,6 +53,7 @@ var codecIDs = map[string]uint16{
 	"stored":  binpazer.CodecStored,
 	"deflate": binpazer.CodecDeflate,
 	"zstd":    binpazer.CodecZstd,
+	"lz4":     binpazer.CodecLZ4,
 }
 
 // codecName is the reverse of codecIDs. An id outside the registry renders as
@@ -83,7 +84,7 @@ func displayFlagNames(f uint16) []string {
 func parseCodec(name string) (uint16, error) {
 	id, ok := codecIDs[strings.ToLower(name)]
 	if !ok {
-		return 0, fmt.Errorf("unknown codec %q (known: stored, deflate, zstd)", name)
+		return 0, fmt.Errorf("unknown codec %q (known: stored, deflate, zstd, lz4)", name)
 	}
 	return id, nil
 }

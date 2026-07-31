@@ -322,7 +322,8 @@ header in this format.
 | 1 | `stored` -- identity; `codec_data` is the payload verbatim |
 | 2 | `deflate` -- raw DEFLATE (RFC 1951), no zlib/gzip wrapper |
 | 3 | `zstd` (RFC 8878) |
-| 4..65534 | unassigned; a future revision of this document assigns them |
+| 4 | `lz4` -- LZ4 frame format |
+| 5..65534 | unassigned; a future revision of this document assigns them |
 | 65535 | codec identified by `codec_guid`, for codecs outside this registry |
 
 `stored` exists so every implementation can write and read a well-formed
