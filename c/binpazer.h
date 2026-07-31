@@ -37,12 +37,25 @@ extern "C" {
  * raising the per-block cap from 4 GiB to (2^32-1)*4096 (~16 TiB). */
 #define BINPAZER_LARGE_UNIT 4096
 
-/* Block flag bits (the 16-bit `flags` field). */
+/* Block flag bits (the 16-bit `flags` field). Bits 5.. are reserved, must be 0,
+ * and readers MUST ignore ones they do not know. */
 enum {
+    /* An unknown block type here is fatal: stop, the file needs a feature you
+     * lack. Clear (ancillary) means an unknown block is safe to skip. */
     BINPAZER_FLAG_CRITICAL     = 1u << 0,
+    /* An editor that does not understand this block may copy it verbatim when
+     * rewriting the file. Clear means drop it instead -- what the Block Index
+     * does, since its offsets do not survive a rewrite. */
     BINPAZER_FLAG_SAFE_TO_COPY = 1u << 1,
-    BINPAZER_FLAG_COMPRESSED   = 1u << 2,  /* payload is a Compression Envelope */
+    /* The stored payload is a Compression Envelope, not the block's logical
+     * bytes; `length` still counts the STORED bytes. */
+    BINPAZER_FLAG_COMPRESSED   = 1u << 2,
+    /* A 4-byte CRC-32C over [block start .. end of payload] follows the
+     * payload, before the alignment padding. It covers the bytes on disk, so
+     * for a compressed block that is the envelope, before any codec runs. */
     BINPAZER_FLAG_HAS_CRC      = 1u << 3,
+    /* `length` counts 4096-byte units instead of bytes, raising the per-block
+     * cap from 4 GiB to ~16 TiB at 4096-byte granularity. */
     BINPAZER_FLAG_LARGE_MODE   = 1u << 4
 };
 
