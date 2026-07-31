@@ -265,6 +265,44 @@ int main() {
         CHECK(!binpazer::parse_compression(bad, sizeof bad).has_value(), "compress: codec id 0 rejected");
     }
 
+    // Group blocks: the wrapper parses nested blocks out of one payload, and
+    // a child's payload aliases the buffer rather than being copied.
+    {
+        std::vector<uint8_t> g(32, 0);
+        auto put16 = [&](size_t at, uint16_t v) { g[at] = uint8_t(v); g[at+1] = uint8_t(v >> 8); };
+        auto put32 = [&](size_t at, uint32_t v) { for (int i = 0; i < 4; i++) g[at+i] = uint8_t(v >> (8*i)); };
+        put16(0, 1); put16(2, 0); put32(4, 4); std::memcpy(g.data() + 8, "abcd", 4);
+        put16(16, 2); put16(18, 0); put32(20, 2); std::memcpy(g.data() + 24, "xy", 2);
+
+        bool ok = false;
+        auto kids = binpazer::parse_group(g, &ok);
+        CHECK(ok, "group: clean parse");
+        CHECK(kids.size() == 2, "group: two children");
+        CHECK(kids.size() == 2 && kids[0].type_id == 1 && kids[0].payload_len == 4, "group: child 0");
+        CHECK(kids.size() == 2 && std::memcmp(kids[0].payload, "abcd", 4) == 0, "group: child 0 payload");
+        CHECK(kids.size() == 2 && kids[1].type_id == 2 && kids[1].offset == 16, "group: child 1");
+        CHECK(kids.size() == 2 && kids[0].payload == g.data() + 8, "group: payload aliases the buffer");
+    }
+
+    // A streaming writer (no seek) can compress once it declares 1.1 up front.
+    {
+        std::vector<uint8_t> sbuf;
+        size_t spos = 0;
+        auto swrite = [&](const void *b, size_t n) -> size_t {
+            if (spos + n > sbuf.size()) sbuf.resize(spos + n);
+            std::memcpy(sbuf.data() + spos, b, n);
+            spos += n;
+            return n;
+        };
+        binpazer::Writer w(swrite, writer, "stream", defs, {}, BINPAZER_VERSION_MINOR_COMPRESSION);
+        CHECK(w.ok(), "streaming: writer constructed");
+        CHECK(w.compressed_block(1, 0, binpazer::codec::Stored, std::string_view("payload"), 7) ==
+                  binpazer::Status::Ok,
+              "streaming: compressed block with no seek callback");
+        CHECK(w.end() == binpazer::Status::Ok, "streaming: end");
+        CHECK(sbuf[14] == BINPAZER_VERSION_MINOR_COMPRESSION, "streaming: header declares 1.1");
+    }
+
     if (failures == 0) { std::printf("OK: all C++ round-trip checks passed\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failures);
     return 1;

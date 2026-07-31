@@ -170,6 +170,102 @@ static void test_btt_capacity(void) {
 /* Compression (SPEC.md 1.1): the library writes and parses the envelope but
  * carries no codec, so this exercises codec `stored` (identity) and the GUID
  * escape -- the two a dependency-free implementation can produce. */
+/* Group blocks: nested blocks parsed out of one payload, matching what the Go
+ * library's ParseGroupPayload returns for the same bytes. */
+static void put16(uint8_t *p, uint16_t v) { p[0]=(uint8_t)v; p[1]=(uint8_t)(v>>8); }
+static void put32(uint8_t *p, uint32_t v) { for (int i=0;i<4;i++) p[i]=(uint8_t)(v>>(8*i)); }
+
+static void test_group_parse(void) {
+    /* Two children: type 1 "abcd" with a CRC, type 2 "xy" without. Each is a
+     * top-level block header verbatim, 8-byte aligned. */
+    uint8_t g[64];
+    memset(g, 0, sizeof g);
+    size_t off = 0;
+
+    put16(g + off, 1); put16(g + off + 2, BINPAZER_FLAG_HAS_CRC); put32(g + off + 4, 4);
+    memcpy(g + off + 8, "abcd", 4);
+    uint32_t crc = binpazer_crc32c(0, g + off, 8);
+    crc = binpazer_crc32c(crc, g + off + 8, 4);
+    put32(g + off + 12, crc);
+    off = 16;
+
+    put16(g + off, 2); put16(g + off + 2, 0); put32(g + off + 4, 2);
+    memcpy(g + off + 8, "xy", 2);
+    off = 32; /* 16 + header(8) + payload(2) -> aligned to 32 */
+
+    binpazer_group_child kids[4];
+    size_t n = 0;
+    CHECK(binpazer_group_parse(g, off, kids, 4, &n) == BINPAZER_OK, "group: parse ok");
+    CHECK(n == 2, "group: two children");
+    CHECK(kids[0].type_id == 1 && kids[0].payload_len == 4, "group: child 0 header");
+    CHECK(memcmp(kids[0].payload, "abcd", 4) == 0, "group: child 0 payload");
+    CHECK(kids[0].crc_ok, "group: child 0 crc verified");
+    CHECK(kids[1].type_id == 2 && kids[1].payload_len == 2, "group: child 1 header");
+    CHECK(kids[1].offset == 16, "group: child 1 offset");
+
+    /* Counting pass: no buffer, capacity reported rather than truncated. */
+    size_t only = 0;
+    CHECK(binpazer_group_parse(g, off, NULL, 0, &only) == BINPAZER_ERR_CAPACITY, "group: count needs capacity");
+    CHECK(only == 2, "group: counted without a buffer");
+
+    /* A corrupted CRC is reported per child, not as a parse failure. */
+    g[12] ^= 0xFF;
+    CHECK(binpazer_group_parse(g, off, kids, 4, &n) == BINPAZER_OK, "group: bad crc still parses");
+    CHECK(!kids[0].crc_ok && kids[1].crc_ok, "group: bad crc flagged on the right child");
+    g[12] ^= 0xFF;
+
+    /* A child claiming more than the group holds stops the walk, keeping the
+     * children already parsed. */
+    put32(g + 16 + 4, 999);
+    CHECK(binpazer_group_parse(g, off, kids, 4, &n) == BINPAZER_ERR_FORMAT, "group: overlong child rejected");
+    CHECK(n == 1, "group: intact prefix survives");
+}
+
+/* A streaming writer (no seek) can compress once it declares 1.1 up front --
+ * the version cannot be back-patched without a seek, so it must be stated
+ * before any content is written. */
+static void test_streaming_compressed(void) {
+    static uint8_t buf[4096];
+    membuf m = { buf, sizeof buf, 0, 0 };
+    binpazer_guid wg = {{0x01}};
+    binpazer_type_def defs[1] = { {1, {{0x11}}, "P"} };
+
+    binpazer_writer w;
+    CHECK(binpazer_writer_begin_version(&w, mem_write, NULL, &m, &wg, "stream", defs, 1,
+                                        BINPAZER_VERSION_MINOR_COMPRESSION) == BINPAZER_OK,
+          "streaming: begin at 1.1");
+    /* stored needs no codec library, so the core test binary can do this. */
+    CHECK(binpazer_writer_block_compressed(&w, 1, 0, BINPAZER_CODEC_STORED, NULL,
+                                           "payload", 7, 7) == BINPAZER_OK,
+          "streaming: compressed block without a seek callback");
+    CHECK(binpazer_writer_end(&w) == BINPAZER_OK, "streaming: end");
+
+    m.pos = 0;
+    binpazer_reader r; char nm[32]; binpazer_type_entry te[4]; size_t nte = 0;
+    CHECK(binpazer_reader_begin(&r, mem_read, mem_seek, &m, nm, sizeof nm, te, 4, &nte) == BINPAZER_OK,
+          "streaming: reader begin");
+    CHECK(r.version_minor == BINPAZER_VERSION_MINOR_COMPRESSION, "streaming: file declares 1.1");
+
+    binpazer_block blk;
+    CHECK(binpazer_reader_next(&r, te, nte, &blk) == BINPAZER_OK, "streaming: next");
+    CHECK((blk.flags & BINPAZER_FLAG_COMPRESSED) != 0, "streaming: compressed flag");
+    uint8_t pb[64];
+    CHECK(binpazer_reader_read_payload(&r, &blk, pb, sizeof pb) == BINPAZER_OK, "streaming: read payload");
+    binpazer_compression c;
+    CHECK(binpazer_compression_parse(pb, blk.payload_len, &c) == BINPAZER_OK, "streaming: envelope parses");
+    CHECK(c.codec_id == BINPAZER_CODEC_STORED && c.uncompressed_length == 7, "streaming: envelope fields");
+    CHECK(memcmp(pb + c.header_size, "payload", 7) == 0, "streaming: stored bytes");
+
+    /* Without the up-front declaration it is still refused: nothing can raise
+     * the version afterwards. */
+    membuf m2 = { buf, sizeof buf, 0, 0 };
+    binpazer_writer w2;
+    binpazer_writer_begin(&w2, mem_write, NULL, &m2, &wg, "stream", defs, 1);
+    CHECK(binpazer_writer_block_compressed(&w2, 1, 0, BINPAZER_CODEC_STORED, NULL,
+                                           "payload", 7, 7) == BINPAZER_ERR_NOSEEK,
+          "streaming: 1.0 header + no seek is still refused");
+}
+
 static void test_compression(void) {
     static uint8_t buf[65536];
     membuf m = { buf, sizeof buf, 0, 0 };
@@ -349,6 +445,8 @@ int main(void) {
     test_large();
     test_btt_capacity();
     test_compression();
+    test_group_parse();
+    test_streaming_compressed();
 
     if (failures == 0) { printf("OK: all C round-trip checks passed\n"); return 0; }
     printf("%d FAILURE(S)\n", failures);
