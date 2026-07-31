@@ -32,7 +32,7 @@ jobs:
       # reads what the other writes, for every codec in the registry -- so it
       # is checked here, in both directions, rather than asserted in a doc.
       - name: Codec libraries for the C implementation
-        run: sudo apt-get install -y --no-install-recommends zlib1g-dev libzstd-dev liblz4-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zlib1g-dev libzstd-dev liblz4-dev
       - name: Cross-impl codec interop (C <-> Go)
         uses: wow-look-at-my/actions@typescript#latest
         with:
@@ -100,7 +100,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Codec libraries
-        run: sudo apt-get install -y --no-install-recommends zlib1g-dev libzstd-dev liblz4-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zlib1g-dev libzstd-dev liblz4-dev
       # Each `make test` builds two binaries: the core one, which links nothing
       # but libc and proves the core stayed dependency-free, and the codec one.
       - name: C tests
