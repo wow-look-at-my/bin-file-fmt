@@ -37,32 +37,42 @@ jobs:
         uses: wow-look-at-my/actions@typescript#latest
         with:
           script: |
+            // Every ${...} in a $`` template is ONE argument -- that is what
+            // makes it injection-proof -- so a path has to be interpolated
+            // whole, never glued to adjacent literal text.
             const dir = 'interop-out';
             fs.mkdirSync(dir, { recursive: true });
-            await $`cc -std=c11 -Wall -Wextra -Wpedantic -O2 c/binpazer.c c/binpazer_codec.c c/interop.c -o ${dir}/interop -lz -lzstd -llz4`;
-            await $`${dir}/interop payload ${dir}/payload.bin`;
-            await $`${dir}/interop write ${dir}`;
 
+            const interop = path.join(dir, 'interop');
+            const payloadFile = path.join(dir, 'payload.bin');
             const bp = 'go/build/binpazer';
-            const payload = fs.readFileSync(`${dir}/payload.bin`);
+
+            await $`cc -std=c11 -Wall -Wextra -Wpedantic -O2 c/binpazer.c c/binpazer_codec.c c/interop.c -o ${interop} -lz -lzstd -llz4`;
+            await $`${interop} payload ${payloadFile}`;
+            await $`${interop} write ${dir}`;
+            const payload = fs.readFileSync(payloadFile);
 
             for (const codec of ['stored', 'deflate', 'zstd', 'lz4']) {
               // Go decodes what C wrote.
-              await $`${bp} cat ${dir}/c-${codec}.binpazer --type 1 -o ${dir}/go-read-${codec}.bin`;
-              if (!payload.equals(fs.readFileSync(`${dir}/go-read-${codec}.bin`))) {
+              const fromC = path.join(dir, `c-${codec}.binpazer`);
+              const decoded = path.join(dir, `go-read-${codec}.bin`);
+              await $`${bp} cat ${fromC} --type 1 -o ${decoded}`;
+              if (!payload.equals(fs.readFileSync(decoded))) {
                 core.setFailed(`Go decoded C's ${codec} block to different bytes`);
                 continue;
               }
-              // C decodes what Go wrote. `file` is resolved relative to the
-              // manifest, so the payload sits beside it.
-              fs.writeFileSync(`${dir}/manifest-${codec}.json`, JSON.stringify({
+              // C decodes what Go wrote. A manifest's `file` is resolved
+              // relative to the manifest, so the payload sits beside it.
+              const manifest = path.join(dir, `manifest-${codec}.json`);
+              const fromGo = path.join(dir, `go-${codec}.binpazer`);
+              fs.writeFileSync(manifest, JSON.stringify({
                 writer_guid: '01000000-0000-0000-0000-000000000000',
                 writer_name: 'interop',
                 types: [{ type_id: 1, guid: '11000000-0000-0000-0000-000000000000', name: 'Payload' }],
                 blocks: [{ type_id: 1, flags: ['has_crc'], codec, file: 'payload.bin' }],
               }));
-              await $`${bp} pack ${dir}/manifest-${codec}.json -o ${dir}/go-${codec}.binpazer`;
-              await $`${dir}/interop read ${dir}/go-${codec}.binpazer`;
+              await $`${bp} pack ${manifest} -o ${fromGo}`;
+              await $`${interop} read ${fromGo}`;
               core.info(`${codec}: C->Go and Go->C both decode`);
             }
 
