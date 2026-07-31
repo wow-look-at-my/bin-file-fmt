@@ -95,6 +95,7 @@ keep in step when adding to any of them:
 | nested blocks in a Group | `ParseGroupPayload` | `binpazer_group_parse` / `parse_group` |
 | declare 1.1 up front (streaming writer) | `NewWriterVersion` | `binpazer_writer_begin_version` / `Writer(..., version_minor)` |
 | GUID <-> canonical text | `ParseGUID` / `GUID.String` | `binpazer_guid_parse` / `_format` / `to_string` |
+| is a codec available? | `LookupCodec` / `LookupCodecGUID` | `binpazer_codec_lookup` |
 
 Known and deliberate differences: Go's `NewReaderLimited` allocation cap has no
 C counterpart because C allocates nothing -- every buffer is the caller's, so

@@ -13,6 +13,20 @@ import (
 	"io"
 )
 
+// LookupCodec returns the codec registered for a registry id and whether one
+// is available -- the question a caller asks before offering a format, or
+// after ErrCodecUnavailable. Mirrors binpazer_codec_lookup in C.
+func LookupCodec(codecID uint16) (Codec, bool) {
+	c, err := lookupCodec(Compression{CodecID: codecID})
+	return c, err == nil
+}
+
+// LookupCodecGUID is LookupCodec for a codec addressed by GUID.
+func LookupCodecGUID(g GUID) (Codec, bool) {
+	c, err := lookupCodec(Compression{CodecID: CodecByGUID, CodecGUID: g})
+	return c, err == nil
+}
+
 // CompressBound reports a worst-case encoded size for srcLen bytes under a
 // registry codec, or 0 when the codec is unavailable.
 func CompressBound(codecID uint16, srcLen int) int {

@@ -137,3 +137,22 @@ func TestCompressIntoGUIDCodec(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, src, back)
 }
+
+// Availability is answerable before a compress/decompress attempt, the way it
+// is in C -- every registry id is present, anything else is not.
+func TestLookupCodec(t *testing.T) {
+	for _, c := range bufCodecs {
+		codec, ok := LookupCodec(c.id)
+		require.True(t, ok, c.name)
+		assert.NotNil(t, codec)
+	}
+	_, ok := LookupCodec(4242)
+	assert.False(t, ok, "an unassigned registry id has no codec")
+
+	g := GUID{0xD0, 0x0D}
+	_, ok = LookupCodecGUID(g)
+	assert.False(t, ok, "an unregistered GUID has no codec")
+	require.NoError(t, RegisterCodecGUID(g, storedCodec{}))
+	_, ok = LookupCodecGUID(g)
+	assert.True(t, ok, "a registered GUID resolves")
+}
