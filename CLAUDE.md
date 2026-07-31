@@ -25,10 +25,12 @@ without the others.
 ## Build & test
 
 ```sh
-make -C c test               # C11 round-trip tests
-make -C cpp test             # C++17 round-trip tests
+make -C c test               # C11 round-trip tests (core, then codecs)
+make -C cpp test             # C++17 round-trip tests (core, then codecs)
 cd go && go-toolchain        # tidy + vet + tests + coverage gate + go/build/binpazer
 ```
+
+The codec targets need `zlib1g-dev libzstd-dev liblz4-dev`; nothing else does.
 
 ASan+UBSan variants (exactly what CI runs):
 
@@ -53,7 +55,8 @@ Go rules:
   cd go && /usr/local/go/bin/go test -fuzz=FuzzReader -fuzztime=60s .
   ```
 
-CI (`.github/workflows/ci.yml`): a `go` job (`wow-look-at-my/go-toolchain@v1`)
+CI (`.github/workflows/ci.yml`): a `go` job (`wow-look-at-my/go-toolchain@v1`,
+then the C<->Go codec interop check, which needs the CLI that job just built)
 and a `c-cpp` job (make tests, both ASan builds, the fixture `cmp` above),
 plus a `publish` job gated on both that ships the CLI matrix binaries to
 https://pazer.build as project `bin-file-fmt/binpazer`. The project name is
@@ -67,9 +70,12 @@ and fails without it. Nothing merges red.
 ## Layout
 
 `SPEC.md` is the format spec; `c/` is the allocation-free C11 reference
-(`binpazer.h`/`binpazer.c`, tests in `test.c`, fixture generator `gen.c`);
-`cpp/` is a header-only C++17 wrapper over the C core (`binpazer.hpp`); `go/`
-is a pure-Go library at the package root plus the cobra CLI in
+(`binpazer.h`/`binpazer.c`, tests in `test.c`, fixture generator `gen.c`) plus
+the codec layer (`binpazer_codec.h`/`.c`, tests in `test_codec.c`) and the
+cross-impl harness `interop.c`; `cpp/` is a header-only C++17 wrapper over both
+(`binpazer.hpp`, tests in `test.cpp` and `test_codec.cpp`); `go/` is a pure-Go
+library at the package root -- `compress.go` for the envelope and codecs,
+`codecbuf.go` for the caller-buffer layer -- plus the cobra CLI in
 `go/cmd/binpazer/` (one command per file). `go/testdata/sample.binpazer` is
 the shared 280-byte fixture.
 
@@ -150,19 +156,41 @@ this is the codec-identifying mechanism SPEC.md said would replace it.
 
 Invariants worth knowing before touching it:
 
-- **Go implements every codec the registry names** -- `stored`, `deflate`,
-  `zstd` (klauspost/compress), `lz4` (pierrec/lz4). A caller should not have to
-  supply a codec the format itself names; that only guarantees files this
-  library writes are files it cannot read.
-  `RegisterCodec`/`RegisterCodecGUID` are for codecs OUTSIDE the registry (the
-  GUID escape) or to override a built-in.
-- **C and C++ carry no codec**, by contract: they do no allocation and no IO,
-  so they write and parse the envelope around bytes the CALLER encoded
-  (`binpazer_writer_block_compressed`, `binpazer_compression_parse`). Do not add
-  a codec dependency to either -- the asymmetry is deliberate, and `stored`
-  keeps a well-formed envelope writable from them with nothing linked in.
-- `stored` (id 1) exists so every implementation can produce a well-formed
-  envelope with no dependency; it is what the cross-impl fixture uses.
+- **All three implementations carry every codec the registry names** --
+  `stored`, `deflate`, `zstd`, `lz4`. Go uses klauspost/compress and
+  pierrec/lz4; C and C++ use zlib, libzstd and liblz4 through
+  `c/binpazer_codec.c`. No implementation may write a file another cannot read,
+  so a codec added to one is added to all three or it is not added.
+  `RegisterCodec`/`RegisterCodecGUID` (Go) and
+  `binpazer_codec_register`/`_register_guid` (C) are for codecs OUTSIDE the
+  registry (the GUID escape) or to override a built-in.
+- **Parity means DECODE-compatibility, not identical bytes.** A real codec's
+  encoder output is implementation-defined -- zlib and klauspost/compress are
+  under no obligation to agree, and do not. The byte-identity fixtures cover
+  the uncompressed and `stored` cases, where agreement IS required; everything
+  else is covered by the interop check in the `go` CI job, which has C write a
+  file per codec for the Go CLI to decode and the Go CLI pack one per codec for
+  `c/interop.c` to decode. Never "fix" a size difference between
+  implementations -- it is not a defect.
+- **The C core stays dependency-free; codecs are a SECOND translation unit.**
+  `binpazer.c` links nothing but libc and knows only the envelope
+  (`binpazer_writer_block_compressed` takes bytes the caller already encoded);
+  `binpazer_codec.c` adds the codecs and links `-lz -lzstd -llz4`. `make -C c
+  test` builds both `test_c` (core alone, no codec library) and `test_codec`,
+  so dependency-freedom is a CHECK, not a claim -- same split in C++
+  (`test_cpp` / `test_cpp_codec`). The codec entry points in `binpazer.hpp` are
+  inline, so including the header never forces the link.
+- **The caller-buffer API is the base layer everywhere**, and the allocating
+  forms are thin wrappers over it: `binpazer_compress`/`binpazer_decompress`
+  and Go's `CompressInto`/`DecompressInto` write into a destination the caller
+  owns and allocate nothing. Size it with
+  `binpazer_compress_bound`/`CompressBound` -- which is why a bound is a
+  required member of Go's `Codec` interface and a required function pointer in
+  `binpazer_codec`. It must never under-report: too small a bound turns
+  incompressible input into `ErrShortBuffer`, so
+  `TestCompressBoundCoversIncompressibleInput` pins it against random data.
+- `stored` (id 1) is the codec every implementation can run with nothing
+  linked, which is why the cross-impl byte-identity fixture uses it.
 - **`length` still counts STORED bytes**, so walking, skipping, `large_mode`,
   the Block Index and CRCs are untouched, and a 1.0 reader traverses a 1.1 file
   correctly. `has_crc` covers the stored bytes, before any codec runs.

@@ -29,6 +29,12 @@ var (
 	// envelope's uncompressed_length.
 	ErrBadEnvelope = errors.New("binpazer: bad compression envelope")
 
+	// ErrShortBuffer means a caller-supplied destination is too small for the
+	// bytes a codec produced. Size a compression destination with
+	// CompressBound and a decompression destination with the envelope's
+	// UncompressedLen.
+	ErrShortBuffer = errors.New("binpazer: destination buffer too small")
+
 	// ErrCodecUnavailable means a compressed block names a codec this build
 	// does not have. The block can still be walked, skipped and copied
 	// verbatim; only its payload is uninterpretable. Register the codec with

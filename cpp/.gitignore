@@ -1,3 +1,4 @@
 test_cpp
 test_cpp_san
 *.o
+test_cpp_codec

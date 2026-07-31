@@ -330,6 +330,14 @@ header in this format.
 envelope with no external dependency, and so a writer can decide per block not
 to compress without changing the block's shape.
 
+**Encoder output is implementation-defined.** A codec id names a *decodable
+format*, not one encoder: two conforming writers may compress identical input
+to different `codec_data` of different lengths, and both files are correct. An
+implementation is conformant when it can DECODE every codec in this registry,
+never because its encoded bytes match anyone else's. Byte-for-byte agreement
+between implementations is required only for uncompressed blocks and for
+`stored`, where no encoder is involved.
+
 Rules:
 
 - The block's `length` field always describes the **stored** bytes -- the

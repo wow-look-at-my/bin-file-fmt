@@ -12,10 +12,10 @@ package binpazer
 // files it cannot read. RegisterCodec remains for codecs OUTSIDE the registry
 // (the GUID escape) and for overriding a built-in.
 //
-// The C and C++ implementations stay codec-free by contract: they do no
-// allocation and no IO, so they hand the caller the envelope and its bytes.
-// That asymmetry is deliberate -- it is the Go library that is used as a
-// library.
+// The C and C++ implementations carry the same four codecs (c/binpazer_codec.c
+// and the entry points binpazer.hpp exposes over it), so no implementation can
+// write a file another cannot read. Their core translation unit stays
+// codec-free and dependency-free; codecs are a second file you link.
 
 import (
 	"compress/flate"
@@ -84,6 +84,11 @@ type Codec interface {
 	NewReader(r io.Reader) (io.ReadCloser, error)
 	// NewWriter encodes into w. Close flushes the codec's trailer.
 	NewWriter(w io.Writer) (io.WriteCloser, error)
+	// CompressBound reports a size that encoding srcLen bytes cannot exceed,
+	// including the codec's own framing. It is what lets CompressInto write
+	// into a caller's buffer, so it must never under-report -- a too-small
+	// answer surfaces as ErrShortBuffer on incompressible input.
+	CompressBound(srcLen int) int
 }
 
 var (
@@ -158,6 +163,8 @@ func (storedCodec) NewWriter(w io.Writer) (io.WriteCloser, error) {
 	return nopWriteCloser{w}, nil
 }
 
+func (storedCodec) CompressBound(srcLen int) int { return srcLen }
+
 type nopWriteCloser struct{ io.Writer }
 
 func (nopWriteCloser) Close() error { return nil }
@@ -172,6 +179,12 @@ func (deflateCodec) NewReader(r io.Reader) (io.ReadCloser, error) {
 
 func (deflateCodec) NewWriter(w io.Writer) (io.WriteCloser, error) {
 	return flate.NewWriter(w, flate.DefaultCompression)
+}
+
+// CompressBound mirrors zlib's compressBound: incompressible input falls back
+// to stored blocks, which cost 5 bytes of framing per 64 KiB window.
+func (deflateCodec) CompressBound(srcLen int) int {
+	return srcLen + srcLen/16 + 5*(srcLen/16384+1) + 64
 }
 
 // zstdCodec is zstd (RFC 8878, SPEC registry id 3), the codec worth reaching
@@ -192,6 +205,16 @@ func (zstdCodec) NewWriter(w io.Writer) (io.WriteCloser, error) {
 	return zstd.NewWriter(w)
 }
 
+// CompressBound is ZSTD_COMPRESSBOUND plus room for the frame header and a
+// final empty block.
+func (zstdCodec) CompressBound(srcLen int) int {
+	margin := 0
+	if srcLen < 128<<10 {
+		margin = ((128 << 10) - srcLen) >> 11
+	}
+	return srcLen + srcLen/128 + margin + 64
+}
+
 // lz4Codec is LZ4 (frame format, SPEC registry id 4): a weaker ratio than
 // zstd, for content read far more often than it is written.
 type lz4Codec struct{}
@@ -202,6 +225,15 @@ func (lz4Codec) NewReader(r io.Reader) (io.ReadCloser, error) {
 
 func (lz4Codec) NewWriter(w io.Writer) (io.WriteCloser, error) {
 	return lz4.NewWriter(w), nil
+}
+
+// CompressBound is LZ4F_compressFrameBound computed for the smallest block
+// size a writer may choose (64 KiB), which bounds every larger one too: frame
+// header and footer, plus per-block worst-case expansion and a 4-byte block
+// header.
+func (lz4Codec) CompressBound(srcLen int) int {
+	blocks := srcLen/(64<<10) + 1
+	return srcLen + srcLen/255 + blocks*4 + 64
 }
 
 // encodeEnvelopeHeader serializes the fixed envelope header.
@@ -422,12 +454,7 @@ func (bw *Writer) CompressedBlock(typeID, flags, codecID uint16, payload []byte)
 		return bw.err
 	}
 	c := Compression{CodecID: codecID, UncompressedLen: uint64(len(payload))}
-	codec, err := lookupCodec(c)
-	if err != nil {
-		bw.err = err
-		return err
-	}
-	stored, err := compressAll(codec, payload)
+	stored, err := compressAlloc(c, payload)
 	if err != nil {
 		bw.err = err
 		return err
@@ -448,12 +475,7 @@ func (bw *Writer) CompressedBlockGUID(typeID, flags uint16, codecGUID GUID, payl
 		return bw.err
 	}
 	c := Compression{CodecID: CodecByGUID, CodecGUID: codecGUID, UncompressedLen: uint64(len(payload))}
-	codec, err := lookupCodec(c)
-	if err != nil {
-		bw.err = err
-		return err
-	}
-	stored, err := compressAll(codec, payload)
+	stored, err := compressAlloc(c, payload)
 	if err != nil {
 		bw.err = err
 		return err
@@ -461,30 +483,4 @@ func (bw *Writer) CompressedBlockGUID(typeID, flags uint16, codecGUID GUID, payl
 	body := append(encodeEnvelopeHeader(c), stored...)
 	bw.usedCompression = true
 	return bw.Block(typeID, flags|FlagCompressed, body)
-}
-
-// compressAll runs payload through a codec and returns the encoded bytes.
-func compressAll(codec Codec, payload []byte) ([]byte, error) {
-	var buf sliceWriter
-	w, err := codec.NewWriter(&buf)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := w.Write(payload); err != nil {
-		w.Close()
-		return nil, err
-	}
-	if err := w.Close(); err != nil {
-		return nil, err
-	}
-	return buf.b, nil
-}
-
-// sliceWriter is an append-only io.Writer over a byte slice (bytes.Buffer
-// without the read side).
-type sliceWriter struct{ b []byte }
-
-func (s *sliceWriter) Write(p []byte) (int, error) {
-	s.b = append(s.b, p...)
-	return len(p), nil
 }

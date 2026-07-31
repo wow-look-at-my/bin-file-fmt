@@ -24,6 +24,48 @@ jobs:
           # the publish job below (same buildhost action, same naming).
           autorelease: false
 
+      # Parity between implementations is a claim about DECODING, not about
+      # bytes: a real codec's encoder output is implementation-defined, so zlib
+      # and klauspost/compress are not expected to agree bit for bit (the
+      # byte-identity fixtures in c-cpp cover the uncompressed and `stored`
+      # cases, where they must). What has to hold is that each implementation
+      # reads what the other writes, for every codec in the registry -- so it
+      # is checked here, in both directions, rather than asserted in a doc.
+      - name: Codec libraries for the C implementation
+        run: sudo apt-get install -y --no-install-recommends zlib1g-dev libzstd-dev liblz4-dev
+      - name: Cross-impl codec interop (C <-> Go)
+        uses: wow-look-at-my/actions@typescript#latest
+        with:
+          script: |
+            const dir = 'interop-out';
+            fs.mkdirSync(dir, { recursive: true });
+            await $`cc -std=c11 -Wall -Wextra -Wpedantic -O2 c/binpazer.c c/binpazer_codec.c c/interop.c -o ${dir}/interop -lz -lzstd -llz4`;
+            await $`${dir}/interop payload ${dir}/payload.bin`;
+            await $`${dir}/interop write ${dir}`;
+
+            const bp = 'go/build/binpazer';
+            const payload = fs.readFileSync(`${dir}/payload.bin`);
+
+            for (const codec of ['stored', 'deflate', 'zstd', 'lz4']) {
+              // Go decodes what C wrote.
+              await $`${bp} cat ${dir}/c-${codec}.binpazer --type 1 -o ${dir}/go-read-${codec}.bin`;
+              if (!payload.equals(fs.readFileSync(`${dir}/go-read-${codec}.bin`))) {
+                core.setFailed(`Go decoded C's ${codec} block to different bytes`);
+                continue;
+              }
+              // C decodes what Go wrote. `file` is resolved relative to the
+              // manifest, so the payload sits beside it.
+              fs.writeFileSync(`${dir}/manifest-${codec}.json`, JSON.stringify({
+                writer_guid: '01000000-0000-0000-0000-000000000000',
+                writer_name: 'interop',
+                types: [{ type_id: 1, guid: '11000000-0000-0000-0000-000000000000', name: 'Payload' }],
+                blocks: [{ type_id: 1, flags: ['has_crc'], codec, file: 'payload.bin' }],
+              }));
+              await $`${bp} pack ${dir}/manifest-${codec}.json -o ${dir}/go-${codec}.binpazer`;
+              await $`${dir}/interop read ${dir}/go-${codec}.binpazer`;
+              core.info(`${codec}: C->Go and Go->C both decode`);
+            }
+
   # Publish the CLI matrix binaries to https://pazer.build. buildhost scopes a
   # repo's OIDC token to the repo's own namespace, and the binary name
   # (binpazer) differs from the repo name, so the action publishes it as the
@@ -57,6 +99,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Codec libraries
+        run: sudo apt-get install -y --no-install-recommends zlib1g-dev libzstd-dev liblz4-dev
+      # Each `make test` builds two binaries: the core one, which links nothing
+      # but libc and proves the core stayed dependency-free, and the codec one.
       - name: C tests
         run: make -C c test
       - name: C++ tests
@@ -65,10 +111,14 @@ jobs:
         run: |
           cc -std=c11 -Wall -Wextra -O1 -fsanitize=address,undefined -fno-sanitize-recover=all c/binpazer.c c/test.c -o /tmp/test_c_san
           /tmp/test_c_san
+          cc -std=c11 -Wall -Wextra -O1 -fsanitize=address,undefined -fno-sanitize-recover=all c/binpazer.c c/binpazer_codec.c c/test_codec.c -o /tmp/test_codec_san -lz -lzstd -llz4
+          /tmp/test_codec_san
       - name: C++ tests (ASan + UBSan)
         run: |
           c++ -std=c++17 -Wall -Wextra -O1 -fsanitize=address,undefined -fno-sanitize-recover=all -Ic cpp/test.cpp c/binpazer.c -o /tmp/test_cpp_san
           /tmp/test_cpp_san
+          c++ -std=c++17 -Wall -Wextra -O1 -fsanitize=address,undefined -fno-sanitize-recover=all -Ic cpp/test_codec.cpp c/binpazer.c c/binpazer_codec.c -o /tmp/test_cpp_codec_san -lz -lzstd -llz4
+          /tmp/test_cpp_codec_san
       - name: Cross-impl fixtures are reproducible
         run: |
           cc -std=c11 -O2 c/binpazer.c c/gen.c -o /tmp/binpazer_gen
