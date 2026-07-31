@@ -119,6 +119,7 @@ typedef struct {
     uint64_t          index_offset; /* offset of the Block Index block, once written */
     int               wrote_index;
     int               used_compression; /* a compressed block was written: file is 1.1 */
+    uint16_t          version_minor;    /* as declared in the header at begin */
 } binpazer_writer;
 
 /* One block-type-table entry supplied by the caller. Use user ids (1, 2, ...);
@@ -136,6 +137,19 @@ binpazer_status binpazer_writer_begin(
     binpazer_write_fn write, binpazer_seek_fn seek, void *ctx,
     const binpazer_guid *writer_guid, const char *writer_name,
     const binpazer_type_def *defs, size_t ndefs);
+
+/* binpazer_writer_begin declaring a specific minor version in the header
+ * instead of BINPAZER_VERSION_MINOR. The one reason to use it: a compressed
+ * block normally raises the version by back-patching the header at end, which
+ * needs a seek callback -- declare BINPAZER_VERSION_MINOR_COMPRESSION here and
+ * a STREAMING writer (no seek) can write compressed blocks too. Declaring a
+ * version whose features the file does not use is legal but pointless: it just
+ * turns readers away. */
+binpazer_status binpazer_writer_begin_version(
+    binpazer_writer *w,
+    binpazer_write_fn write, binpazer_seek_fn seek, void *ctx,
+    const binpazer_guid *writer_guid, const char *writer_name,
+    const binpazer_type_def *defs, size_t ndefs, uint16_t version_minor);
 
 /* Writes one block. `payload` may be NULL iff payload_len == 0.
  * If `flags` has LARGE_MODE, payload_len is the byte length and must be a
@@ -243,6 +257,33 @@ binpazer_status binpazer_reader_read_payload(
 /* Skips the current block's payload (and CRC) and advances to the next block. */
 binpazer_status binpazer_reader_skip_payload(
     binpazer_reader *r, const binpazer_block *blk);
+
+/* ---- Group blocks (nesting, predefined type 65530) ---- */
+
+/* One nested block inside a Group block's payload. `payload` points INTO the
+ * caller's buffer -- nothing is copied, so it is valid as long as that buffer
+ * is. */
+typedef struct {
+    uint16_t       type_id;
+    uint16_t       flags;
+    uint64_t       offset;       /* of the child's 8-byte header, relative to the payload */
+    const uint8_t *payload;
+    uint64_t       payload_len;
+    int            crc_ok;       /* 0 only when has_crc is set and the stored CRC mismatches */
+} binpazer_group_child;
+
+/* Parses a Group block's payload -- nested blocks laid out exactly like
+ * top-level ones -- from a buffer the caller has already read. Children are
+ * written to `out` (up to `cap`) and `*count` receives the TOTAL child count,
+ * so BINPAZER_ERR_CAPACITY means "call again with a buffer this big". A
+ * structural error returns BINPAZER_ERR_FORMAT with the children parsed before
+ * it still filled in, so a caller can render the intact prefix of a damaged
+ * group. A child's CRC is verified into crc_ok without failing the parse.
+ * Child type ids resolve against the same file-global Block Type Table as
+ * top-level blocks; that resolution is left to the caller, which has it. */
+binpazer_status binpazer_group_parse(
+    const void *payload, uint64_t payload_len,
+    binpazer_group_child *out, size_t cap, size_t *count);
 
 /* ---- Block Index (optional, predefined type 65533) ---- */
 

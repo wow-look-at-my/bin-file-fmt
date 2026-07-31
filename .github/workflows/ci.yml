@@ -33,6 +33,13 @@ jobs:
       # is checked here, in both directions, rather than asserted in a doc.
       - name: Codec libraries for the C implementation
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zlib1g-dev libzstd-dev liblz4-dev
+      # go-toolchain does not leave build/ in the workspace -- it hands the
+      # binaries off through the org cache (which is how the publish job gets
+      # them). Take the same hand-off rather than rebuilding the CLI.
+      - uses: wow-look-at-my/actions@cache-download#latest
+        with:
+          name: go-build-go
+          path: go/build
       - name: Cross-impl codec interop (C <-> Go)
         uses: wow-look-at-my/actions@typescript#latest
         with:
@@ -46,6 +53,12 @@ jobs:
             const interop = path.join(dir, 'interop');
             const payloadFile = path.join(dir, 'payload.bin');
             const bp = 'go/build/binpazer';
+
+            if (!fs.existsSync(bp)) {
+              core.setFailed(`${bp} is missing: the go-toolchain build hand-off did not land`);
+              return;
+            }
+            fs.chmodSync(bp, 0o755); // the cache round-trip need not preserve the mode
 
             await $`cc -std=c11 -Wall -Wextra -Wpedantic -O2 c/binpazer.c c/binpazer_codec.c c/interop.c -o ${interop} -lz -lzstd -llz4`;
             await $`${interop} payload ${payloadFile}`;

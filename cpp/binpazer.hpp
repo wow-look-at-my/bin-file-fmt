@@ -103,6 +103,26 @@ inline std::optional<std::vector<uint8_t>> decompress(const Compression &c, cons
     return out;
 }
 
+using GroupChild = binpazer_group_child;
+
+// Parses a Group block's payload into its nested blocks. Each child's
+// `payload` points INTO the buffer passed in, so keep it alive. A structural
+// error yields the intact prefix, matching the C and Go parsers -- check
+// `ok` to tell a clean parse from a truncated one.
+inline std::vector<GroupChild> parse_group(const void *payload, uint64_t len, bool *ok = nullptr) {
+    size_t n = 0;
+    binpazer_group_parse(payload, len, nullptr, 0, &n);
+    std::vector<GroupChild> out(n);
+    binpazer_status s = binpazer_group_parse(payload, len, out.data(), out.size(), &n);
+    out.resize(n < out.size() ? n : out.size());
+    if (ok) *ok = (s == BINPAZER_OK);
+    return out;
+}
+
+inline std::vector<GroupChild> parse_group(const std::vector<uint8_t> &payload, bool *ok = nullptr) {
+    return parse_group(payload.data(), payload.size(), ok);
+}
+
 // IO callbacks. read/write return bytes transferred (fread/fwrite style); seek
 // returns true on success. An empty `SeekFn` means no seek capability.
 using ReadFn  = std::function<size_t(void *buf, size_t n)>;
@@ -126,8 +146,15 @@ class Writer {
 public:
     // Writes the file header and Block Type Table immediately. Do not include
     // type id 65534 in `defs`; the table entry is added automatically.
+    //
+    // `version_minor` declares a minor version in the header up front. The one
+    // reason to set it: a compressed block normally raises the version by
+    // back-patching the header at end(), which needs a seek callback -- pass
+    // BINPAZER_VERSION_MINOR_COMPRESSION and a STREAMING writer can compress
+    // too.
     Writer(WriteFn write, const Guid &writer_guid, std::string_view name,
-           const std::vector<TypeDef> &defs, SeekFn seek = {}) {
+           const std::vector<TypeDef> &defs, SeekFn seek = {},
+           uint16_t version_minor = BINPAZER_VERSION_MINOR) {
         io_.write = std::move(write);
         io_.seek  = std::move(seek);
         name_     = std::string(name);
@@ -137,10 +164,10 @@ public:
         for (const auto &d : defs)
             cdefs.push_back(binpazer_type_def{d.type_id, d.guid, d.name.c_str()});
 
-        binpazer_writer_begin(&w_, detail::tramp_write,
-                              io_.seek ? detail::tramp_seek : nullptr, &io_,
-                              &writer_guid, name_.c_str(),
-                              cdefs.data(), cdefs.size());
+        binpazer_writer_begin_version(&w_, detail::tramp_write,
+                                      io_.seek ? detail::tramp_seek : nullptr, &io_,
+                                      &writer_guid, name_.c_str(),
+                                      cdefs.data(), cdefs.size(), version_minor);
     }
 
     Writer(const Writer &) = delete;
