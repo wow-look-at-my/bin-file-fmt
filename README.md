@@ -94,6 +94,12 @@ binpazer pack manifest.json -o demo.binpazer
   `critical`, `safe_to_copy`, `has_crc`, `large_mode`), and
   exactly one content source: `data` (UTF-8 text), `data_base64`, or `file`
   (a path relative to the manifest).
+- `codec` on a block -- `stored`, `deflate`, `zstd` or `lz4` -- compresses that
+  block's payload (SPEC.md "Compression"). The manifest always holds the
+  block's LOGICAL bytes, so `unpack` writes decoded payloads and records the
+  codec that produced them; re-packing reproduces the file exactly. There is no
+  `compressed` flag name: compression is named by its codec or it does not
+  happen.
 - `"index": true` -- append a Block Index + footer so readers can jump by type.
 
 `pack - -o -` reads the manifest from stdin and writes the archive to stdout
