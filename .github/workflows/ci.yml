@@ -44,25 +44,19 @@ jobs:
         uses: wow-look-at-my/actions@typescript#latest
         with:
           script: |
-            // Every ${...} in a $`` template is ONE argument -- that is what
-            // makes it injection-proof -- so a path has to be interpolated
-            // whole, never glued to adjacent literal text.
             const dir = 'interop-out';
             fs.mkdirSync(dir, { recursive: true });
 
             const interop = path.join(dir, 'interop');
             const payloadFile = path.join(dir, 'payload.bin');
 
-            // The hand-off carries the whole publish matrix, and its layout is
-            // go-toolchain's to change -- so find this runner's binary rather
-            // than hard-coding where it lands.
-            // Annotated because the action type-checks with strict: true, and a
-            // recursive arrow cannot infer its own return type.
+            // explicit return type: the action type-checks with strict: true, and a recursive arrow cannot infer its own return type
             const walk = (d: string): string[] =>
               fs.readdirSync(d, { withFileTypes: true }).flatMap((e): string[] => {
                 const p = path.join(d, e.name);
                 return e.isDirectory() ? walk(p) : [p];
               });
+            // search go/build rather than hard-coding a path -- the hand-off's layout is go-toolchain's to change
             const built: string[] = fs.existsSync('go/build') ? walk('go/build') : [];
             const bp = built.find((f: string) => path.basename(f) === 'binpazer')
               ?? built.find((f: string) => /binpazer.*linux.*amd64/.test(path.basename(f)));
@@ -73,6 +67,7 @@ jobs:
             core.info(`using CLI ${bp}`);
             fs.chmodSync(bp, 0o755); // the cache round-trip need not preserve the mode
 
+            // each ${...} in a $`` template is interpolated as one argument, never glued to adjacent literal text -- that is what makes it injection-proof
             await $`cc -std=c11 -Wall -Wextra -Wpedantic -O2 c/binpazer.c c/binpazer_codec.c c/interop.c -o ${interop} -lz -lzstd -llz4`;
             await $`${interop} payload ${payloadFile}`;
             await $`${interop} write ${dir}`;
@@ -87,10 +82,10 @@ jobs:
                 core.setFailed(`Go decoded C's ${codec} block to different bytes`);
                 continue;
               }
-              // C decodes what Go wrote. A manifest's `file` is resolved
-              // relative to the manifest, so the payload sits beside it.
+              // C decodes what Go wrote.
               const manifest = path.join(dir, `manifest-${codec}.json`);
               const fromGo = path.join(dir, `go-${codec}.binpazer`);
+              // a manifest's `file` resolves relative to the manifest, so the payload sits beside it
               fs.writeFileSync(manifest, JSON.stringify({
                 writer_guid: '01000000-0000-0000-0000-000000000000',
                 writer_name: 'interop',
