@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   go:
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
     permissions:
       id-token: write
       contents: write
@@ -104,7 +104,7 @@ jobs:
   # git branch recorded on the release):
   #   https://dl.pazer.build/bin-file-fmt/binpazer?branch=<branch>&os=<os>&arch=<arch>
   publish:
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
     needs: [go, c-cpp]
     permissions:
       id-token: write # mint the OIDC token buildhost trusts
@@ -127,7 +127,7 @@ jobs:
           path: build
 
   c-cpp:
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - name: Codec libraries
