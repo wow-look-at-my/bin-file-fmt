@@ -14,9 +14,11 @@ jobs:
       contents: write
       actions: read
       checks: read
+      deployments: write
+      artifact-metadata: write
     steps:
       - uses: actions/checkout@v4
-      - uses: wow-look-at-my/go-toolchain@v1
+      - uses: wow-look-at-my/go-toolchain@master
         with:
           working-directory: go
           # autorelease stays off so publishing waits for the whole CI --
@@ -32,7 +34,7 @@ jobs:
       # reads what the other writes, for every codec in the registry -- so it
       # is checked here, in both directions, rather than asserted in a doc.
       - name: Codec libraries for the C implementation
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zlib1g-dev libzstd-dev liblz4-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential zlib1g-dev libzstd-dev liblz4-dev
       # go-toolchain does not leave build/ in the workspace -- it hands the
       # binaries off through the org cache (which is how the publish job gets
       # them). Take the same hand-off rather than rebuilding the CLI.
@@ -131,7 +133,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Codec libraries
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zlib1g-dev libzstd-dev liblz4-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential zlib1g-dev libzstd-dev liblz4-dev
       # Each `make test` builds two binaries: the core one, which links nothing
       # but libc and proves the core stayed dependency-free, and the codec one.
       - name: C tests

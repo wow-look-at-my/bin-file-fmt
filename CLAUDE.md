@@ -55,7 +55,7 @@ Go rules:
   cd go && /usr/local/go/bin/go test -fuzz=FuzzReader -fuzztime=60s .
   ```
 
-CI (`.github/workflows/ci.yml`): a `go` job (`wow-look-at-my/go-toolchain@v1`,
+CI (`.github/workflows/ci.yml`): a `go` job (`wow-look-at-my/go-toolchain@master`,
 then the C<->Go codec interop check, which needs the CLI that job just built)
 and a `c-cpp` job (make tests, both ASan builds, the fixture `cmp` above),
 plus a `publish` job gated on both that ships the CLI matrix binaries to
