@@ -40,7 +40,7 @@ static binpazer_status deflate_compress(void *u, const void *src, uint64_t src_l
     (void)u;
     z_stream zs;
     memset(&zs, 0, sizeof zs);
-    /* A negative windowBits selects RAW deflate -- no zlib or gzip wrapper,
+    /* 
      * which is what RFC 1951 (and every other implementation) means by
      * "deflate" here. */
     if (deflateInit2(&zs, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -MAX_WBITS, 8,
@@ -128,7 +128,7 @@ static binpazer_status zstd_compress(void *u, const void *src, uint64_t src_len,
     if (!fits_size(src_len) || !fits_size(*dst_len)) return BINPAZER_ERR_CAPACITY;
     size_t got = ZSTD_compress(dst, (size_t)*dst_len, src, (size_t)src_len,
                                ZSTD_CLEVEL_DEFAULT);
-    /* Distinguished without zstd_errors.h: the one failure a caller can act on
+    /* 
      * is a destination below the codec's own bound. */
     if (ZSTD_isError(got))
         return *dst_len < ZSTD_compressBound((size_t)src_len)

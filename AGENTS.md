@@ -41,7 +41,7 @@ Go rules:
   cd go && /usr/local/go/bin/go test -fuzz=FuzzReader -fuzztime=60s .
   ```
 
-CI (`.github/workflows/ci.yml`): a `go` job (`wow-look-at-my/go-toolchain@master`, then the C<->Go codec interop check, which needs the CLI that job just built) and a `c-cpp` job (make tests, both ASan builds, the fixture `cmp` above), plus a `publish` job gated on both that ships the CLI matrix binaries to https://pazer.build as project `bin-file-fmt/binpazer`. The project name is repo-derived because buildhost scopes a repo's OIDC token to the repo's own namespace (`bin-file-fmt` and `bin-file-fmt/<...>`). A `project: binpazer` override gets a 404 -- do not "fix" the name. `publish` gets the binaries from go-toolchain's `go-build-go` cache hand-off (org CI has no GHA artifacts) and needs `deployments: write` -- buildhost-publish registers a GitHub Deployment and fails without it. Nothing merges red.
+CI (`.github/workflows/ci.yml`) has a `go` job (`wow-look-at-my/go-toolchain@master`, then the C<->Go codec interop check, which needs the CLI that job just built). It has a `c-cpp` job (make tests, both ASan builds, the fixture `cmp` above). It also has a `publish` job gated on both that ships the CLI matrix binaries to https://pazer.build as project `bin-file-fmt/binpazer`. The project name is repo-derived because buildhost scopes a repo's OIDC token to the repo's own namespace (`bin-file-fmt` and `bin-file-fmt/<...>`). A `project: binpazer` override gets a 404 -- do not "fix" the name. `publish` gets the binaries from go-toolchain's `go-build-go` cache hand-off (org CI has no GHA artifacts) and needs `deployments: write` -- buildhost-publish registers a GitHub Deployment and fails without it. Nothing merges red.
 
 ## Layout
 

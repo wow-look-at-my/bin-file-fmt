@@ -258,7 +258,7 @@ Rules:
 - `has_crc` covers the stored bytes (the envelope), not the decoded payload: the CRC verifies what is on disk, before any codec runs.
 - `uncompressed_length` is authoritative. A reader MUST treat a decode that yields a different length as corruption, and Must use the field to bound its allocation *before* decoding (a decoder is otherwise an unbounded allocator driven by untrusted bytes).
 - A reader that does not implement a block's `codec_id` MUST NOT interpret its payload. It may still skip the block, copy it verbatim when `safe_to_copy` is set, and report the codec. The same applies to a pre-1.1 reader, which sees bit 2 as a reserved bit: it walks. It skips correctly but must not read the payload of a block whose flag bits it does not all understand.
-- Compression is per block. Mixing compressed and uncompressed blocks in one file is normal and expected. The [Block Type Table](#block-type-table), [Block Index](#block-index) and [footer](#footer) are never compressed, so the structural path stays directly mappable.
+- Compression is per block. Mixing compressed and uncompressed blocks in one file is normal and expected. The [Block Type Table](#block-type-table), [Block Index](#block-index) and [footer](#footer) are never compressed. The structural path thus stays directly mappable.
 - Nothing about an uncompressed block changes in 1.1. A file with no compressed block is byte-identical to the 1.0 file with the same content.
 
 ### Footer
