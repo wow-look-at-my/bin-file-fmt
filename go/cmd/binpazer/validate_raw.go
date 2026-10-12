@@ -14,7 +14,7 @@ func pad8(n uint64) uint64 { return ((n + 7) &^ 7) - n }
 // inspect bytes the library reader deliberately ignores: reserved fields
 // (header_flags, header reserved, BTT reserved, entry_flags) and string NUL
 // terminators. It runs only after a successful parse, so every length is
-// already known to fit the input, and it restores the input position so the
+// already known to fit the input. It restores the input position so the
 // block walk that follows is unaffected. Seekable inputs only.
 func (v *validator) rawStructuralChecks(rs io.ReadSeeker, br *binpazer.Reader) {
 	cur, err := rs.Seek(0, io.SeekCurrent)
@@ -26,7 +26,6 @@ func (v *validator) rawStructuralChecks(rs io.ReadSeeker, br *binpazer.Reader) {
 
 	fail := func(err error) { v.add(ruleStructure, 0, "raw header checks: %v", err) }
 
-	// File header: header_flags (48) and reserved (52) must be 0.
 	hdr := make([]byte, 56)
 	if _, err := rs.Seek(0, io.SeekStart); err != nil {
 		fail(err)
@@ -58,9 +57,7 @@ func (v *validator) rawStructuralChecks(rs io.ReadSeeker, br *binpazer.Reader) {
 		v.add(ruleStringTerm, nulOff, "writer_name terminator is %#02x, not NUL", nb[0])
 	}
 
-	// Block Type Table: reserved u32 after entry_count, then per entry the
-	// entry_flags and the name terminator. Entry layout: 20-byte header,
-	// u32 name length, name, NUL, zero pad to 8.
+	// Block Type Table: reserved u32 after entry_count, then per entry the entry_flags and the name terminator.
 	base := br.FirstBlockOffset
 	if _, err := rs.Seek(int64(base+12), io.SeekStart); err != nil {
 		fail(err)

@@ -1,19 +1,13 @@
 /* Generates the canonical cross-implementation sample file using the C library
- * (with FILE*-backed callbacks). Used as a fixture for the Go/C++ tests.
- *
- *   gen <output-path>
- *
- * This is a tool, not part of the library -- the library itself does no file IO.
- * The exact same inputs are reproduced by each language's test, so a correct
- * implementation writes byte-identical output. */
+ * (with FILE*-backed callbacks). Used as a fixture for the Go/C++ tests. */
 #include "binpazer.h"
 #include <stdio.h>
 
 static size_t file_write(void *ctx, const void *b, size_t n) { return fwrite(b, 1, n, (FILE *)ctx); }
 static int    file_seek(void *ctx, uint64_t off) { return fseek((FILE *)ctx, (long)off, SEEK_SET); }
 
-/* The compressed fixture uses codec `stored` (identity) deliberately: it is the
- * one codec every implementation can produce with no dependency, so all three
+/* The compressed fixture uses codec `stored` (identity) deliberately. It is the
+ * one codec every implementation can produce with no dependency. All of them
  * write these exact bytes and what gets compared is the envelope itself. */
 static int gen_compressed(const char *path) {
     FILE *f = fopen(path, "wb");

@@ -33,9 +33,9 @@ int main() {
         {2, g_note, "Note"},
     };
 
-    const char *mesh = "vertices-go-here";          // 16
-    const char *note = "hello, file!";              // 12
-    const char *big  = "0123456789ABCDEF01234567";  // 24
+    const char *mesh = "vertices-go-here";
+    const char *note = "hello, file!";
+    const char *big  = "0123456789ABCDEF01234567";
 
     {
         binpazer::Writer w(write, writer, "demo", defs, seek);
@@ -197,9 +197,9 @@ int main() {
         CHECK(p.size() == 4096 && std::memcmp(p.data(), big4.data(), 4096) == 0, "large: payload");
     }
 
-    // Compression (SPEC.md 1.1). Like the C core, the wrapper carries no codec:
-    // it writes and parses the envelope around bytes the caller encoded, so this
-    // uses codec `stored` (identity) and the GUID escape.
+    // Like the C core, the wrapper carries no codec: it writes and parses the
+    // envelope around bytes the caller encoded. This uses codec `stored`
+    // (identity) and the GUID escape.
     {
         std::vector<uint8_t> cbuf;
         size_t cp = 0;
@@ -216,9 +216,9 @@ int main() {
         };
         binpazer::Guid g_codec{{0xc0,0xde,0xc0,0xde,0,0,0,0,0,0,0,0,0,0,0,7}};
         std::vector<binpazer::TypeDef> d = {{2, g_note, "Note"}};
-        const char *plain = "plain block";          // 11
-        const char *comp  = "compressed, sort of";  // 19
-        const char *gcod  = "guid-codec payload";   // 18
+        const char *plain = "plain block";
+        const char *comp  = "compressed, sort of";
+        const char *gcod  = "guid-codec payload";
         {
             binpazer::Writer w(cwrite, writer, "demo", d, cseek);
             CHECK(w.block(2, 0, std::string_view(plain, 11)) == binpazer::Status::Ok, "compress: plain");
@@ -260,7 +260,7 @@ int main() {
         CHECK(c2 && std::memcmp(c2->codec_guid.bytes, g_codec.bytes, 16) == 0, "compress: block 2 codec guid");
         CHECK(c2 && std::memcmp(p2.data() + c2->header_size, gcod, 18) == 0, "compress: block 2 bytes");
 
-        // An envelope with codec id 0 is corruption, not an empty payload.
+        // An envelope with codec one id is corruption, not an empty payload.
         uint8_t bad[BINPAZER_ENVELOPE_FIXED_SIZE] = {0};
         CHECK(!binpazer::parse_compression(bad, sizeof bad).has_value(), "compress: codec id 0 rejected");
     }
@@ -284,7 +284,6 @@ int main() {
         CHECK(kids.size() == 2 && kids[0].payload == g.data() + 8, "group: payload aliases the buffer");
     }
 
-    // A streaming writer (no seek) can compress once it declares 1.1 up front.
     {
         std::vector<uint8_t> sbuf;
         size_t spos = 0;

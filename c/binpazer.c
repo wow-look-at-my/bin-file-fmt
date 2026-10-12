@@ -52,7 +52,7 @@ static binpazer_status w_pad(binpazer_writer *w, uint64_t n) {
 
 /* on-disk size of one BTT entry given its name length */
 static uint64_t btt_entry_size(size_t name_len) {
-    return align8((uint64_t)20 + 4 + name_len + 1); /* hdr(20) + string(4+len+1), padded */
+    return align8((uint64_t)20 + 4 + name_len + 1); /* */
 }
 
 static binpazer_status w_btt_entry(binpazer_writer *w, uint16_t type_id,
@@ -103,7 +103,6 @@ binpazer_status binpazer_writer_begin_version(
     if (writer_guid) memcpy(hdr + 16, writer_guid->bytes, 16);
     put_u64(hdr + 32, BINPAZER_FILE_LENGTH_UNKNOWN);
     put_u64(hdr + 40, first_block);
-    /* 48: header_flags, 52: reserved -- already zero */
     if (w_raw(w, hdr, 56)) return (binpazer_status)w->err;
 
     uint8_t lp[4]; put_u32(lp, (uint32_t)name_len);
@@ -112,7 +111,6 @@ binpazer_status binpazer_writer_begin_version(
     uint8_t nul = 0; if (w_raw(w, &nul, 1)) return (binpazer_status)w->err;
     if (w_pad(w, first_block - w->offset)) return (binpazer_status)w->err;
 
-    /* Block Type Table payload length: 8 (count + reserved) + entries */
     uint64_t payload_len = 8;
     payload_len += btt_entry_size(strlen("BlockTypeTable"));
     for (size_t i = 0; i < ndefs; i++)
@@ -219,9 +217,6 @@ binpazer_status binpazer_writer_block_compressed(
     if (w->err) return (binpazer_status)w->err;
     if (codec_id == BINPAZER_CODEC_INVALID) return (binpazer_status)(w->err = BINPAZER_ERR_RANGE);
     if (codec_id == BINPAZER_CODEC_BY_GUID && !codec_guid) return (binpazer_status)(w->err = BINPAZER_ERR_RANGE);
-    /* version_minor was written before the content was known, so declaring 1.1
-     * needs a back-patch -- and that needs a seek callback. A streaming writer
-     * declares it up front instead, with binpazer_writer_begin_version. */
     if (!w->seek && w->version_minor < BINPAZER_VERSION_MINOR_COMPRESSION)
         return (binpazer_status)(w->err = BINPAZER_ERR_NOSEEK);
 
@@ -249,7 +244,6 @@ binpazer_status binpazer_writer_block_compressed(
     uint8_t env[BINPAZER_ENVELOPE_GUID_SIZE];
     memset(env, 0, sizeof env);
     put_u16(env + 0, codec_id);
-    /* 2: codec_flags, 4: reserved -- zero */
     put_u64(env + 8, uncompressed_len);
     if (codec_id == BINPAZER_CODEC_BY_GUID) memcpy(env + 16, codec_guid->bytes, 16);
 
@@ -272,8 +266,8 @@ binpazer_status binpazer_writer_block_compressed(
 
 /* Parses nested blocks out of a Group block's payload. Mirrors the Go
  * library's ParseGroupPayload, including its tolerance: trailing zero padding
- * ends the walk cleanly, and a bad child stops the walk with everything before
- * it intact. */
+ * ends the walk cleanly, and a bad child stops the walk with everything. This
+ * happens before it intact. */
 binpazer_status binpazer_group_parse(
     const void *payload, uint64_t payload_len,
     binpazer_group_child *out, size_t cap, size_t *count)
@@ -287,7 +281,7 @@ binpazer_status binpazer_group_parse(
     while (off < payload_len) {
         uint64_t rem = payload_len - off;
         if (rem < 8) {
-            /* Fewer than 8 bytes left: alignment padding if zero, junk if not. */
+            /* A bounded number of bytes left: alignment padding if zero, junk if not. */
             for (uint64_t i = 0; i < rem; i++)
                 if (p[off + i] != 0) { *count = n; return BINPAZER_ERR_FORMAT; }
             break;
@@ -325,8 +319,7 @@ binpazer_status binpazer_group_parse(
         off = next;
     }
     *count = n;
-    /* Same contract as binpazer_reader_find: a count larger than the buffer is
-     * reported, not truncated silently. Passing out=NULL, cap=0 counts. */
+    /* Same contract as binpazer_reader_find: a count larger than the buffer is reported, not truncated silently. */
     return n > cap ? BINPAZER_ERR_CAPACITY : BINPAZER_OK;
 }
 
@@ -361,10 +354,6 @@ binpazer_status binpazer_writer_end(binpazer_writer *w) {
         if (w_raw(w, ft, 16)) return (binpazer_status)w->err;
     }
     if (w->seek) {
-        /* A compressed block makes the file 1.1; the header claimed 1.0,
-         * having been written before the content was known. A writer that
-         * declared 1.1 or later up front needs no patch -- and must not be
-         * patched DOWN to 1.1. */
         if (w->used_compression && w->version_minor < BINPAZER_VERSION_MINOR_COMPRESSION) {
             if (w->seek(w->ctx, 14) != 0) return (binpazer_status)(w->err = BINPAZER_ERR_IO);
             uint8_t v[2]; put_u16(v, BINPAZER_VERSION_MINOR_COMPRESSION);
@@ -437,14 +426,12 @@ binpazer_status binpazer_reader_begin(
     uint8_t cc[8]; if (r_raw(r, cc, 8)) return (binpazer_status)r->err;
     uint32_t entry_count = get_u32(cc);
 
-    /* Each entry occupies at least 32 bytes on disk (20-byte header, 4-byte
-     * name length, empty name, NUL, padded to 8), so a count the table's own
-     * payload cannot hold is structurally invalid. */
+    /* Each entry occupies many bytes on disk (20-byte header, 4-byte name length, empty name, NUL, padded to a set
+     * limit), so a count the table's own payload cannot hold is structurally invalid. */
     if (btt_len < 8 || (uint64_t)entry_count * 32u > (uint64_t)btt_len - 8)
         return (binpazer_status)(r->err = BINPAZER_ERR_FORMAT);
     /* An undersized caller buffer is an error, not a silent truncation (the
-     * dropped types would later resolve as unknown). Report the required
-     * count so the caller can retry with a bigger buffer. */
+     * dropped types would later resolve as unknown). */
     if (entries && entry_count > entries_cap) {
         if (entries_count) *entries_count = entry_count;
         return (binpazer_status)(r->err = BINPAZER_ERR_CAPACITY);
@@ -584,8 +571,7 @@ binpazer_status binpazer_reader_stream_payload(
     if (has_crc) {
         uint8_t cb[4];
         if (r_raw(r, cb, 4)) return (binpazer_status)r->err;
-        /* Reported after the fact: a streaming reader cannot know the payload
-         * is intact until it has passed all of it on. */
+        /* Reported after the fact. */
         if (crc != get_u32(cb)) return (binpazer_status)(r->err = BINPAZER_ERR_CRC);
     }
     return r_advance_tail(r, blk);

@@ -50,19 +50,15 @@ func runUnpack(br *binpazer.Reader, outDir string) (*Manifest, error) {
 		})
 		i++
 	}
-	// Recorded after the walk: a non-seekable input only discovers the footer
-	// (and thus the index) when the walk reaches it.
+	// Recorded after the walk: a non-seekable input only discovers the footer.
 	m.Index = br.HasIndex()
 	return m, nil
 }
 
-// streamBlockToFile streams the block's payload straight to path (64 KiB
-// chunks, CRC verified when present) so no payload is ever buffered whole, and
-// returns the codec name for a compressed block ("" otherwise).
 //
-// A compressed block is written out DECODED: the file is named for the block's
-// payload, so envelope bytes in it would be a lie, and the manifest's `codec`
-// is what lets pack put the block back exactly as it was. On error the partial
+// A compressed block is written out DECODED. The file is named for the block's
+// payload. Envelope bytes in it would be a lie, and the manifest's `codec` is
+// what lets pack put the block back exactly as it was. On error the partial
 // file is removed.
 func streamBlockToFile(br *binpazer.Reader, b *binpazer.Block, path string) (string, error) {
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)

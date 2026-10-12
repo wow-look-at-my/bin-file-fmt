@@ -11,7 +11,7 @@ import (
 )
 
 // TestWritePayloadTo streams every sample block and expects the exact bytes
-// ReadPayload would have returned, including CRC verification on block 0.
+// ReadPayload would have returned, including CRC verification on one block.
 func TestWritePayloadTo(t *testing.T) {
 	br, err := NewReader(bytes.NewReader(sampleBytes(t)))
 	require.NoError(t, err)
@@ -41,8 +41,6 @@ func TestWritePayloadToCRCMismatch(t *testing.T) {
 	assert.True(t, errors.Is(err, ErrCRCMismatch), "got %v", err)
 }
 
-// TestWritePayloadToMultiChunk exercises the chunk loop with a payload larger
-// than one 64 KiB buffer, CRC-verified, plus a zero-length CRC block.
 func TestWritePayloadToMultiChunk(t *testing.T) {
 	payload := make([]byte, ioBufSize*3+12345)
 	for i := range payload {
@@ -83,7 +81,6 @@ func TestPayloadReader(t *testing.T) {
 	br, err := NewReader(bytes.NewReader(sampleBytes(t)))
 	require.NoError(t, err)
 
-	// Block 0 (mesh): consume only 4 bytes, then skip the rest.
 	b, err := br.Next()
 	require.NoError(t, err)
 	pr, err := br.PayloadReader(b)
@@ -94,7 +91,6 @@ func TestPayloadReader(t *testing.T) {
 	assert.Equal(t, meshPayload[:4], string(head))
 	require.NoError(t, br.SkipPayload(b)) // remainder + CRC + pad
 
-	// Block 1 (note): consume fully; the reader must end with a clean EOF.
 	b, err = br.Next()
 	require.NoError(t, err)
 	pr, err = br.PayloadReader(b)
@@ -107,7 +103,6 @@ func TestPayloadReader(t *testing.T) {
 	assert.Equal(t, io.EOF, err)
 	require.NoError(t, br.SkipPayload(b))
 
-	// Block 2 (big): after the skip above, Next must be positioned correctly.
 	b, err = br.Next()
 	require.NoError(t, err)
 	assert.Equal(t, uint64(len(bigPayload)), b.PayloadLen)
@@ -120,7 +115,7 @@ func TestPayloadReader(t *testing.T) {
 // ErrTruncated through the payload reader.
 func TestPayloadReaderTruncated(t *testing.T) {
 	full := sampleBytes(t)
-	cut := full[:sampleOffPayload1+4] // 4 of the 16 mesh payload bytes remain
+	cut := full[:sampleOffPayload1+4]
 	br, err := NewReader(nonSeeker{bytes.NewReader(cut)})
 	require.NoError(t, err)
 	b, err := br.Next()

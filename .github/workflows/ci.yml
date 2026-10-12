@@ -2,6 +2,11 @@ name: CI
 
 on:
   push:
+    branches: ['**']
+
+concurrency:
+  group: gha_${{ github.repository }}_${{ github.workflow }}_${{ github.ref != 'refs/heads/master' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 permissions:
   contents: read
@@ -21,23 +26,13 @@ jobs:
       - uses: wow-look-at-my/go-toolchain@master
         with:
           working-directory: go
-          # autorelease stays off so publishing waits for the whole CI --
-          # including the c-cpp job's cross-impl byte-identity check -- via
-          # the publish job below (same buildhost action, same naming).
+          # autorelease stays off so publishing waits for the whole CI -- including the c-cpp job's cross-impl byte-identity check. Via the publish job below (same buildhost action, same naming).
           autorelease: false
 
-      # Parity between implementations is a claim about DECODING, not about
-      # bytes: a real codec's encoder output is implementation-defined, so zlib
-      # and klauspost/compress are not expected to agree bit for bit (the
-      # byte-identity fixtures in c-cpp cover the uncompressed and `stored`
-      # cases, where they must). What has to hold is that each implementation
-      # reads what the other writes, for every codec in the registry -- so it
-      # is checked here, in both directions, rather than asserted in a doc.
+      # Parity between implementations is a claim about DECODING, not about bytes. A real codec's encoder output is implementation-defined, so zlib and klauspost/compress are not expected to agree bit for bit (the byte-identity fixtures in c-cpp cover the uncompressed and `stored` cases, where they must). What has to hold is that each implementation reads what the other writes, for every codec in the registry -- so it is checked here. That implementation is in both directions, rather than asserted in a doc.
       - name: Codec libraries for the C implementation
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential zlib1g-dev libzstd-dev liblz4-dev
-      # go-toolchain does not leave build/ in the workspace -- it hands the
-      # binaries off through the org cache (which is how the publish job gets
-      # them). Take the same hand-off rather than rebuilding the CLI.
+      # go-toolchain does not leave build/ in the workspace -- it hands the binaries off through the org cache (which is how the publish job gets them). Take the same hand-off rather than rebuilding the CLI.
       - uses: wow-look-at-my/actions@cache-download#latest
         with:
           name: go-build-go
@@ -99,12 +94,7 @@ jobs:
               core.info(`${codec}: C->Go and Go->C both decode`);
             }
 
-  # Publish the CLI matrix binaries to https://pazer.build. buildhost scopes a
-  # repo's OIDC token to the repo's own namespace, and the binary name
-  # (binpazer) differs from the repo name, so the action publishes it as the
-  # nested project "bin-file-fmt/binpazer" (auto-provisioned on first publish,
-  # git branch recorded on the release):
-  #   https://dl.pazer.build/bin-file-fmt/binpazer?branch=<branch>&os=<os>&arch=<arch>
+  # Publish the CLI matrix binaries to https://pazer.build. buildhost scopes a repo's OIDC token to the repo's own namespace, and the binary name (binpazer) differs from the repo name. The action publishes it as the nested project "bin-file-fmt/binpazer" (auto-provisioned on first publish, git branch recorded on the release): https://dl.pazer.build/bin-file-fmt/binpazer?branch=<branch>&os=<os>&arch=<arch>
   publish:
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     needs: [go, c-cpp]
@@ -116,10 +106,7 @@ jobs:
       actions: read # all-builds guard (embedded in buildhost-publish) scans this run's jobs
       checks: read # ... and the head commit's check runs
     steps:
-      # go-toolchain hands go/build off through the org cache, not a GHA
-      # artifact (org CI runs with artifact storage exhausted). It saves two
-      # hand-offs -- the per-job name plus the deprecated bare `go-build`
-      # alias -- so nameless discovery is ambiguous and the name is explicit.
+      # go-toolchain hands go/build off through the org cache, not a GHA artifact (org CI runs with artifact storage exhausted). It saves two hand-offs -- the per-job name plus the deprecated bare `go-build` alias -- so nameless discovery is ambiguous and the name is explicit.
       - uses: wow-look-at-my/actions@cache-download#latest
         with:
           name: go-build-go
@@ -134,8 +121,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Codec libraries
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential zlib1g-dev libzstd-dev liblz4-dev
-      # Each `make test` builds two binaries: the core one, which links nothing
-      # but libc and proves the core stayed dependency-free, and the codec one.
+      # Each `make test` builds two binaries: the core one, which links nothing but libc and proves the core stayed dependency-free, and the codec one.
       - name: C tests
         run: make -C c test
       - name: C++ tests

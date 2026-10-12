@@ -57,7 +57,7 @@ func assertFails(t *testing.T, res *validateResult, err error, rule string) {
 	assert.Equal(t, "fail", ruleStatusOf(t, res, rule).Status)
 }
 
-// validArchive builds a conformant two-block archive (block 0 carries a CRC).
+// validArchive builds a conformant two-block archive (one block carries a CRC).
 func validArchive(t *testing.T, withIndex bool) []byte {
 	t.Helper()
 	_, data := writeArchive(t, t.TempDir(), "valid.binpazer", func(bw *binpazer.Writer) {
@@ -67,8 +67,6 @@ func validArchive(t *testing.T, withIndex bool) []byte {
 			require.NoError(t, bw.WriteIndex())
 		}
 	})
-	// Guard the fixed offsets the corruption tests patch ("demo" writer,
-	// first block at 72, 4 BTT entries starting at 88).
 	require.EqualValues(t, 72, binary.LittleEndian.Uint64(data[40:]), "first_block_offset drifted")
 	require.EqualValues(t, 0, data[64], "writer_name NUL drifted")
 	require.EqualValues(t, binpazer.TypeBlockTypeTable, binary.LittleEndian.Uint16(data[72:]))
@@ -171,17 +169,16 @@ func TestValidateRuleReservedZero(t *testing.T) {
 
 	t.Run("block_flag_bits", func(t *testing.T) {
 		_, data := writeArchive(t, t.TempDir(), "flags.binpazer", func(bw *binpazer.Writer) {
-			require.NoError(t, bw.Block(1, 1<<7, []byte("x"))) // reserved bit 7
+			require.NoError(t, bw.Block(1, 1<<7, []byte("x"))) // reserved a later bit
 		})
 		res, err := validateJSON(t, data)
 		assertFails(t, res, err, ruleReservedZero)
 		assert.Contains(t, findRule(res, ruleReservedZero)[0].Detail, "reserved flag bits")
 	})
 
-	// Bit 5 is the lowest STILL-reserved flag bit (bit 2 became `compressed` in
-	// 1.1). Patch it into the has_crc block of an otherwise valid file,
-	// re-sealing the CRC the way a writer that set the bit would have (the
-	// CRC-32C covers the 8-byte header): the ONLY finding must be the reserved
+	// Patch it into the has_crc block of an otherwise valid file. That block
+	// is re-sealing the CRC the way a writer that set the bit would have (the
+	// CRC-32C covers the 8-byte header). The ONLY finding must be the reserved
 	// bit, not a CRC mismatch.
 	t.Run("reserved_flag_bit", func(t *testing.T) {
 		data := validArchive(t, false)
@@ -207,7 +204,7 @@ func TestValidateRuleReservedZero(t *testing.T) {
 		data := validArchive(t, true)
 		idx := indexOffsetOf(t, data)
 		data[idx+12] |= 0x01 // index payload reserved u32
-		data[idx+18] |= 0x01 // entry 0 reserved u16
+		data[idx+18] |= 0x01 // One entry reserved u16
 		res, err := validateJSON(t, data)
 		assertFails(t, res, err, ruleReservedZero)
 		assert.Len(t, findRule(res, ruleReservedZero), 2)
@@ -217,7 +214,6 @@ func TestValidateRuleReservedZero(t *testing.T) {
 func TestValidateRuleAlignment(t *testing.T) {
 	data := validArchive(t, true)
 	idx := indexOffsetOf(t, data)
-	// Entry 0's target offset: make it unaligned.
 	target := binary.LittleEndian.Uint64(data[idx+24:])
 	binary.LittleEndian.PutUint64(data[idx+24:], target+4)
 	res, err := validateJSON(t, data)
@@ -233,9 +229,7 @@ func TestValidateRuleLength(t *testing.T) {
 	})
 
 	t.Run("stream_ends_early", func(t *testing.T) {
-		// Cut the stream at the second block's boundary: a pipe cannot check
-		// the size up front, but the walk's clean-yet-early EOF must fire
-		// the end-of-blocks position check.
+		// Cut the stream at the second block's boundary: a pipe cannot check the size up front.
 		data := validArchive(t, false)
 		br, err := binpazer.NewReader(bytes.NewReader(data))
 		require.NoError(t, err)
@@ -258,7 +252,7 @@ func TestValidateRuleLength(t *testing.T) {
 func TestValidateRuleStringTerm(t *testing.T) {
 	data := validArchive(t, false)
 	data[64] = '!'  // writer_name terminator
-	data[126] = '!' // BTT entry 0 name terminator
+	data[126] = '!' // BTT one entry name terminator
 	res, err := validateJSON(t, data)
 	assertFails(t, res, err, ruleStringTerm)
 	assert.Len(t, findRule(res, ruleStringTerm), 2)
@@ -375,7 +369,7 @@ func TestValidateRuleCompressionEnvelope(t *testing.T) {
 func TestValidateRuleIndex(t *testing.T) {
 	t.Run("footer_points_at_wrong_block", func(t *testing.T) {
 		data := validArchive(t, true)
-		binary.LittleEndian.PutUint64(data[len(data)-16:], 72) // the BTT, type 65534
+		binary.LittleEndian.PutUint64(data[len(data)-16:], 72) // the BTT, a later type
 		res, err := validateJSON(t, data)
 		assertFails(t, res, err, ruleIndex)
 		assert.Contains(t, findRule(res, ruleIndex)[0].Detail, "not the Block Index")
@@ -384,7 +378,7 @@ func TestValidateRuleIndex(t *testing.T) {
 	t.Run("entry_claims_wrong_type", func(t *testing.T) {
 		data := validArchive(t, true)
 		idx := indexOffsetOf(t, data)
-		binary.LittleEndian.PutUint16(data[idx+16:], 42) // entry 0: type 1 -> 42
+		binary.LittleEndian.PutUint16(data[idx+16:], 42) // One entry: one type -> 42
 		res, err := validateJSON(t, data)
 		assertFails(t, res, err, ruleIndex)
 		assert.Contains(t, findRule(res, ruleIndex)[0].Detail, "claims type 42")
@@ -404,8 +398,7 @@ func TestValidateRuleStructure(t *testing.T) {
 	res, err := validateJSON(t, data[:len(data)-4]) // cut into the final block
 	require.Error(t, err)
 	assert.False(t, res.OK)
-	// Either the walk or the size check must catch it; the walk's finding is
-	// the structural one.
+	// Either the walk or the size check must catch it; the walk's finding is the structural one.
 	assert.NotEmpty(t, res.Findings)
 }
 

@@ -2,12 +2,11 @@
 // Header-only. Links against the C core (binpazer.c); no file IO, no mmap --
 // the caller injects IO via std::function callbacks.
 //
-// Requires C++17. Depends only on the standard library, binpazer.h and
-// binpazer_codec.h. The codec entry points (compress, decompress,
-// Writer::compress_block, Reader::read_payload_decompressed) additionally need
-// binpazer_codec.c and its libraries at LINK time -- and only if you call
-// them: they are inline, so a program that never compresses links the core
-// alone, exactly as before.
+// Depends only on the standard library, binpazer.h and binpazer_codec.h. The
+// codec entry points (compress, decompress, Writer::compress_block,
+// Reader::read_payload_decompressed) additionally need binpazer_codec.c and
+// its libraries at LINK time -- and only if you call them. They are inline, so
+// a program that never compresses links the core alone, exactly as before.
 #ifndef BINPAZER_HPP
 #define BINPAZER_HPP
 
@@ -103,15 +102,13 @@ inline std::optional<std::vector<uint8_t>> decompress(const Compression &c, cons
     return out;
 }
 
-// Canonical UUID text for a GUID (8-4-4-4-12, lowercase hex).
 inline std::string to_string(const Guid &g) {
     char buf[BINPAZER_GUID_STRING_SIZE];
     if (binpazer_guid_format(&g, buf, sizeof buf) != BINPAZER_OK) return {};
     return std::string(buf);
 }
 
-// Parses canonical UUID text; hyphens optional. nullopt when it is not 32 hex
-// digits.
+// Parses canonical UUID text; hyphens optional.
 inline std::optional<Guid> parse_guid(std::string_view s) {
     Guid g{};
     if (binpazer_guid_parse(std::string(s).c_str(), &g) != BINPAZER_OK) return std::nullopt;
@@ -160,11 +157,11 @@ inline int    tramp_seek(void *c, uint64_t o)              { return static_cast<
 class Writer {
 public:
     // Writes the file header and Block Type Table immediately. Do not include
-    // type id 65534 in `defs`; the table entry is added automatically.
+    // type a later id in `defs`; the table entry is added automatically.
     //
     // `version_minor` declares a minor version in the header up front. The one
     // reason to set it: a compressed block normally raises the version by
-    // back-patching the header at end(), which needs a seek callback -- pass
+    // back-patching the header at end(). Which needs a seek callback -- pass
     // BINPAZER_VERSION_MINOR_COMPRESSION and a STREAMING writer can compress
     // too.
     Writer(WriteFn write, const Guid &writer_guid, std::string_view name,
@@ -255,7 +252,7 @@ private:
 class Reader {
 public:
     // Type ids are 16-bit, so no conformant Block Type Table can hold more
-    // distinct entries than this; larger declared counts are rejected as
+    // distinct entries than this. Larger declared counts are rejected as
     // Status::ErrCapacity instead of being allocated for.
     static constexpr size_t kMaxTypeEntries = 65536;
 

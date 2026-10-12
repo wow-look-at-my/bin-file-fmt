@@ -15,21 +15,21 @@ import (
 // the checklist implies (CRC trailers, footer/index consistency, general
 // parseability).
 const (
-	ruleMagic          = "magic"                 // magic and signature match exactly
-	ruleFirstBlockBTT  = "first_block_btt"       // the first block is type_id 65534
-	ruleBTTDupID       = "btt_dup_type_id"       // no duplicate type_id in the BTT
-	ruleBTTInvalidID   = "btt_invalid_type_id"   // the BTT never contains 0 or 65535
-	ruleBlockInvalidID = "block_invalid_type_id" // block headers never use 0 or 65535
-	ruleUnknownTypeID  = "unknown_type_id"       // every block's type_id is in the table (predefined ids exempt)
-	ruleReservedZero   = "reserved_nonzero"      // reserved fields and flag bits are 0
-	ruleAlignment      = "alignment"             // blocks start 8-byte aligned
-	ruleLength         = "length_mismatch"       // file_length matches the input; the last block ends at it
-	ruleStringTerm     = "string_term"           // a string's byte_length bytes are followed by 0x00
-	ruleStringUTF8     = "string_utf8"           // string data is valid UTF-8
-	ruleCRC            = "crc"                   // stored CRC-32C trailers match
-	ruleIndex          = "index"                 // the footer and Block Index point at real blocks of the claimed types
-	ruleEnvelope       = "compression_envelope"  // a compressed block carries a whole, well-formed Compression Envelope
-	ruleStructure      = "structure"             // the input parses: no truncation, capacity, or version problems
+	ruleMagic          = "magic" // magic and signature match exactly
+	ruleFirstBlockBTT  = "first_block_btt"
+	ruleBTTDupID       = "btt_dup_type_id" // no duplicate type_id in the BTT
+	ruleBTTInvalidID   = "btt_invalid_type_id"
+	ruleBlockInvalidID = "block_invalid_type_id"
+	ruleUnknownTypeID  = "unknown_type_id" // every block's type_id is in the table (predefined ids exempt)
+	ruleReservedZero   = "reserved_nonzero"
+	ruleAlignment      = "alignment"            // blocks start 8-byte aligned
+	ruleLength         = "length_mismatch"      // file_length matches the input; the last block ends at it
+	ruleStringTerm     = "string_term"          // a string's byte_length bytes are followed by 0x00
+	ruleStringUTF8     = "string_utf8"          // string data is valid UTF-8
+	ruleCRC            = "crc"                  // stored CRC-32C trailers match
+	ruleIndex          = "index"                // the footer and Block Index point at real blocks of the claimed types
+	ruleEnvelope       = "compression_envelope" // a compressed block carries a whole, well-formed Compression Envelope
+	ruleStructure      = "structure"            // the input parses: no truncation, capacity, or version problems
 )
 
 // allRules lists every rule in report order.
@@ -40,8 +40,6 @@ var allRules = []string{
 	ruleStructure,
 }
 
-// knownFlagsMask covers the five defined block flag bits (bit 2 is
-// `compressed`, defined in 1.1); the rest are reserved and must be 0.
 const knownFlagsMask = binpazer.FlagCritical | binpazer.FlagSafeToCopy |
 	binpazer.FlagCompressed | binpazer.FlagHasCRC | binpazer.FlagLargeMode
 
@@ -124,8 +122,7 @@ func (v *validator) fatalInit(err error) {
 	}
 }
 
-// bttChecks validates the Block Type Table's ids: no duplicates, never 0 or
-// 65535. Works on streams (the table is already parsed).
+// Works on streams (the table is already parsed).
 func (v *validator) bttChecks(br *binpazer.Reader) {
 	seen := map[uint16]int{}
 	for i, t := range br.Types {
@@ -185,17 +182,12 @@ func (v *validator) walk(br *binpazer.Reader) (indexBlockSeen, clean bool) {
 		if b.TypeID == binpazer.TypeBlockIndex {
 			indexBlockSeen = true
 		}
-		// A compressed block must carry a whole, well-formed envelope. Only the
-		// envelope HEADER is inspected: validation is about the file's
-		// structure, and decoding would need a codec this build may not have.
-		// The header rides along with the payload stream, so a compressed
-		// block costs one pass whether or not it also carries a CRC.
+		// A compressed block must carry a whole, well-formed envelope.
 		var env *headCapture
 		if b.Flags&binpazer.FlagCompressed != 0 {
 			env = &headCapture{}
 		}
-		// Stream CRC-carrying payloads through the checksum in 64 KiB
-		// chunks; skip the rest without reading. Nothing is buffered.
+		// Nothing is buffered.
 		if b.Flags&binpazer.FlagHasCRC != 0 || env != nil {
 			var sink io.Writer = io.Discard
 			if env != nil {
@@ -220,9 +212,7 @@ func (v *validator) walk(br *binpazer.Reader) (indexBlockSeen, clean bool) {
 	}
 }
 
-// headCapture keeps the first bytes written through it and discards the rest,
-// so a payload can be streamed (for the CRC) while its envelope header is
-// captured, with nothing buffered.
+// headCapture keeps the first bytes written through it and discards the rest.
 type headCapture struct {
 	head [32]byte
 	n    int
@@ -235,11 +225,8 @@ func (h *headCapture) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// envelopeChecks validates a compressed block's Compression Envelope header
-// against SPEC.md: a whole header must be present, the codec id must not be 0,
-// and the envelope's reserved fields must be 0. An unassigned codec id is a
-// file from a later revision, not a violation -- and is deliberately not
-// reported as one.
+// An unassigned codec id is a file from a later revision, not a violation --
+// and is deliberately not reported as one.
 func (v *validator) envelopeChecks(b *binpazer.Block, n int, head []byte) {
 	off := b.Offset()
 	if len(head) < 16 {
@@ -262,8 +249,8 @@ func (v *validator) envelopeChecks(b *binpazer.Block, n int, head []byte) {
 }
 
 // lengthChecks compares file_length against the real input size (seekable
-// only) and, after a clean walk, against where the blocks actually ended.
-// The streaming sentinel exempts both (SPEC.md).
+// only) and, after a clean walk, against where the blocks ended. The
+// streaming sentinel exempts both (SPEC.md).
 func (v *validator) lengthChecks(br *binpazer.Reader, clean bool) {
 	if br.FileLength == binpazer.FileLengthUnknown {
 		return
@@ -279,8 +266,7 @@ func (v *validator) lengthChecks(br *binpazer.Reader, clean bool) {
 	if !clean {
 		return // the walk already failed; the end position is meaningless
 	}
-	// Seekable readers stop right before a footer (file_length-16); a stream
-	// discovers and consumes the footer, landing exactly at file_length.
+	// Seekable readers stop right before a footer (file_length-16).
 	end := br.Offset()
 	want := br.FileLength
 	if br.HasIndex() && end == want-16 {

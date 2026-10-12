@@ -2,10 +2,7 @@ package binpazer
 
 // Buffer-to-buffer codec entry points -- the base layer every other
 // compression path is built on, here and in the C implementation
-// (binpazer_compress / binpazer_decompress). The caller owns the destination,
-// so nothing here allocates the result: size a destination with
-// CompressBound, or use the allocating wrappers below when convenience beats
-// control.
+// (binpazer_compress / binpazer_decompress).
 
 import (
 	"bytes"
@@ -14,8 +11,7 @@ import (
 )
 
 // LookupCodec returns the codec registered for a registry id and whether one
-// is available -- the question a caller asks before offering a format, or
-// after ErrCodecUnavailable. Mirrors binpazer_codec_lookup in C.
+// is available -- the question.
 func LookupCodec(codecID uint16) (Codec, bool) {
 	c, err := lookupCodec(Compression{CodecID: codecID})
 	return c, err == nil
@@ -27,8 +23,6 @@ func LookupCodecGUID(g GUID) (Codec, bool) {
 	return c, err == nil
 }
 
-// CompressBound reports a worst-case encoded size for srcLen bytes under a
-// registry codec, or 0 when the codec is unavailable.
 func CompressBound(codecID uint16, srcLen int) int {
 	codec, err := lookupCodec(Compression{CodecID: codecID})
 	if err != nil {
@@ -79,7 +73,7 @@ func compressInto(c Compression, dst, src []byte) (int, error) {
 
 // DecompressInto decodes an envelope's codec bytes into dst and returns the
 // decoded length. c.UncompressedLen is authoritative: a codec that yields any
-// other length is corruption, which is also what keeps a decompression bomb
+// other length is corruption. This is also what keeps a decompression bomb
 // bounded by a buffer the caller chose.
 func DecompressInto(c Compression, dst, stored []byte) (int, error) {
 	codec, err := lookupCodec(c)
@@ -105,8 +99,7 @@ func DecompressInto(c Compression, dst, stored []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	// One more read: a codec with bytes left over decodes to more than the
-	// envelope declares, which is the same corruption seen from the other side.
+	// One more read: a codec with bytes left over decodes to more than the envelope declares.
 	var probe [1]byte
 	if extra, _ := r.Read(probe[:]); extra > 0 {
 		return 0, fmt.Errorf("binpazer: decoded payload exceeds the envelope's %d bytes: %w",
@@ -140,9 +133,7 @@ func compressAlloc(c Compression, src []byte) ([]byte, error) {
 }
 
 // Decompress is DecompressInto with the destination allocated from the
-// envelope's declared length. Prefer DecompressInto when the length comes from
-// an untrusted file and you want to cap the allocation yourself; Reader's
-// decompressing entry points do that for you.
+// envelope's declared length.
 func Decompress(c Compression, stored []byte) ([]byte, error) {
 	dst := make([]byte, c.UncompressedLen)
 	n, err := DecompressInto(c, dst, stored)

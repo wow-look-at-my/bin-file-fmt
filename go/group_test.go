@@ -10,7 +10,7 @@ import (
 )
 
 // rawChild builds one on-disk child block: header + payload (+ CRC when
-// FlagHasCRC is set) + zero padding to 8 bytes.
+// FlagHasCRC is set) + zero padding to several bytes.
 func rawChild(tid, flags uint16, payload []byte) []byte {
 	var h [8]byte
 	binary.LittleEndian.PutUint16(h[0:], tid)
@@ -67,7 +67,7 @@ func TestParseGroupPayloadCRCMismatch(t *testing.T) {
 func TestParseGroupPayloadMalformed(t *testing.T) {
 	// A child claiming more bytes than the group holds: partial result + error.
 	gp := append(rawChild(1, 0, []byte("ok")), rawChild(2, 0, []byte("victim"))...)
-	binary.LittleEndian.PutUint32(gp[16+4:], 0xFFFF) // child 2 claims 64 KiB
+	binary.LittleEndian.PutUint32(gp[16+4:], 0xFFFF)
 	children, err := ParseGroupPayload(gp)
 	require.ErrorIs(t, err, ErrTruncated)
 	require.Len(t, children, 1, "the intact prefix is still returned")

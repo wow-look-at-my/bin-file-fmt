@@ -1,19 +1,4 @@
-/* Cross-implementation interop harness.
- *
- * Byte-identical output is only guaranteed for uncompressed files and the
- * `stored` codec -- a real codec's encoder output is implementation-defined,
- * so zlib and klauspost/compress will not agree bit for bit and never had to.
- * What DOES have to hold is that every implementation can DECODE what every
- * other one writes. This tool is the C half of that check: it writes one file
- * per registry codec for the Go CLI to read, and verifies files the Go CLI
- * wrote.
- *
- *   interop payload <file>   write the canonical payload (both sides compare
- *                            against this, so there is one definition of it)
- *   interop write <dir>      write <dir>/c-<codec>.binpazer for each codec
- *   interop read <file>      decode block type 1 and check it against the
- *                            canonical payload; nonzero exit on mismatch
- */
+/* Cross-implementation interop harness. */
 #include "binpazer_codec.h"
 
 #include <stdio.h>
