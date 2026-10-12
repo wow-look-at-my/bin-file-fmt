@@ -1,6 +1,6 @@
 module github.com/wow-look-at-my/bin-file-fmt/go
 
-go 1.24
+go 1.26
 
 require (
 	github.com/klauspost/compress v1.19.1
@@ -8,6 +8,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.9
 	github.com/stretchr/testify v1.11.1
+	github.com/wow-look-at-my/go-containers v0.0.0
 )
 
 require (

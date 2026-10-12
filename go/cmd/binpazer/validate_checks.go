@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	binpazer "github.com/wow-look-at-my/bin-file-fmt/go"
+	"github.com/wow-look-at-my/go-containers/set"
 )
 
 // Rule ids, one per item of SPEC.md's "Validation" checklist plus the checks
@@ -83,9 +84,9 @@ func (v *validator) skip(rule, reason string) { v.skipped[rule] = reason }
 // finish materializes the per-rule statuses: fail when the rule has a
 // finding, else the recorded skip, else pass.
 func (v *validator) finish() *validateResult {
-	failed := map[string]bool{}
+	failed := set.New[string]()
 	for _, f := range v.findings {
-		failed[f.Rule] = true
+		failed.Add(f.Rule)
 	}
 	res := &validateResult{Findings: v.findings, OK: len(v.findings) == 0}
 	if res.Findings == nil {
@@ -93,7 +94,7 @@ func (v *validator) finish() *validateResult {
 	}
 	for _, r := range allRules {
 		st := ruleStatus{Rule: r, Status: "pass"}
-		if failed[r] {
+		if failed.Contains(r) {
 			st.Status = "fail"
 		} else if reason, ok := v.skipped[r]; ok {
 			st.Status = "skipped"
