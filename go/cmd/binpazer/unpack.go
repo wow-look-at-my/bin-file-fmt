@@ -55,7 +55,6 @@ func runUnpack(br *binpazer.Reader, outDir string) (*Manifest, error) {
 	return m, nil
 }
 
-//
 // A compressed block is written out DECODED. The file is named for the block's
 // payload. Envelope bytes in it would be a lie, and the manifest's `codec` is
 // what lets pack put the block back exactly as it was. On error the partial
