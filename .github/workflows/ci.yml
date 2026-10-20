@@ -9,6 +9,7 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 permissions:
+  id-token: write
   contents: read
 
 jobs:
@@ -23,7 +24,7 @@ jobs:
       artifact-metadata: write
     steps:
       - uses: actions/checkout@v4
-      - uses: wow-look-at-my/go-toolchain@master
+      - uses: wow-look-at-my/go-toolchain@lkgb
         with:
           working-directory: go
           # autorelease stays off so publishing waits for the whole CI -- including the c-cpp job's cross-impl byte-identity check. Via the publish job below (same buildhost action, same naming).
@@ -111,7 +112,7 @@ jobs:
         with:
           name: go-build-go
           path: build
-      - uses: wow-look-at-my/buildhost/.github/actions/buildhost-publish@master
+      - uses: wow-look-at-my/buildhost/.github/actions/buildhost-publish@lkgb
         with:
           path: build
 

@@ -88,7 +88,7 @@ int main() {
     auto b4 = r.next();
     CHECK(!b4.has_value() && r.ok(), "clean end");
 
-    // --- Block Index: write with an index, discover it, find + at ---
+    // --- Block Index: write with an index, discover it. ---
     {
         std::vector<uint8_t> ibuf;
         size_t ip = 0;
