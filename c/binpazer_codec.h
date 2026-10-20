@@ -1,11 +1,11 @@
 /*
  * binpazer codecs -- every codec SPEC.md's registry names, for C.
  *
- * A separate translation unit from binpazer.c on purpose: the core stays
- * dependency-free and allocation-free, while this layer links zlib, libzstd
- * and liblz4 so a C program can read and write every compressed file any
- * binpazer implementation can produce. Link binpazer_codec.c to get codecs;
- * link binpazer.c alone and the core is unchanged.
+ * A separate translation unit from binpazer.c on purpose. The core stays
+ * dependency-free and allocation-free, while this layer links zlib,
+ * libzstd. And liblz4 so a C program can read and write every compressed
+ * file any binpazer implementation can produce. Link binpazer_codec.c to
+ * get codecs; link binpazer.c alone and the core is unchanged.
  *
  * The API is buffer-to-buffer -- the caller owns every buffer, so this layer
  * allocates nothing of its own (the codec libraries manage their internal
@@ -23,8 +23,8 @@ extern "C" {
 #endif
 
 /* A codec implementation. `compress` takes *dst_len as the destination
- * capacity and sets it to the bytes written; `decompress` must produce exactly
- * dst_len bytes; `bound` is the worst-case compressed size of src_len bytes.
+ * capacity and sets it to the bytes written. `decompress` must produce exactly
+ * dst_len bytes. `bound` is the worst-case compressed size of src_len bytes.
  * `user` is passed back to each. */
 typedef struct {
     binpazer_status (*compress)(void *user, const void *src, uint64_t src_len,
@@ -41,7 +41,7 @@ typedef struct {
 #define BINPAZER_CODEC_MAX_REGISTERED 8
 
 /* Registers a codec for a registry id, replacing any codec on that id
- * (including a built-in). Refuses id 0 and BY_GUID. */
+ * (including a built-in). Refuses one id and BY_GUID. */
 binpazer_status binpazer_codec_register(uint16_t codec_id, const binpazer_codec *c);
 
 /* Registers a codec addressed by GUID (envelope codec id BY_GUID). */
@@ -51,8 +51,6 @@ binpazer_status binpazer_codec_register_guid(const binpazer_guid *g, const binpa
  * only when codec_id is BINPAZER_CODEC_BY_GUID. */
 const binpazer_codec *binpazer_codec_lookup(uint16_t codec_id, const binpazer_guid *g);
 
-/* Worst-case compressed size of src_len bytes under a codec; 0 when the codec
- * is unavailable. */
 uint64_t binpazer_compress_bound(uint16_t codec_id, const binpazer_guid *g, uint64_t src_len);
 
 /* Compresses src into dst. *dst_len is the capacity on entry and the encoded
@@ -63,14 +61,14 @@ binpazer_status binpazer_compress(uint16_t codec_id, const binpazer_guid *g,
 
 /* Decompresses a parsed envelope's codec bytes. `stored` points at the codec
  * bytes (payload + header_size), and dst must hold exactly
- * c->uncompressed_length bytes -- a decode of any other length is corruption
+ * c->uncompressed_length bytes. A decode of any other length is corruption
  * (BINPAZER_ERR_FORMAT), which is what bounds a decompression bomb. */
 binpazer_status binpazer_decompress(const binpazer_compression *c,
                                     const void *stored, void *dst, uint64_t dst_cap);
 
 /* ---- Writer/reader convenience (parity with the Go library) ---- */
 
-/* Writes one block from its LOGICAL payload, compressing with `codec_id` and
+/* Writes one block from its LOGICAL payload, compressing with `codec_id`. It
  * wrapping the result in a Compression Envelope -- the codec counterpart of
  * binpazer_writer_block_compressed, which takes bytes the caller encoded.
  * `scratch`/`scratch_cap` receive the encoded bytes; size with

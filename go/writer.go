@@ -18,10 +18,7 @@ type Writer struct {
 	idx         []IndexEntry // recorded as blocks are written
 	indexOffset uint64
 	wroteIndex  bool
-	// versionMinor is what the header declares; usedCompression records that
-	// the content has outgrown it. A file declares the lowest minor version its
-	// content requires, so a file with no 1.1 feature stays byte-identical to
-	// what a 1.0 writer produced.
+	// versionMinor is what the header declares; usedCompression records that the content has outgrown it.
 	versionMinor    uint16
 	usedCompression bool
 }
@@ -58,7 +55,6 @@ func (bw *Writer) pad(n uint64) {
 func (bw *Writer) writeBTTEntry(typeID uint16, guid GUID, name string) {
 	var hdr [20]byte
 	binary.LittleEndian.PutUint16(hdr[0:], typeID)
-	// entry_flags (hdr[2:4]) = 0
 	copy(hdr[4:20], guid[:])
 	bw.write(hdr[:])
 	var lp [4]byte
@@ -71,19 +67,15 @@ func (bw *Writer) writeBTTEntry(typeID uint16, guid GUID, name string) {
 }
 
 // NewWriter writes the file header and the Block Type Table, then returns a
-// Writer ready for Block calls. If w implements io.Seeker, the exact file length
-// is back-patched by End; otherwise the streaming sentinel is used.
-//
-// The header declares version 1.0. Writing a compressed block raises it to 1.1,
-// back-patched by End; a non-seekable destination cannot be back-patched, so
-// there the version must be declared up front with NewWriterVersion.
+// Writer ready for Block calls.
 func NewWriter(w io.Writer, writerGUID GUID, name string, defs []TypeDef) (*Writer, error) {
 	return NewWriterVersion(w, writerGUID, name, defs, VersionMinor)
 }
 
-// NewWriterVersion is NewWriter with an explicit header version_minor, for a
-// non-seekable destination whose content will use a feature from a later minor
-// revision (compressed blocks: VersionMinorCompression).
+// NewWriterVersion is NewWriter with an explicit header version_minor. That
+// NewWriterVersion is for a non-seekable destination whose content will use a
+// feature from a later minor revision (compressed blocks:
+// VersionMinorCompression).
 func NewWriterVersion(w io.Writer, writerGUID GUID, name string, defs []TypeDef, versionMinor uint16) (*Writer, error) {
 	bw := &Writer{dst: w, w: bufio.NewWriterSize(w, ioBufSize), versionMinor: versionMinor}
 	if s, ok := w.(io.Seeker); ok {
@@ -137,8 +129,7 @@ func NewWriterVersion(w io.Writer, writerGUID GUID, name string, defs []TypeDef,
 	return bw, bw.err
 }
 
-// Block writes one block. If flags has FlagLargeMode, len(payload) must be a
-// multiple of 4096 (the on-disk length field stores len/4096).
+// Block writes one block.
 func (bw *Writer) Block(typeID, flags uint16, payload []byte) error {
 	if bw.err != nil {
 		return bw.err
@@ -182,8 +173,7 @@ func (bw *Writer) Block(typeID, flags uint16, payload []byte) error {
 	return bw.err
 }
 
-// Offset returns the number of bytes written so far, i.e. the file offset where
-// the next block will start. Record it before Block to index that block.
+// Offset returns the number of bytes written so far, i.e. the file offset where the next block will start.
 func (bw *Writer) Offset() uint64 { return bw.off }
 
 // WriteIndex writes a Block Index covering every block written so far. Call it
@@ -242,8 +232,6 @@ func (bw *Writer) End() error {
 		return bw.err
 	}
 	if bw.seeker != nil {
-		// Raise the declared version first: a compressed block makes the file
-		// 1.1, and the header was written before the content was known.
 		if bw.usedCompression && bw.versionMinor < VersionMinorCompression {
 			if _, err := bw.seeker.Seek(14, io.SeekStart); err != nil {
 				bw.err = err

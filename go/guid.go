@@ -6,7 +6,6 @@ import (
 	"strings"
 )
 
-// String formats the GUID as a canonical UUID (8-4-4-4-12 lowercase hex).
 func (g GUID) String() string {
 	h := hex.EncodeToString(g[:])
 	return fmt.Sprintf("%s-%s-%s-%s-%s", h[0:8], h[8:12], h[12:16], h[16:20], h[20:32])

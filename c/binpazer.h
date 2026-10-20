@@ -18,13 +18,11 @@
 extern "C" {
 #endif
 
-#define BINPAZER_MAGIC          "binpazer"   /* 8 bytes */
+#define BINPAZER_MAGIC          "binpazer"   /* Several bytes */
 #define BINPAZER_VERSION_MAJOR  1
 #define BINPAZER_VERSION_MINOR  0
 #define BINPAZER_FILE_LENGTH_UNKNOWN  0xFFFFFFFFFFFFFFFFULL
 
-/* Block type ids: 0 and 65535 are invalid; user types ascend from 1;
- * predefined types descend from 65534. */
 #define BINPAZER_TYPE_INVALID          0
 #define BINPAZER_TYPE_INVALID_MAX      65535
 #define BINPAZER_TYPE_BLOCK_TYPE_TABLE 65534
@@ -33,12 +31,9 @@ extern "C" {
 #define BINPAZER_TYPE_PADDING          65531
 #define BINPAZER_TYPE_GROUP            65530
 
-/* large_mode (flag bit 4): `length` counts units of this many bytes (one page),
- * raising the per-block cap from 4 GiB to (2^32-1)*4096 (~16 TiB). */
 #define BINPAZER_LARGE_UNIT 4096
 
-/* Block flag bits (the 16-bit `flags` field). Bits 5.. are reserved, must be 0,
- * and readers MUST ignore ones they do not know. */
+/* Block flag bits (the 16-bit `flags` field). */
 enum {
     /* An unknown block type here is fatal: stop, the file needs a feature you
      * lack. Clear (ancillary) means an unknown block is safe to skip. */
@@ -54,8 +49,6 @@ enum {
      * payload, before the alignment padding. It covers the bytes on disk, so
      * for a compressed block that is the envelope, before any codec runs. */
     BINPAZER_FLAG_HAS_CRC      = 1u << 3,
-    /* `length` counts 4096-byte units instead of bytes, raising the per-block
-     * cap from 4 GiB to ~16 TiB at 4096-byte granularity. */
     BINPAZER_FLAG_LARGE_MODE   = 1u << 4
 };
 
@@ -65,7 +58,7 @@ enum {
 /* Codec ids from SPEC.md's registry. This library carries no codec code: it
  * reads and writes the envelope, and the caller supplies the codec bytes. That
  * is what keeps it dependency-free -- BINPAZER_CODEC_STORED needs no codec at
- * all, so a well-formed compressed block is always writable from here. */
+ * all. A well-formed compressed block is always writable from here. */
 enum {
     BINPAZER_CODEC_INVALID = 0,
     BINPAZER_CODEC_STORED  = 1,     /* identity: codec bytes are the payload */
@@ -81,16 +74,9 @@ enum {
 
 typedef struct { uint8_t bytes[16]; } binpazer_guid;
 
-/* The well-known GUID of the Block Type Table (62696e70-617a-6572-0000-...0001). */
 extern const binpazer_guid BINPAZER_GUID_BLOCK_TYPE_TABLE;
 
-/*
- * IO callbacks (fread/fwrite-style):
- *   read  returns the number of bytes read   (< n means EOF/short)
- *   write returns the number of bytes written (< n means error)
- *   seek  is optional (may be NULL); absolute offset from the start; 0 == ok.
- * The opaque `ctx` is passed back to each callback.
- */
+/*The opaque `ctx` is passed back to each callback. */
 typedef size_t (*binpazer_read_fn)(void *ctx, void *buf, size_t n);
 typedef size_t (*binpazer_write_fn)(void *ctx, const void *buf, size_t n);
 typedef int    (*binpazer_seek_fn)(void *ctx, uint64_t offset);
@@ -118,13 +104,11 @@ typedef struct {
     int               err;    /* sticky error (binpazer_status) */
     uint64_t          index_offset; /* offset of the Block Index block, once written */
     int               wrote_index;
-    int               used_compression; /* a compressed block was written: file is 1.1 */
+    int               used_compression; /* */
     uint16_t          version_minor;    /* as declared in the header at begin */
 } binpazer_writer;
 
-/* One block-type-table entry supplied by the caller. Use user ids (1, 2, ...);
- * do not use predefined ids (65531..65534). The Block Type Table's own entry
- * (65534) is added automatically. */
+/* One block-type-table entry supplied by the caller. */
 typedef struct {
     uint16_t       type_id;
     binpazer_guid  guid;
@@ -141,8 +125,8 @@ binpazer_status binpazer_writer_begin(
 /* binpazer_writer_begin declaring a specific minor version in the header
  * instead of BINPAZER_VERSION_MINOR. The one reason to use it: a compressed
  * block normally raises the version by back-patching the header at end, which
- * needs a seek callback -- declare BINPAZER_VERSION_MINOR_COMPRESSION here and
- * a STREAMING writer (no seek) can write compressed blocks too. Declaring a
+ * needs a seek callback. Declare BINPAZER_VERSION_MINOR_COMPRESSION here and a
+ * STREAMING writer (no seek) can write compressed blocks too. Declaring a
  * version whose features the file does not use is legal but pointless: it just
  * turns readers away. */
 binpazer_status binpazer_writer_begin_version(
@@ -151,19 +135,16 @@ binpazer_status binpazer_writer_begin_version(
     const binpazer_guid *writer_guid, const char *writer_name,
     const binpazer_type_def *defs, size_t ndefs, uint16_t version_minor);
 
-/* Writes one block. `payload` may be NULL iff payload_len == 0.
- * If `flags` has LARGE_MODE, payload_len is the byte length and must be a
- * multiple of BINPAZER_LARGE_UNIT (4096); the length field stores the unit count. */
+/* Writes one block. */
 binpazer_status binpazer_writer_block(
     binpazer_writer *w, uint16_t type_id, uint16_t flags,
     const void *payload, uint64_t payload_len);
 
-/* ---- Compression (SPEC.md "Compression", 1.1) ---- */
 
 /* A block's Compression Envelope: what codec produced the stored bytes, and
  * how many bytes they decode to. */
 typedef struct {
-    uint16_t      codec_id;            /* BINPAZER_CODEC_*; 0 is invalid */
+    uint16_t      codec_id;            /* */
     binpazer_guid codec_guid;          /* only when codec_id == BY_GUID */
     uint64_t      uncompressed_length; /* authoritative decoded size */
     uint64_t      stored_length;       /* codec bytes, i.e. payload - header */
@@ -174,11 +155,7 @@ typedef struct {
  * `stored`/`stored_len` -- bytes the CALLER has already encoded with the named
  * codec (for BINPAZER_CODEC_STORED they are the payload itself). The
  * BINPAZER_FLAG_COMPRESSED flag is added to `flags`. `codec_guid` is used only
- * when codec_id is BINPAZER_CODEC_BY_GUID and may otherwise be NULL.
- *
- * A compressed block makes the file 1.1, and the header was already written,
- * so this requires a seek callback to back-patch version_minor in
- * binpazer_writer_end; without one it returns BINPAZER_ERR_NOSEEK. */
+ * when codec_id is BINPAZER_CODEC_BY_GUID and may otherwise be NULL. */
 binpazer_status binpazer_writer_block_compressed(
     binpazer_writer *w, uint16_t type_id, uint16_t flags,
     uint16_t codec_id, const binpazer_guid *codec_guid,
@@ -193,8 +170,7 @@ binpazer_status binpazer_compression_parse(
     const void *payload, uint64_t payload_len, binpazer_compression *out);
 
 /* Finishes the file. Patches file_length when a seek callback is available;
- * otherwise file_length stays the streaming sentinel. When a compressed block
- * was written, version_minor is patched to 1.1 at the same time. */
+ * otherwise file_length stays the streaming sentinel. */
 binpazer_status binpazer_writer_end(binpazer_writer *w);
 
 /* ---- Reading ---- */
@@ -224,14 +200,14 @@ typedef struct {
     uint16_t      flags;
     uint64_t      payload_len;     /* in bytes, already decoded from large_mode */
     binpazer_guid guid;            /* resolved from the type table (zero if unknown) */
-    int           known;           /* 1 if type_id was found in the table */
+    int           known;           /* */
     uint64_t      payload_offset;
 } binpazer_block;
 
 /* Reads and validates the file header and the Block Type Table. The table is
  * copied into `entries`; `*entries_count` receives the number stored. If
  * `entries` is non-NULL and the table holds more than `entries_cap` entries,
- * BINPAZER_ERR_CAPACITY is returned (nothing is stored) and `*entries_count`
+ * BINPAZER_ERR_CAPACITY is returned (nothing is stored). `*entries_count`
  * receives the required count so the caller can retry with a bigger buffer.
  * Passing `entries` == NULL opts out of the table entirely.
  * `writer_name_buf` (if non-NULL) receives the writer name, truncated to fit
@@ -264,17 +240,15 @@ typedef binpazer_status (*binpazer_sink_fn)(void *ctx, const void *buf, size_t n
 
 /* Streams the current block's payload through `sink` in pieces of at most
  * `scratch_cap` bytes, verifying the CRC as it goes, then advances past the
- * block. Peak memory is the scratch buffer, NOT the payload -- which is how a
- * caller reads a payload bigger than memory (large_mode blocks reach ~16 TiB).
- * Use binpazer_reader_read_payload when the whole payload fits and a single
- * buffer is simpler. A CRC failure is reported only after the last chunk has
- * been handed over, since it cannot be known before then. */
+ * block. Use binpazer_reader_read_payload when the whole payload fits and a
+ * single buffer is simpler. A CRC failure is reported only after the last
+ * chunk has been handed over, since it cannot be known before then. */
 binpazer_status binpazer_reader_stream_payload(
     binpazer_reader *r, const binpazer_block *blk,
     void *scratch, size_t scratch_cap,
     binpazer_sink_fn sink, void *sink_ctx);
 
-/* ---- Group blocks (nesting, predefined type 65530) ---- */
+/* ---- Group blocks (nesting, predefined a later type) ---- */
 
 /* One nested block inside a Group block's payload. `payload` points INTO the
  * caller's buffer -- nothing is copied, so it is valid as long as that buffer
@@ -285,7 +259,7 @@ typedef struct {
     uint64_t       offset;       /* of the child's 8-byte header, relative to the payload */
     const uint8_t *payload;
     uint64_t       payload_len;
-    int            crc_ok;       /* 0 only when has_crc is set and the stored CRC mismatches */
+    int            crc_ok;       /* */
 } binpazer_group_child;
 
 /* Parses a Group block's payload -- nested blocks laid out exactly like
@@ -293,15 +267,15 @@ typedef struct {
  * written to `out` (up to `cap`) and `*count` receives the TOTAL child count,
  * so BINPAZER_ERR_CAPACITY means "call again with a buffer this big". A
  * structural error returns BINPAZER_ERR_FORMAT with the children parsed before
- * it still filled in, so a caller can render the intact prefix of a damaged
+ * it still filled in. A caller can render the intact prefix of a damaged
  * group. A child's CRC is verified into crc_ok without failing the parse.
  * Child type ids resolve against the same file-global Block Type Table as
- * top-level blocks; that resolution is left to the caller, which has it. */
+ * top-level blocks. That resolution is left to the caller, which has it. */
 binpazer_status binpazer_group_parse(
     const void *payload, uint64_t payload_len,
     binpazer_group_child *out, size_t cap, size_t *count);
 
-/* ---- Block Index (optional, predefined type 65533) ---- */
+/* ---- Block Index (optional, predefined a later type) ---- */
 
 typedef struct {
     uint16_t type_id;
@@ -335,16 +309,13 @@ binpazer_status binpazer_reader_at(
 /* Bytes needed for a canonical GUID string, including the NUL. */
 #define BINPAZER_GUID_STRING_SIZE 37
 
-/* Formats `g` as a canonical UUID (8-4-4-4-12, lowercase hex) into `buf`,
- * NUL-terminated. `cap` must be at least BINPAZER_GUID_STRING_SIZE. */
+/* `cap` must be at least BINPAZER_GUID_STRING_SIZE. */
 binpazer_status binpazer_guid_format(const binpazer_guid *g, char *buf, size_t cap);
 
-/* Parses a canonical UUID string into `out`. Hyphens are optional and may sit
- * anywhere; exactly 32 hex digits must be present. */
+/* Parses a canonical UUID string into `out`. */
 binpazer_status binpazer_guid_parse(const char *s, binpazer_guid *out);
 
-/* CRC-32C (Castagnoli), the algorithm used by the has_crc flag. Call with
- * crc = binpazer_crc32c(0, NULL, 0) to start, feed chunks, use the result. */
+/* CRC-32C (Castagnoli), the algorithm used by the has_crc flag. */
 uint32_t binpazer_crc32c(uint32_t crc, const void *data, size_t n);
 
 #ifdef __cplusplus

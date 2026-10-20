@@ -31,8 +31,7 @@ func TestInfoJSON(t *testing.T) {
 	assert.EqualValues(t, 8, res.Blocks[0].PayloadLen)
 	assert.Equal(t, "BlockIndex", res.Blocks[3].TypeName)
 
-	// On a pipe, the footer is discovered during the walk; has_index must
-	// still come out true because the JSON is assembled afterwards.
+	// On a pipe, the footer is discovered during the walk.
 	out, _, err = executeIO(nonSeekable{bytes.NewReader(data)}, "info", "-", "--json")
 	require.NoError(t, err)
 	var streamed infoJSON

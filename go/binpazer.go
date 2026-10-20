@@ -4,12 +4,13 @@
 // It does no file IO and no mmap: the caller supplies an io.Writer (optionally
 // also an io.Seeker, to back-patch the exact file length) or an io.Reader.
 //
-// The reader defends against hostile inputs: every length and count field is
-// bounds-checked against the real input size (learned by seeking) -- or, for
-// non-seekable inputs, against a configurable cap (see NewReaderLimited) --
-// before any allocation is sized from it. Failures are reported through the
-// sentinel errors ErrBadMagic, ErrCRCMismatch, ErrTruncated, and
-// ErrCapacityExceeded (match with errors.Is).
+// The reader defends against hostile inputs. Consider every length and count
+// field. That length is bounds-checked against the real input size (learned
+// by seeking) -- or, for non-seekable inputs, against a configurable cap
+// (see NewReaderLimited). This is before any allocation is sized from it.
+// Failures are reported through the sentinel errors ErrBadMagic,
+// ErrCRCMismatch, ErrTruncated, and ErrCapacityExceeded (match with
+// errors.Is).
 package binpazer
 
 import "hash/crc32"
@@ -29,7 +30,7 @@ const (
 	TypeGroup          = 65530
 )
 
-// Block flag bits. Bit 2 is reserved, must be 0 (SPEC.md "Compression").
+// Block flag bits.
 const (
 	FlagCritical   uint16 = 1 << 0
 	FlagSafeToCopy uint16 = 1 << 1
@@ -37,20 +38,17 @@ const (
 	FlagLargeMode  uint16 = 1 << 4
 )
 
-// LargeUnit is the byte size of one large_mode length unit (one page). With a
-// u32 length field this raises the per-block cap to (2^32-1)*4096 (~16 TiB).
+// LargeUnit is the byte size of one large_mode length unit (one page).
 const LargeUnit = 4096
 
-// ioBufSize is the buffer size for reader/writer buffering and for payload
-// streaming: large enough to collapse per-field reads and per-block writes
-// into few syscalls, small enough to keep peak memory flat.
+// ioBufSize is the buffer size for reader/writer buffering and for payload streaming.
 const ioBufSize = 64 << 10
 
 // GUID is a 16-byte block-type identifier, in canonical (RFC 4122) byte order.
 type GUID [16]byte
 
 // The well-known GUIDs of the predefined block types (SPEC.md "Well-known
-// type ids and GUIDs"; the namespace's first 8 bytes spell "binpazer").
+// type ids and GUIDs"; the namespace's first several bytes spell "binpazer").
 var (
 	BlockTypeTableGUID = GUID{0x62, 0x69, 0x6e, 0x70, 0x61, 0x7a, 0x65, 0x72, 0, 0, 0, 0, 0, 0, 0, 1}
 	BlockIndexGUID     = GUID{0x62, 0x69, 0x6e, 0x70, 0x61, 0x7a, 0x65, 0x72, 0, 0, 0, 0, 0, 0, 0, 2}
@@ -62,7 +60,7 @@ var (
 var crcTable = crc32.MakeTable(crc32.Castagnoli)
 
 // TypeDef declares one block type for the Block Type Table. Do not include type
-// id 65534; the table's own entry is added automatically.
+// a later id; the table's own entry is added automatically.
 type TypeDef struct {
 	TypeID uint16
 	GUID   GUID

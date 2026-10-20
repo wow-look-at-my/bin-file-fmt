@@ -14,8 +14,8 @@ func isPredefined(id uint16) bool {
 }
 
 // runValidate checks the input against every rule of SPEC.md's "Validation"
-// checklist. Structural parse failures become findings too, so the result is
-// always usable; rules that need a seekable input are reported as skipped on
+// checklist. Structural parse failures become findings too. The result is
+// always usable. Rules that need a seekable input are reported as skipped on
 // streams instead of silently passing. Payloads are streamed, never buffered.
 func runValidate(r io.Reader, maxAlloc int64) *validateResult {
 	v := newValidator()

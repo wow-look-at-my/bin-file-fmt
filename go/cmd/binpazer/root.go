@@ -8,8 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// version is the release version, overridable at build time via
-// -ldflags "-X main.version=v1.2.3".
+// version is the release version, overridable at build time via -ldflags "-X main.version=v1.2.3".
 var version = "dev"
 
 // versionString returns version, appending the VCS revision stamped into the

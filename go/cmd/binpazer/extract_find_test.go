@@ -18,7 +18,6 @@ func TestExtractByType(t *testing.T) {
 	big, err := os.ReadFile(filepath.Join(dir, "big.bin"))
 	require.NoError(t, err)
 
-	// Default --index 0, CRC-carrying block, via the Block Index.
 	stdout, _, err := executeIO(nil, "extract", path, "--type", "1")
 	require.NoError(t, err)
 	assert.Equal(t, "vertices", stdout)
@@ -101,8 +100,7 @@ func TestFindListsMatches(t *testing.T) {
 	assert.Contains(t, out, "[0] offset=")
 	assert.Contains(t, out, "[1] offset=")
 
-	// JSON shape, and index/walk agreement: the seekable run resolves
-	// through the Block Index, the stream run walks -- offsets must match.
+	// JSON shape, and index/walk agreement: the seekable run resolves through the Block Index, the stream run walks.
 	jsonOut, _, err := executeIO(nil, "find", path, "--type", "1", "--json")
 	require.NoError(t, err)
 	var viaIndex findResult
@@ -130,10 +128,10 @@ func TestFindListsMatches(t *testing.T) {
 	assert.Contains(t, err.Error(), "no blocks of type 9")
 }
 
-// A compressed block's payload is decoded on the way out -- the bytes a caller
-// asked for, whichever codec produced them -- while --stored yields the
-// Compression Envelope verbatim, which is strictly larger and starts with the
-// codec id.
+// Consider a compressed block's payload. That payload is decoded on the way
+// out -- the bytes a caller asked for, whichever codec produced them -- while
+// --stored yields the Compression Envelope verbatim. This is strictly larger
+// and starts with the codec id.
 func TestExtractDecodesCompressedBlocks(t *testing.T) {
 	for _, codec := range []string{"stored", "deflate", "zstd", "lz4"} {
 		t.Run(codec, func(t *testing.T) {
@@ -163,8 +161,7 @@ func TestExtractDecodesCompressedBlocks(t *testing.T) {
 			stored, _, err := executeIO(nil, "extract", archive, "--type", "1", "--stored")
 			require.NoError(t, err)
 			assert.NotEqual(t, payload, stored, "--stored must not decode")
-			// The envelope header precedes the codec bytes, so the stored form
-			// is longer than the codec output whatever the codec achieved.
+			// The envelope header precedes the codec bytes.
 			assert.GreaterOrEqual(t, len(stored), 16)
 		})
 	}

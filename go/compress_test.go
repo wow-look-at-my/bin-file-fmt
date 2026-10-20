@@ -161,9 +161,6 @@ func TestUncompressedFileStaysV10(t *testing.T) {
 
 }
 
-// TestCanonicalSampleUnchanged pins the cross-implementation fixture: the C,
-// C++ and Go writers must still produce these exact bytes, and it must still
-// declare 1.0.
 func TestCanonicalSampleUnchanged(t *testing.T) {
 	f, err := os.Open("testdata/sample.binpazer")
 	require.Nil(t, err)
@@ -188,13 +185,12 @@ func TestCanonicalSampleUnchanged(t *testing.T) {
 	}
 }
 
-// fixtureCodecGUID is the private codec GUID the compressed fixture uses for
-// the CodecByGUID escape (it is `stored` behind a GUID).
+// fixtureCodecGUID is the private codec GUID the compressed fixture uses for the CodecByGUID escape.
 var fixtureCodecGUID = GUID{0xc0, 0xde, 0xc0, 0xde, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7}
 
 // sample-compressed.binpazer is written by the C reference (c/gen.c). These
 // bytes are the cross-implementation contract for the envelope: C, C++ and Go
-// must all produce them exactly. It uses codec `stored`, the one codec every
+// must all produce them exactly. It uses codec `stored`, the codec every
 // implementation can produce with no dependency.
 func writeCompressedSample(w io.Writer) error {
 	bw, err := NewWriter(w, GUID{0xaa, 0xbb, 0xcc, 0xdd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
@@ -378,9 +374,6 @@ func TestGUIDCodecEscape(t *testing.T) {
 
 }
 
-// TestCompressedNonSeekableNeedsDeclaredVersion pins the one place the caller
-// must say up front what a seekable writer infers: a pipe cannot be
-// back-patched, so the header would otherwise claim 1.0 for a 1.1 file.
 func TestCompressedNonSeekableNeedsDeclaredVersion(t *testing.T) {
 	var buf bytes.Buffer // an io.Writer with no Seek
 	w, err := NewWriter(&buf, GUID{1}, "test", compressDefs)

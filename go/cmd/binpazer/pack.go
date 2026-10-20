@@ -86,10 +86,6 @@ func runPack(m *Manifest, baseDir string, w io.Writer) error {
 	return bw.End()
 }
 
-// memFile is a growable in-memory io.WriteSeeker. pack targets it when
-// writing to stdout, so the writer can still seek back and patch file_length;
-// the finished bytes are then streamed out in one pass and stay identical to
-// what a seekable file destination would receive.
 type memFile struct {
 	buf []byte
 	pos int64

@@ -35,10 +35,7 @@ func (br *Reader) verifyCRC(b *Block, crc uint32) error {
 	return nil
 }
 
-// WritePayloadTo streams the current block's payload to w in 64 KiB chunks,
-// verifying the CRC when the block has one, and advances to the next block.
-// It returns the number of payload bytes written to w. Unlike ReadPayload,
-// peak memory stays O(64 KiB) regardless of the payload size.
+// It returns the number of payload bytes written to w.
 //
 // The payload bytes reach w before the trailing CRC can be checked, so on
 // ErrCRCMismatch the caller must discard whatever it received.
@@ -89,10 +86,7 @@ func (br *Reader) WritePayloadTo(b *Block, w io.Writer) (int64, error) {
 
 // PayloadReader returns a reader that yields exactly the current block's
 // payload bytes, without buffering the payload and without CRC verification
-// (use WritePayloadTo to verify while streaming). Reading it advances the
-// Reader; after consuming as much of the payload as needed, call
-// SkipPayload(b) to move to the next block -- it skips whatever remains of
-// the payload, plus the CRC and padding.
+// (use WritePayloadTo to verify while streaming).
 func (br *Reader) PayloadReader(b *Block) (io.Reader, error) {
 	if err := br.claim(payloadClaim(b.PayloadLen, b.Flags), "block payload"); err != nil {
 		return nil, err
