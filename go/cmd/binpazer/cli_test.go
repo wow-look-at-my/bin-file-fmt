@@ -76,9 +76,9 @@ func TestCLIEndToEnd(t *testing.T) {
 	assert.Contains(t, o, "spec-conformant")
 }
 
-// TestCLICompressedRoundTrip covers compression end to end through the CLI:
-// pack compresses, info reports the codec and the DECODED size, unpack writes
-// the decoded payload plus the codec that produced it, and re-packing that
+// TestCLICompressedRoundTrip covers compression end to end through the CLI.
+// Pack compresses, info reports the codec and the DECODED size, unpack writes
+// the decoded payload plus the codec that produced it. Re-packing that
 // manifest reproduces the file byte for byte.
 func TestCLICompressedRoundTrip(t *testing.T) {
 	dir := t.TempDir()
@@ -105,7 +105,7 @@ func TestCLICompressedRoundTrip(t *testing.T) {
 	_, err = execute("pack", manifestPath, "-o", out)
 	require.NoError(t, err)
 
-	// Compression actually happened: the file is smaller than the payload alone.
+	// Compression happened: the file is smaller than the payload alone.
 	st, err := os.Stat(out)
 	require.NoError(t, err)
 	assert.Less(t, st.Size(), int64(len(payload)), "deflate must shrink a repetitive payload")
@@ -161,7 +161,7 @@ func TestDumpBlockOutOfRange(t *testing.T) {
 	_, err := execute("dump", path, "--block", "99")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "block index 99 out of range")
-	assert.Contains(t, err.Error(), "4 block(s)") // 3 data blocks + the index
+	assert.Contains(t, err.Error(), "4 block(s)") // Data blocks + the index
 
 	// The last valid index still works.
 	out, err := execute("dump", path, "--block", "3")

@@ -23,8 +23,9 @@ func indexedSample(t *testing.T) []byte {
 }
 
 // TestStreamWalkStopsAtFooter: a non-seekable reader cannot exclude the
-// footer up front; Next must recognize it by position (file_length-16) and
-// end the walk cleanly instead of misparsing "rezapnib" as a block header.
+// footer up front. This also covers Next must recognize it by position
+// (file_length-16) and end the walk cleanly instead of misparsing
+// "rezapnib" as a block header.
 func TestStreamWalkStopsAtFooter(t *testing.T) {
 	data := indexedSample(t)
 

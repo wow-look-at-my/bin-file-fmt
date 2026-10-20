@@ -12,10 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Byte offsets inside the canonical 280-byte sample (see writeSample):
-// the header's file_length, the writer-name length, the BTT entry count,
-// the first data block's header/payload/CRC, and the first BTT entry's
-// name length.
+// Byte offsets inside the canonical 280-byte sample (see writeSample): the
+// header's file_length, the writer-name length, and the BTT entry count.
 const (
 	sampleOffFileLength = 32
 	sampleOffNameLen    = 56
@@ -43,7 +41,6 @@ func sampleBytes(t testing.TB) []byte {
 // The crafted regression inputs. Each drove an unbounded allocation (or an
 // unexercised failure path) in the pre-hardening reader.
 
-// hugePayloadSample: the first data block claims a ~16 TiB large-mode payload.
 func hugePayloadSample(t testing.TB) []byte {
 	b := sampleBytes(t)
 	binary.LittleEndian.PutUint16(b[sampleOffBlock1+2:], FlagCritical|FlagHasCRC|FlagLargeMode)
@@ -51,21 +48,19 @@ func hugePayloadSample(t testing.TB) []byte {
 	return b
 }
 
-// hugeBTTCountSample: the type table claims 2^32-1 entries (drove a >2 GiB alloc).
 func hugeBTTCountSample(t testing.TB) []byte {
 	b := sampleBytes(t)
 	binary.LittleEndian.PutUint32(b[sampleOffBTTCount:], 0xFFFFFFFF)
 	return b
 }
 
-// hugeNameLenSample: the writer name claims ~4 GiB.
 func hugeNameLenSample(t testing.TB) []byte {
 	b := sampleBytes(t)
 	binary.LittleEndian.PutUint32(b[sampleOffNameLen:], 0xFFFFFFFF)
 	return b
 }
 
-// corruptCRCSample: block 1's payload no longer matches its stored CRC.
+// corruptCRCSample: one block's payload no longer matches its stored CRC.
 func corruptCRCSample(t testing.TB) []byte {
 	b := sampleBytes(t)
 	b[sampleOffPayload1] ^= 0xFF
@@ -125,8 +120,6 @@ func TestBadMagicTyped(t *testing.T) {
 	assert.True(t, errors.Is(err, ErrBadMagic), "got %v", err)
 }
 
-// TestHugePayloadClaimRejected: the ~16 TiB claim must be rejected before any
-// allocation is sized from it (the pre-hardening reader allocated it).
 func TestHugePayloadClaimRejected(t *testing.T) {
 	br, err := NewReader(bytes.NewReader(hugePayloadSample(t)))
 	require.NoError(t, err)
@@ -161,7 +154,7 @@ func TestHugeWriterNameRejected(t *testing.T) {
 
 func TestBTTEntryNameOverrun(t *testing.T) {
 	b := sampleBytes(t)
-	binary.LittleEndian.PutUint32(b[sampleOffEntry0Name:], 0xFFFF) // 64 KiB name in a 112-byte table
+	binary.LittleEndian.PutUint32(b[sampleOffEntry0Name:], 0xFFFF)
 	_, err := NewReader(bytes.NewReader(b))
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, ErrCapacityExceeded), "got %v", err)
@@ -246,11 +239,10 @@ func TestInputSize(t *testing.T) {
 
 // TestSeekSkipTruncationDetected: skip() seeks on seekable inputs, so make
 // sure a file cut mid-block (after the payload the claim check admits, but
-// before the block's aligned end) still reports ErrTruncated -- and does so
+// before the block's aligned end) still reports ErrTruncated. It does so
 // identically to the non-seekable read-through path.
 func TestSeekSkipTruncationDetected(t *testing.T) {
-	// A streaming writer leaves file_length unknown, so the walk cannot stop
-	// early on blocksEnd; the 3-byte payload needs 5 pad bytes we then cut.
+	// A streaming writer leaves file_length unknown.
 	var buf bytes.Buffer
 	bw, err := NewWriter(&buf, sampleWriter, "demo", sampleDefs)
 	require.NoError(t, err)
@@ -266,7 +258,7 @@ func TestSeekSkipTruncationDetected(t *testing.T) {
 			br, err := NewReader(r)
 			require.NoError(t, err)
 			b, err := br.Next()
-			require.NoError(t, err) // the 3 payload bytes are all present...
+			require.NoError(t, err)
 			err = br.SkipPayload(b) // ...but the pad to the 8-byte boundary is not
 			require.Error(t, err)
 			assert.True(t, errors.Is(err, ErrTruncated), "got %v", err)

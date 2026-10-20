@@ -1,6 +1,5 @@
-/* Codec-layer tests: every registry codec must round-trip through a real file.
- * Separate from test.c so the core keeps a test binary that links no codec
- * library at all. */
+/* Codec-layer tests: every registry codec must round-trip through a real
+ * file. */
 #include "binpazer_codec.h"
 #include <stdio.h>
 #include <string.h>
@@ -71,7 +70,6 @@ static void roundtrip(uint16_t codec_id, const binpazer_guid *codec_guid,
     binpazer_reader r; char nm[32]; binpazer_type_entry te[8]; size_t nte = 0;
     CHECK(binpazer_reader_begin(&r, mem_read, mem_seek, &m, nm, sizeof nm, te, 8, &nte) == BINPAZER_OK,
           "codec: reader begin");
-    /* A compressed block makes the file 1.1 -- back-patched by writer_end. */
     CHECK(r.version_minor == BINPAZER_VERSION_MINOR_COMPRESSION, "codec: file declares 1.1");
 
     binpazer_block blk;
@@ -163,7 +161,7 @@ static void test_length_mismatch(void) {
     memset(&c, 0, sizeof c);
     c.codec_id = BINPAZER_CODEC_ZSTD;
     c.stored_length = stored_len;
-    c.uncompressed_length = 999; /* the truth is 1024 */
+    c.uncompressed_length = 999; /* */
     CHECK(binpazer_decompress(&c, scratch, decoded, sizeof decoded) == BINPAZER_ERR_FORMAT,
           "mismatch: short declared length rejected");
     c.uncompressed_length = 4096;

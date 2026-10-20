@@ -7,8 +7,7 @@ import (
 	binpazer "github.com/wow-look-at-my/bin-file-fmt/go"
 )
 
-// The machine-readable shapes shared by info --json and dump --json. Every
-// command emits exactly one JSON object; nesting appears as children arrays.
+// The machine-readable shapes shared by info --json and dump --json.
 
 // typeJSON is one Block Type Table entry.
 type typeJSON struct {

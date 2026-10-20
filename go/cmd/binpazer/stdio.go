@@ -9,16 +9,14 @@ import (
 	binpazer "github.com/wow-look-at-my/bin-file-fmt/go"
 )
 
-// nonSeekable hides an input's Seek method so the binpazer reader takes its
-// capped, streaming path. Pipes and terminals satisfy io.Seeker through
-// *os.File but fail on the first Seek call, so they must be wrapped.
+// nonSeekable hides an input's Seek method so the binpazer reader takes its capped, streaming path.
 type nonSeekable struct{ io.Reader }
 
 // inputReader resolves a positional file argument. "-" means the command's
 // stdin: when stdin is genuinely seekable (redirected from a file) it is used
-// as-is, so the reader can learn the input size and use the block index;
-// otherwise its Seeker is hidden and the reader streams under --max-alloc.
-// The returned closer is nil for stdin.
+// as-is. The reader can learn the input size and use the block index. This
+// also covers otherwise its Seeker is hidden and the reader streams under
+// --max-alloc.
 func inputReader(cmd *cobra.Command, path string) (io.Reader, io.Closer, error) {
 	if path != "-" {
 		f, err := os.Open(path)
@@ -62,10 +60,6 @@ func writeJSON(w io.Writer, v any) error {
 	return enc.Encode(v)
 }
 
-// maxAllocFlag registers --max-alloc on a reading command and returns the
-// bound value; 0 selects the library default (1 GiB). The cap only applies
-// when the input is not seekable (piped stdin) -- seekable inputs are bounded
-// by their real size instead.
 func maxAllocFlag(cmd *cobra.Command) *int64 {
 	v := new(int64)
 	cmd.Flags().Int64Var(v, "max-alloc", 0,

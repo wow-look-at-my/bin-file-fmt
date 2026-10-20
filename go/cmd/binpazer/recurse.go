@@ -10,8 +10,7 @@ import (
 	binpazer "github.com/wow-look-at-my/bin-file-fmt/go"
 )
 
-// maxNestDepth bounds group recursion against hostile or corrupt nesting
-// (SPEC.md: readers SHOULD enforce a maximum nesting depth).
+// maxNestDepth bounds group recursion against hostile or corrupt nesting.
 const maxNestDepth = 32
 
 // typeTable is a lookup view of a file's Block Type Table.
@@ -51,10 +50,10 @@ func (t *typeTable) isGroup(id uint16) bool {
 
 // printGroupChildren renders the children of a group whose payload is in
 // memory. base is the absolute file offset of the payload, label the parent's
-// index path (e.g. "2"), depth the nesting level (top-level children are at
-// 1). dump selects dump-style output (hex payloads) over info-style lines.
-// A malformed tail is reported inline after the intact children, and nested
-// groups recurse up to maxNestDepth.
+// index path (e.g. "2"), depth the nesting level (top-level children are at a
+// set value). dump selects dump-style output (hex payloads) over info-style
+// lines. A malformed tail is reported inline after the intact children, and
+// nested groups recurse up to maxNestDepth.
 func printGroupChildren(w io.Writer, tt *typeTable, payload []byte, base uint64, label string, depth int, dump bool) {
 	indent := strings.Repeat("  ", depth+1)
 	if depth > maxNestDepth {
@@ -89,7 +88,7 @@ func printGroupChildren(w io.Writer, tt *typeTable, payload []byte, base uint64,
 
 // descendGroup buffers a group block's payload and renders its children. A
 // payload-level failure of the group itself (its own CRC) is reported for the
-// subtree and the walk continues with the next block; anything else (e.g.
+// subtree and the walk continues with the next block. Anything else (e.g.
 // truncation) aborts the walk.
 func descendGroup(br *binpazer.Reader, w io.Writer, tt *typeTable, b *binpazer.Block, label string, dump bool) error {
 	payload, err := br.ReadPayload(b)

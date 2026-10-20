@@ -24,9 +24,7 @@ type ManifestType struct {
 }
 
 // ManifestBlock is one block; its content comes from exactly one of data,
-// data_base64, or file (a path, relative to the manifest, to embed). Content is
-// always the block's LOGICAL payload: `codec` names what pack should compress
-// it with, and unpack records the codec it decompressed.
+// data_base64, or file (a path, relative to the manifest, to embed).
 type ManifestBlock struct {
 	TypeID     uint16   `json:"type_id"`
 	Flags      []string `json:"flags,omitempty"`
@@ -36,9 +34,7 @@ type ManifestBlock struct {
 	File       string   `json:"file,omitempty"`
 }
 
-// The `compressed` flag is deliberately absent from this table: it is implied
-// by `codec`, so a manifest cannot claim compression without naming what
-// produced the bytes.
+// The `compressed` flag is deliberately absent from this table: it is implied by `codec`.
 var flagOrder = []string{"critical", "safe_to_copy", "has_crc", "large_mode"}
 
 var flagBits = map[string]uint16{

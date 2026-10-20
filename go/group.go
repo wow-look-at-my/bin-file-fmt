@@ -7,9 +7,7 @@ import (
 )
 
 // GroupChild is one nested block parsed from a Group block's payload (see
-// SPEC.md "Group blocks (nesting)"). Children resolve their type ids against
-// the same file-global Block Type Table as top-level blocks; resolution is
-// left to the caller, which holds the Reader.
+// SPEC.md "Group blocks (nesting)").
 type GroupChild struct {
 	TypeID  uint16
 	Flags   uint16

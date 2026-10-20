@@ -59,9 +59,9 @@ var (
 )
 
 const (
-	meshPayload = "vertices-go-here"         // 16
-	notePayload = "hello, file!"             // 12
-	bigPayload  = "0123456789ABCDEF01234567" // 24
+	meshPayload = "vertices-go-here"
+	notePayload = "hello, file!"
+	bigPayload  = "0123456789ABCDEF01234567"
 )
 
 func writeSample(w io.Writer) error {
@@ -235,7 +235,6 @@ func TestLargeMode(t *testing.T) {
 	}
 	defs := []TypeDef{{1, sampleMesh, "Big"}}
 
-	// a payload that isn't a multiple of 4096 is rejected
 	var bad memFile
 	wbad, err := NewWriter(&bad, sampleWriter, "demo", defs)
 	require.NoError(t, err)
@@ -309,7 +308,7 @@ func TestBlockIndex(t *testing.T) {
 		require.NoError(t, rw.SkipPayload(wb))
 		walked++
 	}
-	assert.Equal(t, 4, walked) // 3 blocks + the index block; footer excluded
+	assert.Equal(t, 4, walked) // Blocks + the index block; footer excluded
 }
 
 // TestFindWithoutIndex confirms Find falls back to a walk when no index exists.
@@ -334,7 +333,7 @@ func TestFindWithoutIndex(t *testing.T) {
 	assert.Equal(t, []uint64{offA, offC}, got)
 }
 
-// TestDuplicateTypeIDFirstWins pins the duplicate-id resolution order: a block
+// TestDuplicateTypeIDFirstWins pins the duplicate-id resolution order. A block
 // whose type id appears twice in the table resolves to the FIRST entry, the
 // same answer the original linear scan gave (and the map lookup must keep).
 func TestDuplicateTypeIDFirstWins(t *testing.T) {
@@ -351,7 +350,7 @@ func TestDuplicateTypeIDFirstWins(t *testing.T) {
 	m.pos = 0
 	br, err := NewReader(&m)
 	require.NoError(t, err)
-	require.Len(t, br.Types, 3) // BTT's own entry + the two duplicates
+	require.Len(t, br.Types, 3) // BTT's own entry + both duplicates
 
 	b, err := br.Next()
 	require.NoError(t, err)

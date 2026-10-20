@@ -29,9 +29,7 @@ func TestStdinReadCommands(t *testing.T) {
 		require.NoError(t, err, cmd)
 		assert.Equal(t, want, got, "%s -: seekable stdin output differs", cmd)
 
-		// Non-seekable stdin: info differs only in has_index (the footer is
-		// only discovered when the walk reaches it), validate reports its
-		// seek-dependent rules as skipped, dump is byte-identical.
+		// Non-seekable stdin: info differs only in has_index (the footer is only discovered when the walk reaches it), validate reports its seek-dependent rules as skipped.
 		got, _, err = executeIO(nonSeekable{bytes.NewReader(data)}, cmd, "-")
 		require.NoError(t, err, cmd)
 		switch cmd {
@@ -85,8 +83,7 @@ func TestPackManifestFromStdin(t *testing.T) {
 	dir := t.TempDir()
 	_, want := packSample(t, dir)
 
-	// Rewrite the manifest without file references (stdin manifests resolve
-	// files against the cwd) -- inline the big block as base64 instead.
+	// Rewrite the manifest without file references (stdin manifests resolve files against the cwd).
 	raw, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
 	require.NoError(t, err)
 	var m Manifest
@@ -136,8 +133,7 @@ func TestUnpackFromStdinRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, out, "unpacked")
 
-	// The stream-discovered footer must survive into the manifest so a
-	// repack reproduces the archive byte for byte.
+	// The stream-discovered footer must survive into the manifest so a repack reproduces the archive byte for byte.
 	raw, err := os.ReadFile(filepath.Join(udir, "manifest.json"))
 	require.NoError(t, err)
 	var m Manifest
@@ -149,8 +145,6 @@ func TestUnpackFromStdinRoundTrip(t *testing.T) {
 	assert.Equal(t, string(data), repacked, "unpack - | pack round-trip not byte-identical")
 }
 
-// TestMaxAllocCapsStreams proves --max-alloc bounds claims on non-seekable
-// input: a 4 KiB block must be rejected under a 512-byte cap.
 func TestMaxAllocCapsStreams(t *testing.T) {
 	dir := t.TempDir()
 	_, data := packSample(t, dir)

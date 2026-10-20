@@ -10,29 +10,20 @@ import (
 	"math"
 )
 
-// DefaultMaxAlloc is the allocation cap NewReader applies to any single
-// length/count field when the total input size cannot be learned (the input is
-// not an io.Seeker). Use NewReaderLimited to choose a different cap.
-const DefaultMaxAlloc int64 = 1 << 30 // 1 GiB
+// DefaultMaxAlloc is the allocation cap NewReader applies to any single length/count field when the total input size cannot be learned.
+const DefaultMaxAlloc int64 = 1 << 30
 
-// minBTTEntrySize is the smallest on-disk Block Type Table entry: a 20-byte
-// header, a 4-byte name length, an empty name, and a NUL, padded to 8 bytes.
+// minBTTEntrySize is the smallest on-disk Block Type Table entry.
 const minBTTEntrySize = 32
 
 // Reader parses a binpazer file from an io.Reader.
-//
-// Position bookkeeping: all reads go through the buffered r, so the
-// underlying input's position can be up to one buffer ahead of the logical
-// offset off. Every reposition therefore seeks to an absolute target derived
-// from off (never relative to the underlying position) and resets the buffer;
-// seekTo is the only place that does this.
 type Reader struct {
 	src    io.Reader     // the original input; seeks reposition it
 	r      *bufio.Reader // buffered view of src; all reads go through it
 	seeker io.Seeker     // non-nil if src also implements io.Seeker
 	off    uint64        // logical offset: bytes consumed through r
 
-	inputSize int64 // total input size in bytes; -1 when unknown (non-seekable)
+	inputSize int64
 	maxAlloc  int64 // per-field allocation cap used when inputSize is unknown
 
 	VersionMajor     uint16
@@ -72,8 +63,6 @@ func (b *Block) nextOffset() uint64 {
 }
 
 // decodePayloadLen converts the on-disk 32-bit length field to a byte count.
-// lf comes from a uint32, so the large-mode multiply cannot overflow uint64:
-// (2^32-1) * 4096 < 2^44.
 func decodePayloadLen(lf uint64, flags uint16) uint64 {
 	if flags&FlagLargeMode != 0 {
 		return lf * LargeUnit
@@ -129,8 +118,8 @@ func (br *Reader) read(p []byte) error {
 }
 
 // seekTo repositions the underlying input at the absolute offset abs, resets
-// the read buffer (which may hold bytes from the old position), and resyncs
-// the logical offset. Requires br.seeker != nil.
+// the read buffer (which may hold bytes from the position), and resyncs the
+// logical offset.
 func (br *Reader) seekTo(abs uint64) error {
 	if _, err := br.seeker.Seek(int64(abs), io.SeekStart); err != nil {
 		return err
@@ -180,11 +169,6 @@ func (br *Reader) skip(n uint64) error {
 }
 
 // NewReader reads and validates the file header and Block Type Table.
-//
-// When r implements io.Seeker, the reader learns the real input size and
-// rejects any length/count field that promises more bytes than remain, before
-// allocating for it. Otherwise every such field is capped at DefaultMaxAlloc;
-// use NewReaderLimited to pick a different cap for streaming callers.
 func NewReader(r io.Reader) (*Reader, error) {
 	return NewReaderLimited(r, DefaultMaxAlloc)
 }
@@ -202,10 +186,7 @@ func NewReaderLimited(r io.Reader, maxAlloc int64) (*Reader, error) {
 	}
 	if s, ok := r.(io.Seeker); ok {
 		br.seeker = s
-		// Note: this probe seeks the raw input before anything is buffered,
-		// so no buffer resync is needed here.
-		// Learn the real input size so every untrusted length/count field can
-		// be bounds-checked before it sizes an allocation.
+		// Note: this probe seeks the raw input before anything is buffered, so no buffer resync is needed here.
 		cur, err := s.Seek(0, io.SeekCurrent)
 		if err == nil {
 			var end int64
@@ -266,7 +247,7 @@ func NewReaderLimited(r io.Reader, maxAlloc int64) (*Reader, error) {
 	}
 
 	// Opportunistically locate a Block Index via the footer. The header's
-	// file_length is untrusted: only probe when it fits the real input size,
+	// file_length is untrusted. Only probe when it fits the real input size,
 	// so a bogus value degrades to "no footer" instead of a wild seek.
 	if br.seeker != nil && br.FileLength != FileLengthUnknown && br.FileLength >= 16 &&
 		br.inputSize >= 0 && br.FileLength <= uint64(br.inputSize) {
@@ -310,8 +291,7 @@ func (br *Reader) readBTT() error {
 		return err
 	}
 	entryCount := binary.LittleEndian.Uint32(cc)
-	// Each entry occupies at least minBTTEntrySize bytes on disk, so a count
-	// the table's own payload cannot hold is structurally impossible.
+	// Each entry occupies at least minBTTEntrySize bytes on disk.
 	maxEntries := uint64(0)
 	if bttLen >= 8 {
 		maxEntries = (bttLen - 8) / minBTTEntrySize
@@ -368,8 +348,8 @@ func (br *Reader) readBTT() error {
 // It returns io.EOF after the last block. The payload is not read.
 //
 // On a non-seekable input the footer cannot be excluded from the walk up
-// front, so when file_length is known and exactly 16 bytes of it remain, Next
-// peeks for the footer magic and ends the walk there (recording the index
+// front. When file_length is known and several bytes of it remain, Next
+// peeks for the footer magic. It ends the walk there (recording the index
 // location) instead of misparsing the footer as a block header. This mirrors
 // the position-based footer detection the seekable probe already performs.
 func (br *Reader) Next() (*Block, error) {
@@ -410,8 +390,7 @@ func (br *Reader) Next() (*Block, error) {
 	return b, nil
 }
 
-// resolveType fills a block's GUID and Known from the type table. Duplicate
-// ids resolve to the table's first entry, matching the on-disk scan order.
+// resolveType fills a block's GUID and Known from the type table.
 func (br *Reader) resolveType(b *Block) {
 	if i, ok := br.typeIdx[b.TypeID]; ok {
 		b.GUID = br.Types[i].GUID
@@ -452,15 +431,12 @@ func (br *Reader) SkipPayload(b *Block) error {
 // HasIndex reports whether a Block Index was located via the footer.
 func (br *Reader) HasIndex() bool { return br.hasIndex }
 
-// IndexOffset returns the absolute offset of the Block Index block's header
-// as recorded in the footer, and whether a footer was found.
+// IndexOffset returns the absolute offset of the Block Index block's header as recorded in the footer.
 func (br *Reader) IndexOffset() (uint64, bool) { return br.indexOffset, br.hasIndex }
 
 // Offset returns the reader's current file offset.
 func (br *Reader) Offset() uint64 { return br.off }
 
-// InputSize returns the total input size learned by seeking, or -1 when the
-// input is not seekable.
 func (br *Reader) InputSize() int64 { return br.inputSize }
 
 // Find returns the file offsets of all blocks with the given type id. It uses

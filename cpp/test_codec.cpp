@@ -67,7 +67,6 @@ void roundtrip(uint16_t codec_id, const char *name, bool expect_shrink,
     binpazer::Reader r([&](void *b, size_t n) { return m.read(b, n); },
                        [&](uint64_t o) { return m.seek(o); });
     check(r.ok(), "codec: reader begin");
-    // A compressed block makes the file 1.1 -- back-patched by end().
     check(r.version_minor() == BINPAZER_VERSION_MINOR_COMPRESSION, "codec: file declares 1.1");
 
     auto blk = r.next();

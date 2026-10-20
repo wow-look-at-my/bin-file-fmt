@@ -91,8 +91,8 @@ func TestFinishMatchesWriteIndexThenEnd(t *testing.T) {
 	assert.Equal(t, write(false), write(true))
 }
 
-// Put and PutCompressed must report the offset the block actually landed at,
-// which is the whole reason they exist.
+// Put and PutCompressed must report the offset the block landed at, which is
+// the whole reason they exist.
 func TestPutReportsTheRealOffset(t *testing.T) {
 	var m memFile
 	w, err := NewWriter(&m, GUID{1}, "container", containerDefs)
@@ -161,8 +161,9 @@ func TestFindMissingTypeIsTyped(t *testing.T) {
 	require.ErrorIs(t, br.DecodeJSONLast(999, &testDir{}), ErrBlockNotFound)
 }
 
-// A directory pointing at the wrong block is the file disagreeing with itself,
-// and must not be reported as a missing block or decoded as the wrong type.
+// A directory pointing at the wrong block is the file disagreeing with itself.
+// The wrong block must not be reported as a missing block or decoded as the
+// wrong type.
 func TestBlockAtWrongTypeIsTyped(t *testing.T) {
 	files := map[string]string{"a.txt": "alpha"}
 	raw := buildContainer(t, files)

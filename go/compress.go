@@ -1,22 +1,5 @@
 package binpazer
 
-// Block compression (SPEC.md "Compression", added in 1.1). A block with
-// FlagCompressed stores a Compression Envelope instead of its logical payload:
-// the flag announces the envelope, the envelope names the codec. The block's
-// length field still describes the STORED bytes, so walking, skipping,
-// large_mode, the Block Index and CRCs are all untouched by compression.
-//
-// Every codec in SPEC.md's registry is built in: stored, deflate, zstd and
-// lz4. A caller should not have to supply an implementation of a codec the
-// format itself names -- that only guarantees files this library writes are
-// files it cannot read. RegisterCodec remains for codecs OUTSIDE the registry
-// (the GUID escape) and for overriding a built-in.
-//
-// The C and C++ implementations carry the same four codecs (c/binpazer_codec.c
-// and the entry points binpazer.hpp exposes over it), so no implementation can
-// write a file another cannot read. Their core translation unit stays
-// codec-free and dependency-free; codecs are a second file you link.
-
 import (
 	"compress/flate"
 	"encoding/binary"
@@ -29,11 +12,10 @@ import (
 	"github.com/pierrec/lz4/v4"
 )
 
-// FlagCompressed (block flag bit 2) marks a payload as a Compression Envelope.
+// FlagCompressed (block flag a later bit) marks a payload as a Compression Envelope.
 const FlagCompressed uint16 = 1 << 2
 
-// VersionMinorCompression is the minor version a file must declare once it
-// contains a compressed block.
+// VersionMinorCompression is the minor version a file must declare once it contains a compressed block.
 const VersionMinorCompression = 1
 
 // Codec ids from SPEC.md's registry. CodecByGUID is the escape for codecs
@@ -59,11 +41,9 @@ type Compression struct {
 	CodecID uint16
 	// CodecGUID identifies the codec when CodecID is CodecByGUID; otherwise zero.
 	CodecGUID GUID
-	// UncompressedLen is the exact size of the decoded payload. It is
-	// authoritative: a decode yielding a different length is corruption.
+	// UncompressedLen is the exact size of the decoded payload.
 	UncompressedLen uint64
-	// StoredLen is the size of the codec bytes as stored (the block payload
-	// minus the envelope header).
+	// StoredLen is the size of the codec bytes as stored (the block payload minus the envelope header).
 	StoredLen uint64
 }
 
@@ -75,19 +55,13 @@ func (c Compression) headerSize() uint64 {
 	return envelopeFixedSize
 }
 
-// Codec compresses and decompresses one codec's byte stream. Registering a
-// codec teaches this package a codec id from SPEC.md's registry (or a
-// GUID-identified one) without adding a dependency to it.
+// Codec compresses and decompresses one codec's byte stream.
 type Codec interface {
-	// NewReader decodes r. The returned closer is closed after the payload is
-	// consumed; closing it must not close r.
+	// NewReader decodes r. The returned closer is closed after the payload is consumed; closing it must not close r.
 	NewReader(r io.Reader) (io.ReadCloser, error)
 	// NewWriter encodes into w. Close flushes the codec's trailer.
 	NewWriter(w io.Writer) (io.WriteCloser, error)
-	// CompressBound reports a size that encoding srcLen bytes cannot exceed,
-	// including the codec's own framing. It is what lets CompressInto write
-	// into a caller's buffer, so it must never under-report -- a too-small
-	// answer surfaces as ErrShortBuffer on incompressible input.
+	// CompressBound reports a size that encoding srcLen bytes cannot exceed, including the codec's own framing.
 	CompressBound(srcLen int) int
 }
 
@@ -103,10 +77,9 @@ var (
 )
 
 // RegisterCodec registers a codec for a registry id. Every id SPEC.md assigns
-// is already built in, so this is for a codec the registry does not name (a
+// is already built in. This is for a codec the registry does not name (a
 // later revision's, ahead of an upgrade) or to override a built-in with a
-// differently-tuned encoder. An id of 0 is refused; re-registering an id
-// replaces it.
+// differently-tuned encoder.
 func RegisterCodec(id uint16, c Codec) error {
 	if id == CodecInvalid {
 		return errors.New("binpazer: codec id 0 is invalid")
@@ -151,8 +124,7 @@ func lookupCodec(c Compression) (Codec, error) {
 	return nil, fmt.Errorf("binpazer: codec id %d: %w", c.CodecID, ErrCodecUnavailable)
 }
 
-// storedCodec is the identity codec (SPEC registry id 1): every implementation
-// can write a well-formed envelope with it, with no dependency.
+// storedCodec is the identity codec (SPEC registry one id): every implementation can write a well-formed envelope with it.
 type storedCodec struct{}
 
 func (storedCodec) NewReader(r io.Reader) (io.ReadCloser, error) {
@@ -169,8 +141,7 @@ type nopWriteCloser struct{ io.Writer }
 
 func (nopWriteCloser) Close() error { return nil }
 
-// deflateCodec is raw DEFLATE (RFC 1951, SPEC registry id 2) -- the one real
-// codec the Go standard library provides.
+// deflateCodec is raw DEFLATE (RFC 1951, SPEC registry a later id) -- the real codec the Go standard library provides.
 type deflateCodec struct{}
 
 func (deflateCodec) NewReader(r io.Reader) (io.ReadCloser, error) {
@@ -181,14 +152,11 @@ func (deflateCodec) NewWriter(w io.Writer) (io.WriteCloser, error) {
 	return flate.NewWriter(w, flate.DefaultCompression)
 }
 
-// CompressBound mirrors zlib's compressBound: incompressible input falls back
-// to stored blocks, which cost 5 bytes of framing per 64 KiB window.
 func (deflateCodec) CompressBound(srcLen int) int {
 	return srcLen + srcLen/16 + 5*(srcLen/16384+1) + 64
 }
 
-// zstdCodec is zstd (RFC 8878, SPEC registry id 3), the codec worth reaching
-// for by default: deflate's ratio at several times its speed.
+// zstdCodec is zstd (RFC 8878, SPEC registry a later id), the codec worth reaching for by default.
 type zstdCodec struct{}
 
 func (zstdCodec) NewReader(r io.Reader) (io.ReadCloser, error) {
@@ -196,8 +164,7 @@ func (zstdCodec) NewReader(r io.Reader) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	// IOReadCloser's Close releases the decoder's goroutines without closing r,
-	// which is what the Codec contract requires.
+	// IOReadCloser's Close releases the decoder's goroutines without closing r, which is what the Codec contract requires.
 	return zr.IOReadCloser(), nil
 }
 
@@ -215,8 +182,7 @@ func (zstdCodec) CompressBound(srcLen int) int {
 	return srcLen + srcLen/128 + margin + 64
 }
 
-// lz4Codec is LZ4 (frame format, SPEC registry id 4): a weaker ratio than
-// zstd, for content read far more often than it is written.
+// lz4Codec is LZ4 (frame format, SPEC registry a later id): a weaker ratio than zstd.
 type lz4Codec struct{}
 
 func (lz4Codec) NewReader(r io.Reader) (io.ReadCloser, error) {
@@ -227,10 +193,6 @@ func (lz4Codec) NewWriter(w io.Writer) (io.WriteCloser, error) {
 	return lz4.NewWriter(w), nil
 }
 
-// CompressBound is LZ4F_compressFrameBound computed for the smallest block
-// size a writer may choose (64 KiB), which bounds every larger one too: frame
-// header and footer, plus per-block worst-case expansion and a 4-byte block
-// header.
 func (lz4Codec) CompressBound(srcLen int) int {
 	blocks := srcLen/(64<<10) + 1
 	return srcLen + srcLen/255 + blocks*4 + 64
@@ -240,7 +202,6 @@ func (lz4Codec) CompressBound(srcLen int) int {
 func encodeEnvelopeHeader(c Compression) []byte {
 	hdr := make([]byte, c.headerSize())
 	binary.LittleEndian.PutUint16(hdr[0:], c.CodecID)
-	// codec_flags (2:4) and reserved (4:8) stay zero.
 	binary.LittleEndian.PutUint64(hdr[8:], c.UncompressedLen)
 	if c.CodecID == CodecByGUID {
 		copy(hdr[16:32], c.CodecGUID[:])
@@ -301,13 +262,7 @@ func (br *Reader) Compression(b *Block) (Compression, error) {
 }
 
 // DecompressedPayloadReader returns a reader over the current block's decoded
-// payload, decompressing as it is read. Like PayloadReader it does not verify
-// the block CRC (which covers the stored bytes) and does not buffer the
-// payload; call SkipPayload(b) afterwards to advance to the next block.
-//
-// The reader yields at most UncompressedLen bytes: the envelope's length field
-// is what bounds a decoder that would otherwise expand untrusted input without
-// limit.
+// payload, decompressing as it is read.
 func (br *Reader) DecompressedPayloadReader(b *Block) (io.Reader, error) {
 	_, r, err := br.DecompressedPayload(b)
 	return r, err
@@ -395,10 +350,7 @@ func (br *Reader) ReadDecompressedPayload(b *Block) ([]byte, error) {
 	if err := br.claimDecoded(c.want); err != nil {
 		return nil, err
 	}
-	// Grown by append rather than preallocated to UncompressedLen: the field is
-	// untrusted, so a file may declare a huge payload it cannot actually
-	// produce. The allocation follows the bytes that really arrive, and
-	// decompressReader stops at the declared length either way.
+	// Grown by append rather than preallocated to UncompressedLen: the field is untrusted.
 	var out []byte
 	buf := make([]byte, min64(c.want, ioBufSize))
 	for {
@@ -417,13 +369,7 @@ func (br *Reader) ReadDecompressedPayload(b *Block) ([]byte, error) {
 	return out, nil
 }
 
-// claimDecoded is the allocation gate for DECOMPRESSED bytes. It deliberately
-// does not use claim: that bounds a length field by the bytes remaining in the
-// input, which is the correct test for stored bytes and the wrong one here --
-// expanding beyond the input size is what a codec is for. The bound is the
-// reader's configured cap (DefaultMaxAlloc unless NewReaderLimited says
-// otherwise), which is what keeps a decompression bomb from being an
-// unbounded allocator.
+// claimDecoded is the allocation gate for DECOMPRESSED bytes.
 func (br *Reader) claimDecoded(n uint64) error {
 	if n > uint64(br.maxAlloc) {
 		return fmt.Errorf("binpazer: decompressed payload claims %d bytes, over the %d-byte cap: %w", n, br.maxAlloc, ErrCapacityExceeded)
@@ -442,9 +388,8 @@ func min64(a, b uint64) uint64 {
 // codec, wrapped in a Compression Envelope. flags must not already contain
 // FlagCompressed; it is added.
 //
-// A compressed block makes the file 1.1, so the header's version_minor is
-// back-patched by End -- which needs a seekable destination. On a non-seekable
-// writer, declare the version up front with NewWriterVersion.
+// On a non-seekable writer, declare the version up front with
+// NewWriterVersion.
 func (bw *Writer) CompressedBlock(typeID, flags, codecID uint16, payload []byte) error {
 	if bw.err != nil {
 		return bw.err

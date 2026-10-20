@@ -14,8 +14,7 @@ import (
 )
 
 // resetFlags restores every command flag to its default so a value set by one
-// execute call cannot leak into the next (pflag values are sticky between
-// Execute calls in the same process).
+// execute call cannot leak.
 func resetFlags() {
 	for _, c := range rootCmd.Commands() {
 		c.Flags().VisitAll(func(f *pflag.Flag) {
@@ -53,9 +52,9 @@ func executeIO(in io.Reader, args ...string) (stdout, stderr string, err error) 
 	return ob.String(), eb.String(), err
 }
 
-// writeSampleManifest writes a small pack manifest (two user types, three
-// blocks, index enabled) plus its referenced payload file into dir and
-// returns the manifest path.
+// writeSampleManifest writes a small pack manifest (user types, blocks,
+// index enabled) plus its referenced payload file into dir and returns
+// the manifest path.
 func writeSampleManifest(t *testing.T, dir string) string {
 	t.Helper()
 	big := make([]byte, 4096)

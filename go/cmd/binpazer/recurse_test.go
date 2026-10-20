@@ -14,7 +14,7 @@ import (
 )
 
 // childBytes builds one on-disk nested block: header + payload (+ CRC when
-// has_crc) + zero pad to 8 bytes.
+// has_crc) + zero pad to several bytes.
 func childBytes(tid, flags uint16, payload []byte) []byte {
 	var h [8]byte
 	binary.LittleEndian.PutUint16(h[0:], tid)
@@ -35,8 +35,8 @@ func childBytes(tid, flags uint16, payload []byte) []byte {
 	return b
 }
 
-// writeArchive writes blocks into a fresh binpazer file (two user types plus
-// type 9 mapped to the Group GUID) and returns its path and bytes.
+// writeArchive writes blocks into a fresh binpazer file (user types plus a
+// later type mapped to the Group GUID) and returns its path and bytes.
 func writeArchive(t *testing.T, dir, name string, add func(*binpazer.Writer)) (string, []byte) {
 	t.Helper()
 	g1, err := binpazer.ParseGUID("11223344-5566-7788-99aa-bbccddeeff00")
@@ -59,9 +59,6 @@ func writeArchive(t *testing.T, dir, name string, add func(*binpazer.Writer)) (s
 	return p, append([]byte(nil), mf.buf...)
 }
 
-// groupArchive: block 0 = a group holding a CRC leaf and a nested group;
-// block 1 = a group through the GUID mapping (type 9); block 2 = a malformed
-// group whose payload is not a block sequence.
 func groupArchive(t *testing.T, dir string) string {
 	t.Helper()
 	inner := childBytes(1, binpazer.FlagHasCRC, []byte("mesh-data"))
@@ -118,7 +115,7 @@ func TestRecurseDepthLimit(t *testing.T) {
 	for i := 0; i < 40; i++ {
 		deep = childBytes(binpazer.TypeGroup, 0, deep)
 	}
-	// deep is now a child block; its payload is 40 levels of nesting.
+	// deep is now a child block; its payload is many levels of nesting.
 	path, _ := writeArchive(t, dir, "deep.binpazer", func(bw *binpazer.Writer) {
 		plen := int(binary.LittleEndian.Uint32(deep[4:]))
 		require.NoError(t, bw.Block(binpazer.TypeGroup, 0, deep[8:8+plen]))

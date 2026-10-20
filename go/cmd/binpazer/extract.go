@@ -38,8 +38,8 @@ func writePayload(br *binpazer.Reader, b *binpazer.Block, w io.Writer, stored bo
 
 // runExtract streams the payload of the k-th block (0-based, file order) with
 // the given type id to w. Seekable inputs jump via Find/At -- straight through
-// the Block Index when the file carries one -- and non-seekable inputs fall
-// back to a sequential walk.
+// the Block Index when the file carries one. And non-seekable inputs fall back
+// to a sequential walk.
 func runExtract(br *binpazer.Reader, typeID uint16, k int, w io.Writer, stored bool) error {
 	if k < 0 {
 		return fmt.Errorf("--index must be >= 0")

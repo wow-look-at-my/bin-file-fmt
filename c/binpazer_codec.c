@@ -8,11 +8,9 @@
 #include <zlib.h>
 #include <zstd.h>
 
-/* Every buffer is caller-owned, so a length that cannot be expressed as a
- * size_t on this platform is a capacity error rather than a truncation. */
+/* Every buffer is caller-owned. */
 static int fits_size(uint64_t n) { return n <= (uint64_t)(size_t)-1; }
 
-/* ---- stored (registry id 1): the identity codec ---- */
 
 static binpazer_status stored_compress(void *u, const void *src, uint64_t n,
                                        void *dst, uint64_t *dst_len) {
@@ -33,10 +31,8 @@ static binpazer_status stored_decompress(void *u, const void *src, uint64_t n,
 
 static uint64_t stored_bound(void *u, uint64_t n) { (void)u; return n; }
 
-/* ---- deflate (registry id 2): raw DEFLATE, RFC 1951 ---- */
 
-/* zlib's avail_in/avail_out are uInt, so a payload larger than that is fed in
- * slices; the stream itself is unaffected. */
+/* zlib's avail_in/avail_out are uInt, so a payload larger than that is fed in slices; the stream itself is unaffected. */
 static uInt slice32(uint64_t n) { return n > (uint64_t)UINT_MAX ? UINT_MAX : (uInt)n; }
 
 static binpazer_status deflate_compress(void *u, const void *src, uint64_t src_len,
@@ -44,7 +40,7 @@ static binpazer_status deflate_compress(void *u, const void *src, uint64_t src_l
     (void)u;
     z_stream zs;
     memset(&zs, 0, sizeof zs);
-    /* A negative windowBits selects RAW deflate -- no zlib or gzip wrapper,
+    /* 
      * which is what RFC 1951 (and every other implementation) means by
      * "deflate" here. */
     if (deflateInit2(&zs, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -MAX_WBITS, 8,
@@ -108,8 +104,7 @@ static binpazer_status deflate_decompress(void *u, const void *src, uint64_t src
 
         if (ret == Z_STREAM_END) break;
         if (ret != Z_OK) { inflateEnd(&zs); return BINPAZER_ERR_FORMAT; }
-        /* No progress possible: either the stream wants more input than exists
-         * or it would outrun the declared length. Both are corruption. */
+        /* No progress possible: either the stream wants more input than exists or it would outrun the declared length. */
         if (made == 0 && zs.avail_in == 0 && in_left == 0) { inflateEnd(&zs); return BINPAZER_ERR_FORMAT; }
         if (out_left == 0 && ret != Z_STREAM_END) { inflateEnd(&zs); return BINPAZER_ERR_FORMAT; }
     }
@@ -121,14 +116,11 @@ static binpazer_status deflate_decompress(void *u, const void *src, uint64_t src
 
 static uint64_t deflate_bound(void *u, uint64_t n) {
     (void)u;
-    /* compressBound is defined for uLong inputs; for anything larger the
-     * per-slice worst case still bounds the whole stream, since deflate's
-     * expansion is proportional. */
+    /* compressBound is defined for uLong inputs. */
     uint64_t slices = n / (uint64_t)UINT_MAX + 1;
     return slices * (uint64_t)compressBound(slice32(n)) + 64;
 }
 
-/* ---- zstd (registry id 3): RFC 8878 ---- */
 
 static binpazer_status zstd_compress(void *u, const void *src, uint64_t src_len,
                                      void *dst, uint64_t *dst_len) {
@@ -136,7 +128,7 @@ static binpazer_status zstd_compress(void *u, const void *src, uint64_t src_len,
     if (!fits_size(src_len) || !fits_size(*dst_len)) return BINPAZER_ERR_CAPACITY;
     size_t got = ZSTD_compress(dst, (size_t)*dst_len, src, (size_t)src_len,
                                ZSTD_CLEVEL_DEFAULT);
-    /* Distinguished without zstd_errors.h: the one failure a caller can act on
+    /* 
      * is a destination below the codec's own bound. */
     if (ZSTD_isError(got))
         return *dst_len < ZSTD_compressBound((size_t)src_len)
@@ -160,7 +152,6 @@ static uint64_t zstd_bound(void *u, uint64_t n) {
     return ZSTD_compressBound((size_t)n);
 }
 
-/* ---- lz4 (registry id 4): LZ4 frame format ---- */
 
 static binpazer_status lz4_compress(void *u, const void *src, uint64_t src_len,
                                     void *dst, uint64_t *dst_len) {
@@ -195,8 +186,7 @@ static binpazer_status lz4_decompress(void *u, const void *src, uint64_t src_len
         in += in_n; in_left -= in_n;
         out += out_n; out_left -= out_n;
         if (hint == 0) break;                       /* frame complete */
-        /* Neither side moved and the frame wants more: truncated input, or a
-         * frame that decodes to more than the envelope declares. */
+        /* Neither side moved and the frame wants more: truncated input. */
         if (in_n == 0 && out_n == 0) { st = BINPAZER_ERR_FORMAT; break; }
     }
     LZ4F_freeDecompressionContext(dctx);

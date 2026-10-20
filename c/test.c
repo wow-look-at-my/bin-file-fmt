@@ -34,7 +34,7 @@ static int failures = 0;
 #define CHECK(cond, msg) do { if (!(cond)) { printf("FAIL: %s\n", msg); failures++; } } while (0)
 
 /* Exercises the Block Index: write with an index, discover it via the footer,
- * find blocks by type without walking, and confirm the no-index walk fallback. */
+ * find blocks by type without walking. It confirm the no-index walk fallback. */
 static void test_index(void) {
     static uint8_t bufA[65536], bufB[65536];
     membuf A = { bufA, sizeof bufA, 0, 0 };
@@ -45,7 +45,7 @@ static void test_index(void) {
     binpazer_type_def defs[2] = { {1, {{0}}, "A"}, {2, {{0}}, "B"} };
     defs[0].guid = g1; defs[1].guid = g2;
 
-    /* file A: three blocks + index + footer */
+    /* file A: blocks + index + footer */
     binpazer_writer w;
     binpazer_writer_begin(&w, mem_write, mem_seek, &A, &wg, "demo", defs, 2);
     binpazer_index_entry idx[3];
@@ -142,7 +142,6 @@ static void test_btt_capacity(void) {
     binpazer_writer_begin(&w, mem_write, mem_seek, &m, &wg, "demo", defs, 3);
     CHECK(binpazer_writer_end(&w) == BINPAZER_OK, "btt-cap: write file");
 
-    /* 4 entries on disk (BTT + 3 user types); a 2-entry buffer is too small */
     m.pos = 0;
     binpazer_reader r; char nm[16]; binpazer_type_entry te[2]; size_t nte = 0;
     CHECK(binpazer_reader_begin(&r, mem_read, mem_seek, &m, nm, sizeof nm, te, 2, &nte)
@@ -167,17 +166,13 @@ static void test_btt_capacity(void) {
           "btt-cap: entries intact");
 }
 
-/* Compression (SPEC.md 1.1): the library writes and parses the envelope but
- * carries no codec, so this exercises codec `stored` (identity) and the GUID
- * escape -- the two a dependency-free implementation can produce. */
 /* Group blocks: nested blocks parsed out of one payload, matching what the Go
  * library's ParseGroupPayload returns for the same bytes. */
 static void put16(uint8_t *p, uint16_t v) { p[0]=(uint8_t)v; p[1]=(uint8_t)(v>>8); }
 static void put32(uint8_t *p, uint32_t v) { for (int i=0;i<4;i++) p[i]=(uint8_t)(v>>(8*i)); }
 
 static void test_group_parse(void) {
-    /* Two children: type 1 "abcd" with a CRC, type 2 "xy" without. Each is a
-     * top-level block header verbatim, 8-byte aligned. */
+    /* Children: one type "abcd" with a CRC, a later type "xy" without. */
     uint8_t g[64];
     memset(g, 0, sizeof g);
     size_t off = 0;
@@ -191,7 +186,7 @@ static void test_group_parse(void) {
 
     put16(g + off, 2); put16(g + off + 2, 0); put32(g + off + 4, 2);
     memcpy(g + off + 8, "xy", 2);
-    off = 32; /* 16 + header(8) + payload(2) -> aligned to 32 */
+    off = 32; /* */
 
     binpazer_group_child kids[4];
     size_t n = 0;
@@ -214,16 +209,12 @@ static void test_group_parse(void) {
     CHECK(!kids[0].crc_ok && kids[1].crc_ok, "group: bad crc flagged on the right child");
     g[12] ^= 0xFF;
 
-    /* A child claiming more than the group holds stops the walk, keeping the
-     * children already parsed. */
+    /* A child claiming more than the group holds stops the walk, keeping the children already parsed. */
     put32(g + 16 + 4, 999);
     CHECK(binpazer_group_parse(g, off, kids, 4, &n) == BINPAZER_ERR_FORMAT, "group: overlong child rejected");
     CHECK(n == 1, "group: intact prefix survives");
 }
 
-/* A streaming writer (no seek) can compress once it declares 1.1 up front --
- * the version cannot be back-patched without a seek, so it must be stated
- * before any content is written. */
 static void test_streaming_compressed(void) {
     static uint8_t buf[4096];
     membuf m = { buf, sizeof buf, 0, 0 };
@@ -256,8 +247,7 @@ static void test_streaming_compressed(void) {
     CHECK(c.codec_id == BINPAZER_CODEC_STORED && c.uncompressed_length == 7, "streaming: envelope fields");
     CHECK(memcmp(pb + c.header_size, "payload", 7) == 0, "streaming: stored bytes");
 
-    /* Without the up-front declaration it is still refused: nothing can raise
-     * the version afterwards. */
+    /* Without the up-front declaration it is still refused: nothing can raise the version afterwards. */
     membuf m2 = { buf, sizeof buf, 0, 0 };
     binpazer_writer w2;
     binpazer_writer_begin(&w2, mem_write, NULL, &m2, &wg, "stream", defs, 1);
@@ -266,8 +256,7 @@ static void test_streaming_compressed(void) {
           "streaming: 1.0 header + no seek is still refused");
 }
 
-/* Streaming a payload: peak memory is the scratch buffer, not the payload, and
- * the CRC is still verified. */
+/* Streaming a payload: peak memory is the scratch buffer, not the payload, and the CRC is still verified. */
 typedef struct { uint8_t *dst; size_t cap, len; size_t chunks; } sink_ctx;
 
 static binpazer_status collect(void *ctx, const void *buf, size_t n) {
@@ -337,7 +326,6 @@ static void test_stream_payload(void) {
           "stream: corrupted payload fails the CRC");
 }
 
-/* GUID text, matching the Go library's canonical 8-4-4-4-12 form. */
 static void test_guid_text(void) {
     binpazer_guid g = {{0xaa,0xbb,0xcc,0xdd, 0x00,0x01, 0x02,0x03, 0x04,0x05,
                         0x06,0x07,0x08,0x09,0x0a,0x0b}};
@@ -373,9 +361,9 @@ static void test_compression(void) {
     binpazer_type_def defs[1] = { { 2, {{0}}, "Note" } };
     defs[0].guid = g_note;
 
-    const char *plain      = "plain block";           /* 11 bytes */
-    const char *compressed = "compressed, sort of";   /* 19 bytes */
-    const char *guidcodec  = "guid-codec payload";    /* 18 bytes */
+    const char *plain      = "plain block";           /* Several bytes */
+    const char *compressed = "compressed, sort of";   /* Several bytes */
+    const char *guidcodec  = "guid-codec payload";    /* Several bytes */
 
     binpazer_writer w;
     CHECK(binpazer_writer_begin(&w, mem_write, mem_seek, &m, &writer, "demo",
@@ -397,7 +385,6 @@ static void test_compression(void) {
     size_t nent = 0;
     CHECK(binpazer_reader_begin(&r, mem_read, mem_seek, &m, NULL, 0,
                                 entries, 8, &nent) == BINPAZER_OK, "compress: reader_begin");
-    /* A compressed block makes the file 1.1, back-patched by writer_end. */
     CHECK(r.version_minor == BINPAZER_VERSION_MINOR_COMPRESSION, "compress: version_minor is 1.1");
 
     binpazer_block b;
@@ -427,8 +414,7 @@ static void test_compression(void) {
     CHECK(memcmp(c.codec_guid.bytes, g_codec.bytes, 16) == 0, "compress: block 2 codec guid");
     CHECK(memcmp(payload + c.header_size, guidcodec, 18) == 0, "compress: block 2 codec bytes");
 
-    /* Envelope validation: codec id 0, set reserved fields, and a payload too
-     * short to hold the header are all corruption. */
+    /* Envelope validation: codec one id. */
     uint8_t bad[BINPAZER_ENVELOPE_FIXED_SIZE] = {0};
     CHECK(binpazer_compression_parse(bad, sizeof bad, &c) == BINPAZER_ERR_FORMAT, "compress: codec id 0 rejected");
     bad[0] = BINPAZER_CODEC_STORED; bad[2] = 1;
@@ -463,9 +449,9 @@ int main(void) {
     defs[0].guid = g_mesh;
     defs[1].guid = g_note;
 
-    const char *mesh_payload = "vertices-go-here";          /* 16 bytes */
-    const char *note_payload = "hello, file!";              /* 12 bytes */
-    const char *big_payload  = "0123456789ABCDEF01234567";  /* 24 bytes */
+    const char *mesh_payload = "vertices-go-here";          /* Several bytes */
+    const char *note_payload = "hello, file!";              /* Several bytes */
+    const char *big_payload  = "0123456789ABCDEF01234567";  /* Many bytes */
 
     /* ---- write ---- */
     binpazer_writer w;
@@ -476,7 +462,7 @@ int main(void) {
                                 mesh_payload, 16) == BINPAZER_OK, "write mesh");
     /* an ancillary block */
     CHECK(binpazer_writer_block(&w, 2, 0, note_payload, 12) == BINPAZER_OK, "write note");
-    /* a third (normal) block, repeating type id 1 */
+    /* a third (normal) block, repeating type one id */
     CHECK(binpazer_writer_block(&w, 1, 0,
                                 big_payload, 24) == BINPAZER_OK, "write third");
     CHECK(binpazer_writer_end(&w) == BINPAZER_OK, "writer_end");
@@ -504,7 +490,6 @@ int main(void) {
     CHECK(r.version_major == 1 && r.version_minor == 0, "version");
     CHECK(memcmp(r.writer_guid.bytes, writer.bytes, 16) == 0, "writer guid");
     CHECK(nentries == 3, "btt entry count (BTT + Mesh + Note)");
-    /* entry 0 is the auto BTT (65534), then Mesh(1), Note(2) */
     CHECK(entries[0].type_id == BINPAZER_TYPE_BLOCK_TYPE_TABLE, "entry0 is BTT");
     CHECK(memcmp(entries[0].guid.bytes, BINPAZER_GUID_BLOCK_TYPE_TABLE.bytes, 16) == 0, "entry0 guid");
     CHECK(entries[1].type_id == 1 && memcmp(entries[1].guid.bytes, g_mesh.bytes,16)==0, "entry1 Mesh");
@@ -513,7 +498,7 @@ int main(void) {
     binpazer_block blk;
     uint8_t pbuf[64];
 
-    /* block 1: Mesh, critical + crc */
+    /* One block: Mesh, critical + crc */
     CHECK(binpazer_reader_next(&r, entries, nentries, &blk) == BINPAZER_OK, "next mesh");
     CHECK(blk.type_id == 1 && blk.known, "mesh type/known");
     CHECK(memcmp(blk.guid.bytes, g_mesh.bytes, 16) == 0, "mesh guid resolved");
@@ -522,13 +507,13 @@ int main(void) {
     CHECK(binpazer_reader_read_payload(&r, &blk, pbuf, sizeof pbuf) == BINPAZER_OK, "read mesh payload (crc ok)");
     CHECK(memcmp(pbuf, mesh_payload, 16) == 0, "mesh payload bytes");
 
-    /* block 2: Note, ancillary */
+    /* A later block: Note, ancillary */
     CHECK(binpazer_reader_next(&r, entries, nentries, &blk) == BINPAZER_OK, "next note");
     CHECK(blk.type_id == 2 && blk.payload_len == 12, "note type/len");
     CHECK(binpazer_reader_read_payload(&r, &blk, pbuf, sizeof pbuf) == BINPAZER_OK, "read note payload");
     CHECK(memcmp(pbuf, note_payload, 12) == 0, "note payload bytes");
 
-    /* block 3: a normal repeat of type 1 */
+    /* A later block: a normal repeat of one type */
     CHECK(binpazer_reader_next(&r, entries, nentries, &blk) == BINPAZER_OK, "next third");
     CHECK(blk.type_id == 1 && (blk.flags & BINPAZER_FLAG_LARGE_MODE) == 0, "third normal");
     CHECK(blk.payload_len == 24, "third len");

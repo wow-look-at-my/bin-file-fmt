@@ -8,17 +8,17 @@ import (
 // FuzzReader hammers the full read surface: NewReader (header + block type
 // table), the Next/ReadPayload/SkipPayload walk, and Find/At. Property: no
 // panics and no unbounded allocations -- every length/count field is
-// bounds-checked against the input size before it sizes an allocation, so
-// hostile inputs fail with typed errors (the companion tests in
+// bounds-checked against the input size before it sizes an allocation.
+// Hostile inputs fail with typed errors (the companion tests in
 // hardening_test.go assert the exact errors for each crafted seed).
 func FuzzReader(f *testing.F) {
 	sample := sampleBytes(f)
 	f.Add(sample)
-	f.Add([]byte("binpazer"))    // magic only: truncated header
-	f.Add(hugePayloadSample(f))  // ~16 TiB large-mode payload claim
-	f.Add(hugeBTTCountSample(f)) // 2^32-1 type table entries claimed
-	f.Add(hugeNameLenSample(f))  // ~4 GiB writer-name claim
-	f.Add(corruptCRCSample(f))   // CRC mismatch path
+	f.Add([]byte("binpazer")) // magic only: truncated header
+	f.Add(hugePayloadSample(f))
+	f.Add(hugeBTTCountSample(f))
+	f.Add(hugeNameLenSample(f))
+	f.Add(corruptCRCSample(f)) // CRC mismatch path
 	for _, n := range []int{4, 56, 60, 100, 150, 224, 279} {
 		f.Add(sample[:n]) // truncated prefixes
 	}
