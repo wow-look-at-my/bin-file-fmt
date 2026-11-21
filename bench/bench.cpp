@@ -125,12 +125,6 @@ uint16_t parse_codec(const char *s) {
 	fail("unknown codec: %s", s);
 }
 
-void grow(std::vector<uint8_t> &b, uint64_t need) {
-	if (need <= b.size()) return;
-	if (need > SIZE_MAX) fail("buffer of %" PRIu64 " bytes exceeds the address space", need);
-	b.resize(static_cast<size_t>(need));
-}
-
 std::vector<uint8_t> load_payload(const char *path) {
 	File f(path, "rb");
 	off_t size;
@@ -264,7 +258,6 @@ void cmd_find(const char *path, const char *lookups_s) {
 	std::vector<uint64_t> offsets = in.r.find(kTypePayload);
 	if (!in.r.ok()) fail("find (status %d)", status_code(in.r.status()));
 	if (offsets.empty()) fail("find returned no type-%u blocks", kTypePayload);
-	std::vector<uint8_t> scratch, dst;
 	uint64_t bytes = 0;
 	uint32_t h = kFnvBasis;
 	for (uint64_t k = 0; k < lookups; k++) {
@@ -274,9 +267,9 @@ void cmd_find(const char *path, const char *lookups_s) {
 		if (!b) fail("seeking to the block at offset %" PRIu64 " (status %d)", off, status_code(in.r.status()));
 		if (b->type_id != kTypePayload)
 			fail("block at offset %" PRIu64 " has type %u, not %u", off, b->type_id, kTypePayload);
-		uint64_t len = in.read_decoded(*b, scratch, dst);
-		h = sum_block(h, dst.data(), len);
-		bytes += len;
+		const std::vector<uint8_t> p = in.read_decoded(*b);
+		h = sum_block(h, p.data(), p.size());
+		bytes += p.size();
 	}
 	print_result("find", lookups, bytes, h);
 }
