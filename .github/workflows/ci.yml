@@ -98,7 +98,7 @@ jobs:
   # Publish the CLI matrix binaries to https://pazer.build. buildhost scopes a repo's OIDC token to the repo's own namespace, and the binary name (binpazer) differs from the repo name. The action publishes it as the nested project "bin-file-fmt/binpazer" (auto-provisioned on first publish, git branch recorded on the release): https://dl.pazer.build/bin-file-fmt/binpazer?branch=<branch>&os=<os>&arch=<arch>
   publish:
     runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
-    needs: [go, c-cpp]
+    needs: [go, c-cpp, ts, bench]
     permissions:
       id-token: write # mint the OIDC token buildhost trusts
       contents: read
@@ -115,6 +115,65 @@ jobs:
       - uses: wow-look-at-my/buildhost/.github/actions/buildhost-publish@lkgb
         with:
           path: build
+
+  # The TypeScript implementation: ts0 type-checks, runs the suite and builds. The suite compiles c/interop.c and runs the reference lz4 tool, so both go in first.
+  ts:
+    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Codec libraries and the reference lz4 tool
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential zlib1g-dev libzstd-dev liblz4-dev lz4
+      - uses: wow-look-at-my/ts0@lkgb
+        with:
+          working-directory: ts
+
+  # Runs every implementation through the same workloads in quick mode. The driver fails when two implementations disagree on a file or a checksum, so this is also the four-way interop check. The numbers of a shared runner are noisy: the committed bench/RESULTS.md comes from a full run on one machine.
+  bench:
+    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
+    needs: [go]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Codec libraries
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential zlib1g-dev libzstd-dev liblz4-dev
+      - uses: wow-look-at-my/actions@cache-download#latest
+        with:
+          name: go-build-go.bgo
+          path: go/build
+      - name: C and C++ bench programs
+        run: make -C bench
+      - name: TypeScript bench program
+        uses: wow-look-at-my/ts0@lkgb
+        with:
+          working-directory: ts
+      - name: Driver type-check and unit tests
+        uses: wow-look-at-my/ts0@lkgb
+        with:
+          working-directory: bench
+      - name: Quick benchmark across all implementations
+        uses: wow-look-at-my/actions@typescript#latest
+        with:
+          script: |
+            const walk = (d: string): string[] =>
+              fs.readdirSync(d, { withFileTypes: true }).flatMap((e): string[] => {
+                const p = path.join(d, e.name);
+                return e.isDirectory() ? walk(p) : [p];
+              });
+            const built: string[] = fs.existsSync('go/build') ? walk('go/build') : [];
+            const bp = built.find((f: string) => path.basename(f) === 'binpazer')
+              ?? built.find((f: string) => /binpazer.*linux.*amd64/.test(path.basename(f)));
+            if (!bp) {
+              core.setFailed(`no linux/amd64 binpazer in the build hand-off (found: ${built.join(', ') || 'nothing'})`);
+              return;
+            }
+            fs.chmodSync(bp, 0o755);
+            await $`node bench/run.ts --quick --go-bin ${bp}`;
+            await core.summary.addRaw(fs.readFileSync('bench/work/RESULTS.md', 'utf-8')).write();
 
   c-cpp:
     runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
