@@ -276,7 +276,7 @@ An optional fixed 16-byte footer at the very end points to the [Block Index](#bl
 2. If `version_major` exceeds the highest you support, refuse.
 3. Read the fixed header. Take `first_block_offset` and `file_length`.
 4. At `first_block_offset`, parse the block. It MUST be `type_id == 65534`. Build the `type_id -> {guid, name}` map.
-5. Walk blocks. For each: extract `type_id`, `flags`, `length`. This also covers resolve the GUID.
+5. Walk blocks. For each. This also covers resolve the GUID.
    - Known GUID: handle it.
    - Unknown GUID, `critical` set: stop -- the file needs a feature you lack.
    - Unknown GUID, `critical` clear: skip it.
