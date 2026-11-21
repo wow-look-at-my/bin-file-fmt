@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { assert, test } from "./testio.ts";
 
-const CORE = ["format.ts", "writer.ts", "reader.ts", "group.ts", "envelope.ts", "memory.ts", "core.ts"];
+const CORE = ["format.ts", "writer.ts", "reader.ts", "group.ts", "envelope.ts", "memory.ts", "stream.ts", "core.ts"];
 const FORBIDDEN = /(?:from|import)\s*\(?\s*["'](?:node:[^"']*|\.\/codec\.ts|\.\/lz4\.ts)["']/;
 
 test("core modules stay free of node: and codec imports", () => {

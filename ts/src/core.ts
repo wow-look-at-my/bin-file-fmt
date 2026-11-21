@@ -6,3 +6,4 @@ export * from "./memory.ts";
 export * from "./writer.ts";
 export * from "./reader.ts";
 export * from "./group.ts";
+export * from "./stream.ts";

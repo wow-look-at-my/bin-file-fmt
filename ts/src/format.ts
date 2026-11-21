@@ -73,10 +73,13 @@ export interface Source {
 	size?(): number;
 }
 
-// Sink.write must consume src before it returns: the writer reuses the buffer.
+// Sink.write may keep src: the writer never changes bytes it has passed to a
+// sink.
 export interface Sink {
 	write(src: Uint8Array): void;
 	seek?(offset: number): void;
+	// A large payload reaches the sink as the caller's own array. A sink that keeps chunks sets this to get a copy.
+	readonly keepsChunks?: boolean;
 }
 
 // Guid is several bytes in canonical (RFC 4122 text) order.
