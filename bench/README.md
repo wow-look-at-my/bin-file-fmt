@@ -47,6 +47,8 @@ node bench/run.ts --profile
 
 `make -C bench prof` builds `bench_c` and `bench_cpp` into `bench/build-prof/` with `-pg` and a static link, so gprof also samples libc and the codec libraries. After the timed runs of a workload, `--profile` runs each implementation. This happens once more for small/read, medium/write and medium/read. This also happens lz4/write and lz4/read: C and C++ under gprof, Go with `--cpuprofile` (pprof), TypeScript with `node --cpu-prof`. These profiled runs always use the full block counts, also with `--quick`, because the samplers only take samples a second. Each profiled run must print the same result line as the reference.
 
+Every write and read goes through the filesystem of the work directory. The report names it. A disk there can add kernel time that has nothing to do with the libraries. Point the work directory at a RAM-backed filesystem with `--work-dir`, or with the `BINPAZER_BENCH_WORK_DIR` environment variable. To keep the block device out of the numbers.
+
 `--render` runs nothing. It rebuilds the report from an existing results file, for a change to the report layout:
 
 ```sh

@@ -212,7 +212,7 @@ export class Bench {
 
 	run(): Results {
 		checkPrograms(this.opts);
-		const environment = collectEnvironment(this.opts.impls.includes("go") ? this.opts.bins.go : null);
+		const environment = collectEnvironment(this.opts.impls.includes("go") ? this.opts.bins.go : null, this.opts.workDir);
 		const workloads = this.opts.workloads.map((w) => this.runWorkload(w));
 		return { mode: this.opts.quick ? "quick" : "full", repeats: this.opts.repeats, environment, workloads, profiles: [...this.profiles] };
 	}
