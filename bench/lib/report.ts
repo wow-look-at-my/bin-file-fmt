@@ -131,14 +131,46 @@ function renderEnvironment(e: Environment): string {
 	return items.map((s) => `- ${s}`).join("\n");
 }
 
+function implLabel(impl: string): string {
+	return (IMPLS as readonly string[]).includes(impl) ? IMPL_LABELS[impl as Impl] : impl;
+}
+
+function formatPercent(p: number): string {
+	const r = Math.round(p);
+	return r === 0 ? "<1%" : `${r}%`;
+}
+
 export function renderProfiles(profiles: ProfileSummary[]): string {
 	if (profiles.length === 0) return "";
-	const parts = ["## Profiles"];
+	const known = IMPLS.filter((i) => profiles.some((p) => p.impl === i));
+	const impls = [...known, ...[...new Set(profiles.map((p) => p.impl))].filter((i) => !(IMPLS as readonly string[]).includes(i))];
+	const tools = impls.map((i) => `${implLabel(i)} ${profiles.find((p) => p.impl === i)!.tool}`);
+	const parts = [
+		"## Where the CPU time goes (self time, top functions)",
+		`Tools: ${tools.join(", ")}. Percentages are of each run's sampled CPU time. The profiled runs are separate runs from the timed ones.`,
+	];
+	const keys: string[] = [];
 	for (const p of profiles) {
-		const label = (IMPLS as readonly string[]).includes(p.impl) ? IMPL_LABELS[p.impl as Impl] : p.impl;
-		parts.push(`### ${label}: ${p.workload} / ${p.op}`);
-		parts.push(`${p.tool}, ${p.totalSamplesOrMs} ${p.unit} in total.`);
-		parts.push(renderTable(["Function", "Self %"], p.top.map((t) => [`\`${t.name}\``, t.selfPercent.toFixed(1)])));
+		const k = `${p.workload} / ${p.op}`;
+		if (!keys.includes(k)) keys.push(k);
+	}
+	for (const k of keys) {
+		const cols = impls.map((i) => {
+			const s = profiles.filter((p) => `${p.workload} / ${p.op}` === k && p.impl === i);
+			if (s.length !== 1) throw new Error(`expected one profile for ${k} / ${i}, got ${s.length}`);
+			return s[0]!;
+		});
+		const ranks = Math.max(...cols.map((c) => c.top.length));
+		const rows: string[][] = [];
+		for (let r = 0; r < ranks; r++) {
+			rows.push([String(r + 1), ...cols.map((c) => {
+				const t = c.top[r];
+				return t === undefined ? "" : `\`${t.name}\` (${formatPercent(t.selfPercent)})`;
+			})]);
+		}
+		rows.push(["sampled", ...cols.map((c) => `${c.totalSamplesOrMs.toFixed(0)} ${c.unit}`)]);
+		parts.push(`### ${k}`);
+		parts.push(renderTable(["Rank", ...impls.map(implLabel)], rows));
 	}
 	return parts.join("\n\n") + "\n";
 }

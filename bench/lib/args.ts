@@ -11,6 +11,8 @@ export interface Options {
 	workloads: Workload[];
 	workDir: string;
 	keep: boolean;
+	profile: boolean;
+	profBins: { c: string; cpp: string };
 	jsonPath: string;
 	reportPath: string;
 	bins: Record<Impl, string>;
@@ -28,10 +30,12 @@ export const USAGE = `usage: node bench/run.ts [options]
 	--report <path>      markdown report (default bench/RESULTS.md)
 	--c-bin, --cpp-bin, --go-bin <path>   bench program paths
 	--ts-bin <path>      the TypeScript bench .js file (run with node)
+	--profile            one extra profiled run per implementation for the hot-spot tables
+	--c-prof-bin, --cpp-prof-bin <path>   gprof builds (default bench/build-prof/bench_c, bench_cpp)
 	--help               print this text`;
 
-const VALUE_OPTIONS = ["--repeats", "--impls", "--only", "--work-dir", "--json", "--report", "--c-bin", "--cpp-bin", "--go-bin", "--ts-bin"];
-const FLAG_OPTIONS = ["--quick", "--keep", "--help"];
+const VALUE_OPTIONS = ["--repeats", "--impls", "--only", "--work-dir", "--json", "--report", "--c-bin", "--cpp-bin", "--go-bin", "--ts-bin", "--c-prof-bin", "--cpp-prof-bin"];
+const FLAG_OPTIONS = ["--quick", "--keep", "--profile", "--help"];
 
 function splitList(opt: string, v: string): string[] {
 	const parts = v.split(",").map((s) => s.trim());
@@ -93,6 +97,11 @@ export function parseArgs(argv: string[], repoRoot: string, cwd: string): Option
 		workloads,
 		workDir,
 		keep: flags.has("--keep"),
+		profile: flags.has("--profile"),
+		profBins: {
+			c: opt("--c-prof-bin", path.join(repoRoot, "bench", "build-prof", "bench_c")),
+			cpp: opt("--cpp-prof-bin", path.join(repoRoot, "bench", "build-prof", "bench_cpp")),
+		},
 		jsonPath: opt("--json", path.join(outBase, "results.json")),
 		reportPath: opt("--report", path.join(outBase, "RESULTS.md")),
 		bins: {

@@ -42,9 +42,15 @@ export function runMeasured(measureBin: string, statsFile: string, argv: string[
 }
 
 // Runs argv without measuring, for untimed cross-checks.
-export function runDirect(argv: string[]): RunOutput {
-	const r = spawnSync(argv[0]!, argv.slice(1), { stdio: ["ignore", "pipe", "inherit"], encoding: "utf8", maxBuffer: MAX_STDOUT });
+export function runDirect(argv: string[], cwd?: string): RunOutput {
+	const r = spawnSync(argv[0]!, argv.slice(1), { stdio: ["ignore", "pipe", "inherit"], encoding: "utf8", maxBuffer: MAX_STDOUT, cwd });
 	return { stdout: check(argv, r), stats: null };
+}
+
+// Throws naming the tool when `<tool> --version` cannot run.
+export function requireTool(tool: string): void {
+	const r = spawnSync(tool, ["--version"], { stdio: "ignore" });
+	if (r.error !== undefined || r.status !== 0) throw new Error(`${tool} is required by --profile but \`${tool} --version\` failed: ${r.error?.message ?? `status ${r.status}`}`);
 }
 
 // Streams the file through sha256 in reads.

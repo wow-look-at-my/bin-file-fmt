@@ -200,6 +200,9 @@ export function decompress(c: Compression, stored: Uint8Array): Uint8Array {
 // compressBlock writes one block from its logical payload, encoded with codecId.
 export function compressBlock(w: Writer, typeId: number, flags: number, codecId: number, codecGuid: Guid | null, payload: Uint8Array): void {
 	w.checkCanCompress();
+	if (codecId === CODEC_BY_GUID && codecGuid === null) {
+		throw new BinpazerError("range", "codec id 65535 needs a codec GUID");
+	}
 	const stored = compress(codecId, codecGuid, payload);
 	w.blockCompressed(typeId, flags, codecId, codecGuid, stored, payload.length);
 }
