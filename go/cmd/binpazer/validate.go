@@ -1,3 +1,5 @@
+// validate.go holds runValidate.
+
 package main
 
 import (
@@ -10,7 +12,7 @@ import (
 )
 
 func isPredefined(id uint16) bool {
-	return id >= binpazer.TypeGroup && id <= binpazer.TypeBlockTypeTable
+	return id >= binpazer.TypeEnd && id <= binpazer.TypeBlockTypeTable
 }
 
 // runValidate checks the input against every rule of SPEC.md's "Validation"
@@ -37,6 +39,7 @@ func runValidate(r io.Reader, maxAlloc int64) *validateResult {
 	}
 
 	indexBlockSeen, clean := v.walk(br)
+	v.appendFileChecks(br, clean)
 	v.lengthChecks(br, clean)
 	if br.InputSize() >= 0 {
 		v.indexChecks(br, indexBlockSeen)
@@ -54,7 +57,12 @@ func init() {
 magic/signature, first-block-is-BTT, duplicate or invalid type ids,
 unknown block types, reserved fields and flag bits, 8-byte alignment,
 file_length consistency, string NUL termination and UTF-8, CRC trailers,
-and footer/Block Index consistency.
+footer/Block Index consistency, and the rules of an appendable file (every
+block sealed, no Block Index, the End block last and empty).
+
+An open appendable file can end in a block that a writer has not finished.
+Those bytes are reported, not failed. A torn block (all bytes present, seal
+incorrect) is a finding: "binpazer append" repairs it.
 
 Each violation prints as one finding (rule id + offset + detail) and the
 exit status is nonzero when any finding exists. On non-seekable stdin,
@@ -85,6 +93,9 @@ pass/fail/skipped status.`,
 				if rs.Status == "skipped" && !strings.HasPrefix(rs.Reason, "not evaluated") {
 					fmt.Fprintf(w, "skipped: %s (%s)\n", rs.Rule, rs.Reason)
 				}
+			}
+			if p := res.InProgress; p != nil {
+				fmt.Fprintf(w, "in progress: the writer has not ended the file; unfinished bytes start at offset %d\n", p.Offset)
 			}
 			if res.OK {
 				fmt.Fprintln(w, "OK: file is spec-conformant")

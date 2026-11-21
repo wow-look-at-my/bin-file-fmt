@@ -33,7 +33,7 @@ c++ -std=c++17 -Wall -Wextra -O1 -fsanitize=address,undefined -fno-sanitize-reco
 
 Go rules:
 
-- **Never run bare `go` commands** -- always `go-toolchain` (no arguments) from `go/`. It enforces >=80% coverage and a per-file line budget (warning at many lines, **hard fail at 750** -- `reader.go` sits near 600, so split before adding bulk). Accept whatever it auto-rewrites (formatting, imports, go.mod) and commit those changes.
+- **Never run bare `go` commands** -- always `go-toolchain` (no arguments) from `go/`. It enforces >=80% coverage and a per-file line budget (warning at many lines, **hard fail at 750** -- split a file before it gets there). Accept whatever it auto-rewrites (formatting, imports, go.mod) and commit those changes.
 - Do not pipe go-toolchain's output (`| tail` etc.) -- it refuses to run.
 - **Exception:** `go-toolchain` cannot drive fuzzing engines. A real fuzz session uses the Go binary the toolchain provisioned (e.g. `/usr/local/go/bin/go`):
 
@@ -47,7 +47,7 @@ Nothing merges red.
 
 ## Layout
 
-`SPEC.md` is the format spec. `c/` is the allocation-free C11 reference (`binpazer.h`/`binpazer.c`, tests in `test.c`, fixture generator `gen.c`) plus the codec layer (`binpazer_codec.h`/`.c`, tests in `test_codec.c`) and the cross-impl harness `interop.c`. `cpp/` is a header-only C++17 wrapper over both (`binpazer.hpp`, tests in `test.cpp` and `test_codec.cpp`). `go/` is a pure-Go library at the package root -- `compress.go` for the envelope and codecs, `codecbuf.go` for the caller-buffer layer. Plus the cobra CLI in `go/cmd/binpazer/` (one command per file). `go/testdata/sample.binpazer` is the shared 280-byte fixture.
+`SPEC.md` is the format spec. `c/` is the allocation-free C11 reference (`binpazer.h`/`binpazer.c`, tests in `test.c` and `test_append.c`, fixture generator `gen.c`) plus the codec layer (`binpazer_codec.h`/`.c`, tests in `test_codec.c`) and the cross-impl harness `interop.c`. `cpp/` is a header-only C++17 wrapper over both. `go/` is a pure-Go library at the package root -- `compress.go` for the envelope and codecs, `codecbuf.go` for the caller-buffer layer. Plus the cobra CLI in `go/cmd/binpazer/` (one command per file). `go/testdata/sample.binpazer` is the shared 280-byte fixture.
 
 ## Parity across implementations
 
@@ -64,6 +64,9 @@ Anything one implementation can express, all three must -- a file none of the ot
 | declare 1.1 up front (streaming writer) | `NewWriterVersion` | `binpazer_writer_begin_version` / `Writer(..., version_minor)` |
 | GUID <-> canonical text | `ParseGUID` / `GUID.String` | `binpazer_guid_parse` / `_format` / `to_string` |
 | is a codec available? | `LookupCodec` / `LookupCodecGUID` | `binpazer_codec_lookup` |
+| start an appendable file | `NewAppendWriter` | `binpazer_writer_begin_append` / `Writer(binpazer::appendable, ...)` |
+| read only committed blocks | `NextCommitted` | `binpazer_reader_next_committed` / `Reader::next_committed` |
+| continue an open appendable file | `ResumeAppendWriter` | `binpazer_writer_resume` / `Writer(binpazer::resume, ...)` |
 
 Known and deliberate differences: Go's `NewReaderLimited` allocation cap has no C counterpart because C allocates nothing -- every buffer is the caller's. The cap is theirs already. The CLI is Go-only. `c/interop.c` is a test harness, not a tool.
 
@@ -77,10 +80,11 @@ Everything degrades gracefully without a seeker: sequential walk, read-through s
 
 - `binpazer.go` -- shared constants/types (flags, predefined type ids/GUIDs, `ioBufSize` = 64 KiB shared by reader/writer/streaming).
 - `reader.go` -- header/BTT parse, block walk, footer probe, `Find`/`At` index jumps. **`claim()` is the allocation gate**: every untrusted length/count is checked against the remaining input size (seekable) or the configured cap *before* any `make`. New parsing code must route through it.
-- `errors.go` -- typed sentinels (`ErrBadMagic`, `ErrCRCMismatch`, `ErrTruncated`, `ErrCapacityExceeded`), matched with `errors.Is`. Keep new failure modes typed, callers (validate) dispatch on them.
+- `errors.go` -- typed sentinels, matched with `errors.Is`. Keep new failure modes typed, callers (validate) dispatch on them.
 - `NewReaderLimited(r, maxAlloc)` -- reader for non-seekable inputs with an explicit per-field cap (`DefaultMaxAlloc` = 1 GiB. `maxAlloc<=0` selects it). Seekable inputs ignore the cap and use the real size, learned in `NewReader`.
 - `payload.go` -- streaming: `WritePayloadTo` (64 KiB chunks, incremental CRC) and `PayloadReader` (bounded reader, `SkipPayload` realigns afterwards). The CLI never buffers whole payloads. Keep it that way (RSS stays ~3 MB on files).
-- `container.go` -- convenience layer for the shape most files take (content blocks + a directory naming their offsets + index/footer): `NewReaderAt`, `FindFirst`/`FindLast`, `BlockAt`/`OpenAt` (offset + type check), `DecodeJSON`/`DecodeJSONLast`, `Put`/`PutCompressed`/`PutJSON` (write and report the offset), `Finish` (WriteIndex + End). Pure composition of the primitives -- it adds no format feature, so files it writes are ordinary binpazer files C and C++ already read. It is exempt from the parity table for that reason. New sugar belongs here, not in reader.go/writer.go.
+- `container.go` -- convenience layer for the shape most files take (content blocks + a directory naming their offsets + index/footer). Pure composition of the primitives -- it adds no format feature, so files it writes are ordinary binpazer files C and C++ already read. It is exempt from the parity table for that reason. New sugar belongs here, not in reader.go/writer.go.
+- `append.go`, `follow.go` -- appendable files: the append writer and resume, and `NextCommitted`. `locate.go` -- `Find`/`At`.
 - `writer.go` -- buffered writer + index/footer emission, `group.go` -- `ParseGroupPayload` for nested blocks (`binpazer_group_parse` in C, `binpazer::parse_group` in C++ -- same tolerance for a damaged group: the intact prefix comes back with the error). This also covers `guid.go` -- GUID parse/format.
 - All reads go through a `bufio.Reader`, so the raw input position can be ahead of the logical offset: reposition **only** via `seekTo(abs)` (never a raw relative seek).
 
@@ -98,7 +102,19 @@ Everything degrades gracefully without a seeker: sequential walk, read-through s
 
 `binpazer validate` implements SPEC.md's "Validation" section: the rule ids in `go/cmd/binpazer/validate_checks.go` (`allRules`) map one-to-one onto that checklist plus its implied checks (CRC trailers, footer/index consistency, structural parseability). If the checklist changes, update the rules and `validate_rules_test.go` (one corruption test per rule) together.
 
-Decision to preserve: the `unknown_type_id` rule **exempts predefined ids 65530-65534** (SPEC.md notes the exemption). The writer emits the Block Index (65533) without a BTT entry and writer bytes are frozen. A strict reading will flag every indexed file. Teaching the writer to add the entry instead will change output bytes in all implementations plus the fixture.
+Decision to preserve: the `unknown_type_id` rule **exempts predefined ids 65529-65534** (SPEC.md notes the exemption). The writer emits the Block Index (65533) without a BTT entry and writer bytes are frozen. A strict reading will flag every indexed file. Teaching the writer to add the entry instead will change output bytes in all implementations plus the fixture.
+
+## Appendable files (1.2)
+
+SPEC.md "Appendable files" is the contract. Header flag the first bit marks the file, the CRC trailer of each block is its commit seal, and the End block (`65529`) closes it. Invariants to keep:
+
+- **Committed means whole and sealed.** `NextCommitted` / `binpazer_reader_next_committed` surface a block only when its full extent, padding included, is in the file and the CRC verifies. Pending and torn leave the reader at the block start with no sticky error, so the caller polls. Never surface a block on its length alone.
+- **`TestFollowIsSafeAtEveryPrefix` (and `test_every_prefix` in C and C++) is the safety proof**: at every length the file can have, a reader sees exactly the whole blocks. A change to the read path must keep it green.
+- **Resume pads, it never overwrites in place.** A torn tail can hold a sealed block of its own (a child of a torn Group), so `ResumeAppendWriter` / `binpazer_writer_resume` cover every stale byte with sealed Padding blocks before appending. The Padding layout is byte-identical across implementations and pinned by `go/testdata/sample-resumed.binpazer`.
+- **The stays of the Block Type Table unsealed** in an appendable file. Readers in this repo older than 1.2 compute the table end without a CRC, so a sealed table breaks them.
+- **An appendable writer keeps no index** (memory must not grow with the file), flushes after every block, and refuses `WriteIndex`. `Find` on an appendable file walks committed blocks only.
+- Fixtures: `sample-appendable.binpazer` and `sample-resumed.binpazer`, from `gen <out> <compressed> <appendable> <resumed>`. The Go tests and `c/test_append.c` each compare their own writer against the files, so no CI step is involved.
+- CLI: `follow` and `append` are the user surface, and the read commands walk through `walkNext`, which stops at the last committed block.
 
 ## Compression (1.1)
 
@@ -106,7 +122,7 @@ Block flag a later bit is `compressed`. The stored payload is a **Compression En
 
 Invariants worth knowing before touching it:
 
-- **All implementations carry every codec the registry names** -- `stored`, `deflate`, `zstd`, `lz4`. Go uses klauspost/compress and pierrec/lz4, C and C++ use zlib, libzstd and liblz4 through `c/binpazer_codec.c`. No implementation may write a file another cannot read, so a codec added to one is added to all three or it is not added. `RegisterCodec`/`RegisterCodecGUID` (Go) and `binpazer_codec_register`/`_register_guid` (C) are for codecs OUTSIDE the registry (the GUID escape) or to override a built-in.
+- Go uses klauspost/compress and pierrec/lz4, C and C++ use zlib, libzstd and liblz4 through `c/binpazer_codec.c`. No implementation may write a file another cannot read, so a codec added to one is added to all three or it is not added. `RegisterCodec`/`RegisterCodecGUID` (Go) and `binpazer_codec_register`/`_register_guid` (C) are for codecs OUTSIDE the registry (the GUID escape) or to override a built-in.
 - **Parity means DECODE-compatibility, not same bytes.** A real codec's encoder output is implementation-defined -- zlib and klauspost/compress are under no obligation to agree, and do not. The byte-identity fixtures cover the uncompressed and `stored` cases, where agreement IS required. The interop check in the `go` CI job covers everything else. This has C write a file per codec. This holds for the Go CLI to decode and the Go CLI pack one per codec for `c/interop.c` to decode. Never "fix" a size difference between implementations -- it is not a defect.
 - **The C core stays dependency-free. Codecs are a SECOND translation unit.** `binpazer.c` links nothing but libc and knows only the envelope (`binpazer_writer_block_compressed` takes bytes the caller already encoded). `binpazer_codec.c` adds the codecs and links `-lz -lzstd -llz4`. `make -C c test` builds both `test_c` (core alone, no codec library) and `test_codec`, so dependency-freedom is a CHECK, not a claim -- same split in C++ (`test_cpp` / `test_cpp_codec`). The codec entry points in `binpazer.hpp` are inline, so including the header never forces the link.
 - **The caller-buffer API is the base layer everywhere**. The allocating forms are thin wrappers over it: `binpazer_compress`/`binpazer_decompress` and Go's `CompressInto`/`DecompressInto` write into a destination the caller owns and allocate nothing. Size it with `binpazer_compress_bound`/`CompressBound`. Which is why a bound is a required member of Go's `Codec` interface and a required function pointer in `binpazer_codec`. It must never under-report: too small a bound turns incompressible input into `ErrShortBuffer`, so `TestCompressBoundCoversIncompressibleInput` pins it against random data.

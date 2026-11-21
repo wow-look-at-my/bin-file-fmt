@@ -1,7 +1,10 @@
+// stdio.go holds nonSeekable.
+
 package main
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 
@@ -50,6 +53,20 @@ func openReader(cmd *cobra.Command, path string, maxAlloc int64) (*binpazer.Read
 		return nil, nil, err
 	}
 	return br, c, nil
+}
+
+// walkNext returns the next block a read command shows, and io.EOF where the walk ends.
+// In a seekable appendable file that is the next committed block: bytes still in progress end the walk.
+// A torn block stays an error, because the file needs a resume before it reads cleanly.
+func walkNext(br *binpazer.Reader) (*binpazer.Block, error) {
+	if !br.Appendable() || br.InputSize() < 0 {
+		return br.Next()
+	}
+	b, err := br.NextCommitted()
+	if errors.Is(err, binpazer.ErrPending) && !errors.Is(err, binpazer.ErrTorn) {
+		return nil, io.EOF
+	}
+	return b, err
 }
 
 // writeJSON emits v as indented JSON (snake_case field names come from the

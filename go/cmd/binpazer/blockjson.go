@@ -1,3 +1,5 @@
+// blockjson.go holds typeJSON.
+
 package main
 
 import (
@@ -44,6 +46,8 @@ type infoJSON struct {
 	HasIndex     bool        `json:"has_index"`
 	Types        []typeJSON  `json:"types"`
 	Blocks       []blockJSON `json:"blocks"`
+	// Appendable is present for an appendable file only.
+	Appendable *appendState `json:"appendable,omitempty"`
 }
 
 // dumpJSON is the shape of dump --json.

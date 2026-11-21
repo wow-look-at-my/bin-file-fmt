@@ -1,3 +1,5 @@
+// recurse.go holds maxNestDepth.
+
 package main
 
 import (

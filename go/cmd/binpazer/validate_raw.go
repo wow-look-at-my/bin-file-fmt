@@ -1,3 +1,5 @@
+// validate_raw.go holds rawStructuralChecks.
+
 package main
 
 import (
@@ -35,8 +37,8 @@ func (v *validator) rawStructuralChecks(rs io.ReadSeeker, br *binpazer.Reader) {
 		fail(err)
 		return
 	}
-	if hf := binary.LittleEndian.Uint32(hdr[48:]); hf != 0 {
-		v.add(ruleReservedZero, 48, "header_flags = %#x (must be 0)", hf)
+	if hf := binary.LittleEndian.Uint32(hdr[48:]) &^ binpazer.HeaderFlagAppendable; hf != 0 {
+		v.add(ruleReservedZero, 48, "header_flags sets reserved bits %#x", hf)
 	}
 	if rv := binary.LittleEndian.Uint32(hdr[52:]); rv != 0 {
 		v.add(ruleReservedZero, 52, "header reserved field = %#x (must be 0)", rv)

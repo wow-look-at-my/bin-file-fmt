@@ -1,3 +1,5 @@
+// compress.go holds FlagCompressed.
+
 package binpazer
 
 import (

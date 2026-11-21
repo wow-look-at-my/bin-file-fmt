@@ -1,3 +1,5 @@
+// validate_checks.go holds ruleMagic.
+
 package main
 
 import (
@@ -30,6 +32,9 @@ const (
 	ruleCRC            = "crc"                  // stored CRC-32C trailers match
 	ruleIndex          = "index"                // the footer and Block Index point at real blocks of the claimed types
 	ruleEnvelope       = "compression_envelope" // a compressed block carries a whole, well-formed Compression Envelope
+	ruleSeal           = "appendable_seal"      // every block of an appendable file after the type table sets has_crc
+	ruleAppendIndex    = "appendable_index"     // an appendable file holds no Block Index block and no footer
+	ruleEnd            = "end_block"            // the End block is in an appendable file only, is empty, and is last
 	ruleStructure      = "structure"            // the input parses: no truncation, capacity, or version problems
 )
 
@@ -38,6 +43,7 @@ var allRules = []string{
 	ruleMagic, ruleFirstBlockBTT, ruleBTTDupID, ruleBTTInvalidID,
 	ruleBlockInvalidID, ruleUnknownTypeID, ruleReservedZero, ruleAlignment,
 	ruleLength, ruleStringTerm, ruleStringUTF8, ruleCRC, ruleIndex, ruleEnvelope,
+	ruleSeal, ruleAppendIndex, ruleEnd,
 	ruleStructure,
 }
 
@@ -63,12 +69,15 @@ type validateResult struct {
 	OK       bool         `json:"ok"`
 	Findings []finding    `json:"findings"`
 	Rules    []ruleStatus `json:"rules"`
+	// InProgress locates the unfinished tail of an open appendable file. It is not a finding.
+	InProgress *inProgress `json:"in_progress,omitempty"`
 }
 
 // validator accumulates findings and skip reasons across the passes.
 type validator struct {
-	findings []finding
-	skipped  map[string]string
+	findings   []finding
+	skipped    map[string]string
+	inProgress *inProgress
 }
 
 func newValidator() *validator {
@@ -88,7 +97,7 @@ func (v *validator) finish() *validateResult {
 	for _, f := range v.findings {
 		failed.Add(f.Rule)
 	}
-	res := &validateResult{Findings: v.findings, OK: len(v.findings) == 0}
+	res := &validateResult{Findings: v.findings, OK: len(v.findings) == 0, InProgress: v.inProgress}
 	if res.Findings == nil {
 		res.Findings = []finding{}
 	}
@@ -160,15 +169,19 @@ func (v *validator) utf8Checks(br *binpazer.Reader) {
 func (v *validator) walk(br *binpazer.Reader) (indexBlockSeen, clean bool) {
 	n := 0
 	for {
-		b, err := br.Next()
+		b, err := v.nextBlock(br)
 		if err == io.EOF {
 			return indexBlockSeen, true
+		}
+		if errors.Is(err, errWalkStopped) {
+			return indexBlockSeen, false // nextBlock filed the finding
 		}
 		if err != nil {
 			v.add(ruleStructure, br.Offset(), "block %d: %v", n, err)
 			return indexBlockSeen, false
 		}
 		off := b.Offset()
+		v.appendBlockChecks(br, b, n)
 		if b.TypeID == binpazer.TypeInvalid || b.TypeID == binpazer.TypeInvalidMax {
 			v.add(ruleBlockInvalidID, off, "block %d uses invalid type_id %d", n, b.TypeID)
 		} else if !b.Known && !isPredefined(b.TypeID) {
@@ -204,6 +217,9 @@ func (v *validator) walk(br *binpazer.Reader) (indexBlockSeen, clean bool) {
 		}
 		if env != nil {
 			v.envelopeChecks(b, n, env.head[:env.n])
+		}
+		if v.openTail(br, err, off) {
+			return indexBlockSeen, true
 		}
 		if err != nil {
 			v.add(ruleStructure, br.Offset(), "block %d (type %d): %v", n, b.TypeID, err)

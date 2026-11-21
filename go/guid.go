@@ -1,3 +1,5 @@
+// guid.go holds ParseGUID.
+
 package binpazer
 
 import (
