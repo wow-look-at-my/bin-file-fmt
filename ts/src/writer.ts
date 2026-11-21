@@ -271,7 +271,9 @@ export class Writer {
 			this.fail(new BinpazerError("range", "payload too large for the length field (use FLAG_LARGE_MODE)"));
 		}
 
-		this.tracked.push({ typeId, offset: this.off });
+		if (!this.appendable) {
+			this.tracked.push({ typeId, offset: this.off });
+		}
 		const bh = new Uint8Array(8);
 		putU16(bh, 0, typeId);
 		putU16(bh, 2, flags);
@@ -292,6 +294,36 @@ export class Writer {
 			this.write(cb);
 		}
 		this.pad(align8(this.off) - this.off);
+		if (this.appendable) {
+			this.flush();
+		}
+	}
+
+	// padOver covers the next n bytes with sealed zero Padding blocks, laid out exactly as C and Go do.
+	private padOver(n: number): void {
+		while (n > 0) {
+			const extent = Math.min(Math.max(align8(n), 16), MAX_PAD_EXTENT);
+			const payloadLen = extent - 12;
+			const bh = new Uint8Array(8);
+			putU16(bh, 0, TYPE_PADDING);
+			putU16(bh, 2, FLAG_HAS_CRC);
+			putU32(bh, 4, payloadLen);
+			this.write(bh);
+			let crc = crc32c(0, bh);
+			for (let rem = payloadLen; rem > 0; ) {
+				const chunk = PAD_ZEROS.subarray(0, Math.min(rem, PAD_ZEROS.length));
+				this.write(chunk);
+				crc = crc32c(crc, chunk);
+				rem -= chunk.length;
+			}
+			const cb = new Uint8Array(4);
+			putU32(cb, 0, crc);
+			this.write(cb);
+			if (extent >= n) {
+				break;
+			}
+			n -= extent;
+		}
 	}
 
 	private writeBTTEntry(typeId: number, guid: Guid, name: Uint8Array): void {
