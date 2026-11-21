@@ -1,3 +1,5 @@
+// errors.go holds ErrBadMagic.
+
 package binpazer
 
 import "errors"

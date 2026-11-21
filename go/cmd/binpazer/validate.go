@@ -1,3 +1,5 @@
+// validate.go holds runValidate.
+
 package main
 
 import (

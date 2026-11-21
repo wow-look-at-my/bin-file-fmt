@@ -1,3 +1,5 @@
+// find.go holds findMatch.
+
 package main
 
 import (

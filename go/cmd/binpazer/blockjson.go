@@ -1,3 +1,5 @@
+// blockjson.go holds typeJSON.
+
 package main
 
 import (

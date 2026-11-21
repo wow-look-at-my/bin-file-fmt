@@ -1,3 +1,5 @@
+// pack.go holds payload.
+
 package main
 
 import (

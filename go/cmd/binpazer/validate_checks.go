@@ -1,3 +1,5 @@
+// validate_checks.go holds ruleMagic.
+
 package main
 
 import (

@@ -1,3 +1,5 @@
+// payload.go holds headerBytes.
+
 package binpazer
 
 import (

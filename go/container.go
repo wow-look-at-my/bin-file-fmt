@@ -1,3 +1,5 @@
+// container.go holds ErrBlockNotFound.
+
 package binpazer
 
 // Helpers for the shape most binpazer files take: content blocks written

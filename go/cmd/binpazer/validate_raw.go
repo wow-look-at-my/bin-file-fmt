@@ -1,3 +1,5 @@
+// validate_raw.go holds rawStructuralChecks.
+
 package main
 
 import (

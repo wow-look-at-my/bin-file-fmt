@@ -1,3 +1,5 @@
+// writer.go holds Writer.
+
 package binpazer
 
 import (

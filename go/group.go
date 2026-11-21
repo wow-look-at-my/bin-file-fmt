@@ -1,3 +1,5 @@
+// group.go holds GroupChild.
+
 package binpazer
 
 import (
