@@ -2,10 +2,43 @@
 
 import { closeSync, fstatSync, openSync, readSync, writeSync } from "node:fs";
 import { join } from "node:path";
-import { CODEC_BY_GUID, CODEC_STORED, FLAG_CRITICAL, FLAG_HAS_CRC } from "./format.ts";
+import assert from "node:assert/strict";
+import { BinpazerError, CODEC_BY_GUID, CODEC_STORED, FLAG_CRITICAL, FLAG_HAS_CRC } from "./format.ts";
 import type { Sink, Source } from "./format.ts";
 import { MemorySink } from "./memory.ts";
+import type { Block, Reader } from "./reader.ts";
 import { Writer } from "./writer.ts";
+
+export { default as assert } from "node:assert/strict";
+export { test } from "node:test";
+
+// codeOf runs f, requires it to throw a BinpazerError, and returns the error code.
+export function codeOf(f: () => unknown): string {
+	try {
+		f();
+	} catch (e) {
+		assert.ok(e instanceof BinpazerError, `expected BinpazerError, got ${String(e)}`);
+		return e.code;
+	}
+	assert.fail("expected a BinpazerError");
+}
+
+export function mustNext(r: Reader): Block {
+	const b = r.next();
+	assert.ok(b !== null, "expected another block");
+	return b;
+}
+
+// pattern returns deterministic pseudo-random bytes.
+export function pattern(n: number, seed = 1): Uint8Array {
+	const p = new Uint8Array(n);
+	let x = seed;
+	for (let i = 0; i < n; i++) {
+		x = (Math.imul(x, 1103515245) + 12345) >>> 0;
+		p[i] = x >>> 24;
+	}
+	return p;
+}
 
 export class FileSource implements Source {
 	private readonly fd: number;
