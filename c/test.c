@@ -171,6 +171,44 @@ static void test_btt_capacity(void) {
 static void put16(uint8_t *p, uint16_t v) { p[0]=(uint8_t)v; p[1]=(uint8_t)(v>>8); }
 static void put32(uint8_t *p, uint32_t v) { for (int i=0;i<4;i++) p[i]=(uint8_t)(v>>(8*i)); }
 
+/* CRC-32C one bit at a time, straight from the polynomial: the definition the
+ * table-driven library function must match. */
+static uint32_t crc32c_bitwise(uint32_t crc, const uint8_t *p, size_t n) {
+    crc = ~crc;
+    for (size_t i = 0; i < n; i++) {
+        crc ^= p[i];
+        for (int k = 0; k < 8; k++) crc = (crc >> 1) ^ (0x82F63B78u & ((uint32_t)0 - (crc & 1u)));
+    }
+    return ~crc;
+}
+
+static void test_crc32c(void) {
+    CHECK(binpazer_crc32c(0, "123456789", 9) == 0xE3069283u, "crc: check value of the standard test string");
+    CHECK(binpazer_crc32c(0, "", 0) == 0, "crc: empty input");
+
+    uint8_t buf[320];
+    uint32_t x = 0x9E3779B9u;
+    for (size_t i = 0; i < sizeof buf; i++) {
+        x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+        buf[i] = (uint8_t)x;
+    }
+    /* Every length across several word boundaries, at every start alignment. */
+    int same = 1;
+    for (size_t start = 0; start < 8; start++)
+        for (size_t len = 0; start + len <= sizeof buf; len++)
+            if (binpazer_crc32c(0, buf + start, len) != crc32c_bitwise(0, buf + start, len)) same = 0;
+    CHECK(same, "crc: matches the bitwise definition at every length and alignment");
+
+    /* Chaining over any split point gives the CRC of the whole. */
+    uint32_t whole = crc32c_bitwise(0, buf, sizeof buf);
+    int chained = 1;
+    for (size_t cut = 0; cut <= sizeof buf; cut++) {
+        uint32_t c = binpazer_crc32c(0, buf, cut);
+        if (binpazer_crc32c(c, buf + cut, sizeof buf - cut) != whole) chained = 0;
+    }
+    CHECK(chained, "crc: chained calls match one call at every split");
+}
+
 static void test_group_parse(void) {
     /* Children: one type "abcd" with a CRC, a later type "xy" without. */
     uint8_t g[64];
@@ -523,6 +561,7 @@ int main(void) {
     /* end */
     CHECK(binpazer_reader_next(&r, entries, nentries, &blk) == BINPAZER_END, "end of blocks");
 
+    test_crc32c();
     test_index();
     test_large();
     test_btt_capacity();

@@ -130,7 +130,7 @@ jobs:
         with:
           working-directory: ts
 
-  # Runs every implementation through the same workloads in quick mode. The driver fails when two implementations disagree on a file or a checksum, so this is also the four-way interop check. The numbers of a shared runner are noisy: the committed bench/RESULTS.md comes from a full run on one machine.
+  # Runs every implementation through the same workloads in quick mode, with the CPU profiles. The driver fails when implementations disagree on a file or a checksum, so this is also the live interop check across all of them. The numbers of a shared runner are noisy: the committed bench/RESULTS.md comes from a full run on one machine.
   bench:
     runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
     needs: [go]
@@ -145,8 +145,8 @@ jobs:
         with:
           name: go-build-go.bgo
           path: go/build
-      - name: C and C++ bench programs
-        run: make -C bench
+      - name: C and C++ bench programs, plain and gprof builds
+        run: make -C bench all prof
       - name: TypeScript bench program
         uses: wow-look-at-my/ts0@lkgb
         with:
@@ -172,7 +172,7 @@ jobs:
               return;
             }
             fs.chmodSync(bp, 0o755);
-            await $`node bench/run.ts --quick --go-bin ${bp}`;
+            await $`node bench/run.ts --quick --profile --go-bin ${bp}`;
             await core.summary.addRaw(fs.readFileSync('bench/work/RESULTS.md', 'utf-8')).write();
 
   c-cpp:
