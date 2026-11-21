@@ -40,7 +40,11 @@ func runAppend(rw io.ReadWriteSeeker, o appendOptions, w io.Writer) error {
 		if !known {
 			return fmt.Errorf("type %d is not in the file's block type table", o.typeID)
 		}
-		flags, err := parseFlags(o.flags)
+		var names []string
+		if o.flags != "" {
+			names = strings.Split(o.flags, ",")
+		}
+		flags, err := parseFlags(names)
 		if err != nil {
 			return err
 		}
