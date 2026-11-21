@@ -21,11 +21,19 @@ export function checkPrograms(opts: Options): void {
 		const bin = opts.bins[impl];
 		if (!fs.existsSync(bin)) throw new Error(`${IMPL_LABELS[impl]} bench program not found: ${bin}; build it with: ${BUILD_COMMANDS[impl]}`);
 	}
+	if (!opts.profile) return;
+	const gprofImpls = opts.impls.filter((i): i is "c" | "cpp" => i === "c" || i === "cpp");
+	for (const impl of gprofImpls) {
+		const bin = opts.profBins[impl];
+		if (!fs.existsSync(bin)) throw new Error(`${IMPL_LABELS[impl]} gprof build not found: ${bin}; build it with: make -C bench prof`);
+	}
+	if (gprofImpls.length > 0) requireTool("gprof");
 }
 
 export class Bench {
 	readonly opts: Options;
 	readonly made = new Set<string>();
+	readonly profiles: ProfileSummary[] = [];
 	readonly statsFile: string;
 
 	constructor(opts: Options) {
