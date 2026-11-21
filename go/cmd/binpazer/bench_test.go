@@ -5,10 +5,12 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,7 +38,16 @@ func fnvBlocks(payloads ...[]byte) string {
 }
 
 func benchLine(op string, blocks, n int, sum string) string {
-	return fmt.Sprintf("{\"op\":\"%s\",\"blocks\":%d,\"bytes\":%d,\"checksum\":\"%s\"}\n", op, blocks, n, sum)
+	line, err := json.Marshal(struct {
+		Op       string `json:"op"`
+		Blocks   int    `json:"blocks"`
+		Bytes    int    `json:"bytes"`
+		Checksum string `json:"checksum"`
+	}{op, blocks, n, sum})
+	if err != nil {
+		panic(err)
+	}
+	return string(line) + "\n"
 }
 
 func repeat(p []byte, n int) [][]byte {
@@ -94,6 +105,17 @@ func TestBenchWriteReadEveryCodec(t *testing.T) {
 	}
 }
 
+func TestBenchLineIsExact(t *testing.T) {
+	dir := t.TempDir()
+	f := benchFile(t, dir, "lit", []byte{1, 2, 3}, 1, "none")
+	o, err := execute("bench", "read", f)
+	require.NoError(t, err)
+	const head, tail = `{"op":"read","blocks":1,"bytes":3,"checksum":"`, "\"}\n"
+	require.True(t, strings.HasPrefix(o, head), o)
+	require.True(t, strings.HasSuffix(o, tail), o)
+	assert.Equal(t, fnvBlocks([]byte{1, 2, 3}), strings.TrimSuffix(strings.TrimPrefix(o, head), tail))
+}
+
 func TestBenchStreamAndFind(t *testing.T) {
 	dir := t.TempDir()
 	p := samplePayload(70000)
@@ -136,8 +158,10 @@ func TestBenchWriteMatchesLibrary(t *testing.T) {
 	got, err := os.ReadFile(f)
 	require.NoError(t, err)
 
-	var buf bytes.Buffer
-	bw, err := binpazer.NewWriter(&buf, binpazer.GUID{0xB0}, "bench",
+	lf, err := os.Create(filepath.Join(dir, "direct.binpazer"))
+	require.NoError(t, err)
+	defer lf.Close()
+	bw, err := binpazer.NewWriter(lf, binpazer.GUID{0xB0}, "bench",
 		[]binpazer.TypeDef{{TypeID: 1, GUID: binpazer.GUID{0x11}, Name: "Payload"}})
 	require.NoError(t, err)
 	for i := 0; i < 3; i++ {
@@ -145,9 +169,8 @@ func TestBenchWriteMatchesLibrary(t *testing.T) {
 	}
 	require.NoError(t, bw.WriteIndex())
 	require.NoError(t, bw.End())
-	// The seekable file has its file_length back-patched; the buffer keeps the streaming sentinel.
-	want := buf.Bytes()
-	binary.LittleEndian.PutUint64(want[32:], uint64(len(want)))
+	want, err := os.ReadFile(lf.Name())
+	require.NoError(t, err)
 	assert.Equal(t, want, got)
 }
 

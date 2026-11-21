@@ -3,6 +3,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -66,9 +67,19 @@ type benchResult struct {
 	sum    benchSum
 }
 
-func printBench(cmd *cobra.Command, r benchResult) {
-	fmt.Fprintf(cmd.OutOrStdout(), "{\"op\":%q,\"blocks\":%d,\"bytes\":%d,\"checksum\":\"%08x\"}\n",
-		r.op, r.blocks, r.bytes, uint32(r.sum))
+// benchLineJSON fixes the key order of the result line.
+type benchLineJSON struct {
+	Op       string `json:"op"`
+	Blocks   int    `json:"blocks"`
+	Bytes    uint64 `json:"bytes"`
+	Checksum string `json:"checksum"`
+}
+
+func printBench(cmd *cobra.Command, r benchResult) error {
+	// Marshal cannot fail: every field is a string or an integer.
+	line, _ := json.Marshal(benchLineJSON{r.op, r.blocks, r.bytes, fmt.Sprintf("%08x", uint32(r.sum))})
+	_, err := fmt.Fprintf(cmd.OutOrStdout(), "%s\n", line)
+	return err
 }
 
 func parseCount(s, what string) (int, error) {
@@ -282,8 +293,7 @@ func init() {
 				if err != nil {
 					return err
 				}
-				printBench(cmd, r)
-				return nil
+				return printBench(cmd, r)
 			},
 		})
 	}
