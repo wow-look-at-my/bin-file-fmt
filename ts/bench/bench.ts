@@ -58,6 +58,8 @@ class FileSource implements Source {
 }
 
 class FileSink implements Sink {
+	// writeSync is done with the bytes when it returns, so large payloads go out with no copy.
+	readonly borrowsChunks = true;
 	private readonly fd: number;
 	private pos = 0;
 

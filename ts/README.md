@@ -50,6 +50,26 @@ const { writer } = resumeAppendWriter(file); // a later process continues the fi
 writer.end();
 ```
 
+## Streaming writes
+
+A sink with no `seek` gets a streaming file: `file_length` keeps the unknown sentinel. A compressed block needs `versionMinor: 1` declared up front. `NodeStreamSink` writes to a Node stream (a socket, an HTTP response, `process.stdout`, a file stream) and `WebStreamSink` writes to the writer of a Web `WritableStream`. Await `drained()` between blocks, so the stream does not queue the whole file in memory.
+
+```ts
+import { FLAG_HAS_CRC, NodeStreamSink, Writer } from "./src/index.ts";
+
+const sink = new NodeStreamSink(process.stdout);
+const w = new Writer(sink, writerGuid, "exporter", types);
+for (const record of records) {
+	w.block(1, FLAG_HAS_CRC, record);
+	await sink.drained(); // waits while the stream is over its high-water mark
+}
+w.end(); // flushes the last buffered bytes to the stream
+```
+
+A stream that fails makes the next `block()` throw a `BinpazerError` with code `"io"`. A plain writer buffers small blocks. An appendable writer sends every block to the stream before `block()` returns.
+
+A sink may keep the chunks it receives, as a stream does. The writer never changes bytes that it passed to a sink. It passes a copy of a large payload. The caller can fill its payload array again at once. A sink that is done with the bytes when `write` returns sets `borrowsChunks`, and gets large payloads with no copy.
+
 ## Build and test
 
 ```sh

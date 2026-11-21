@@ -4,6 +4,8 @@ import { BinpazerError } from "./format.ts";
 import type { Sink, Source } from "./format.ts";
 
 export class MemorySink implements Sink {
+	// write copies src into its own buffer.
+	readonly borrowsChunks = true;
 	protected buf: Uint8Array;
 	protected pos = 0;
 	protected len = 0;

@@ -59,7 +59,9 @@ let resuming: ResumeState | null = null;
 
 export class Writer {
 	private readonly sink: Sink;
-	private readonly buf = new Uint8Array(IO_BUF_SIZE);
+	// Bytes before bufStart went to the sink and are never written again: a sink may still hold them.
+	private buf = new Uint8Array(IO_BUF_SIZE);
+	private bufStart = 0;
 	private bufLen = 0;
 	private off = 0;
 	private err: BinpazerError | null = null;
@@ -356,23 +358,29 @@ export class Writer {
 		if (n > this.buf.length - this.bufLen) {
 			this.flush();
 			if (n >= this.buf.length) {
-				this.guard(() => this.sink.write(src));
+				// src is the caller's array. A sink that may keep it gets a copy, so the caller can fill the array again.
+				const out = this.sink.borrowsChunks === true ? src : src.slice();
+				this.guard(() => this.sink.write(out));
 				this.off += n;
 				return;
 			}
+			this.buf = new Uint8Array(IO_BUF_SIZE);
+			this.bufStart = 0;
+			this.bufLen = 0;
 		}
 		this.buf.set(src, this.bufLen);
 		this.bufLen += n;
 		this.off += n;
 	}
 
+	// flush hands the pending bytes to the sink and keeps filling the rest of the same buffer.
 	private flush(): void {
-		if (this.bufLen === 0) {
+		if (this.bufLen === this.bufStart) {
 			return;
 		}
-		const chunk = this.buf.subarray(0, this.bufLen);
+		const chunk = this.buf.subarray(this.bufStart, this.bufLen);
+		this.bufStart = this.bufLen;
 		this.guard(() => this.sink.write(chunk));
-		this.bufLen = 0;
 	}
 
 	// guard turns a sink exception into a sticky "io" error.
