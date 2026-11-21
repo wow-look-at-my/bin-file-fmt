@@ -5,6 +5,8 @@ import { align8, blockHeaderBytes, crc32c, decodePayloadLength, getU16, getU32, 
 import type { Guid, Source, TypeEntry } from "./format.ts";
 
 const MIN_BTT_ENTRY_SIZE = 32;
+// The most the first buffer fill after a seek asks the source for.
+const SEEK_READ_AHEAD = 4096;
 const decoder = new TextDecoder();
 
 export interface ReaderOptions {
@@ -60,6 +62,7 @@ export class Reader {
 	private winPos = 0;
 	private winEnd = 0;
 	private srcEof = false;
+	private shortFill = false;
 	private cursor = 0;
 	private readonly size: number;
 	private readonly maxAlloc: number;
@@ -424,6 +427,7 @@ export class Reader {
 		this.winPos = 0;
 		this.winEnd = 0;
 		this.srcEof = false;
+		this.shortFill = true;
 		this.cursor = abs;
 	}
 
@@ -506,7 +510,10 @@ export class Reader {
 		this.win.copyWithin(0, this.winPos, this.winEnd);
 		this.winPos = 0;
 		this.winEnd = keep;
-		const n = this.rawRead(this.win.subarray(keep));
+		// A full refill after a seek would cost a whole buffer to hand over one small block.
+		const end = this.shortFill ? Math.min(this.win.length, keep + SEEK_READ_AHEAD) : this.win.length;
+		this.shortFill = false;
+		const n = this.rawRead(this.win.subarray(keep, end));
 		this.winEnd += n;
 		return n;
 	}

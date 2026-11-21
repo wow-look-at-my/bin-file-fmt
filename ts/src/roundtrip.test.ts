@@ -254,3 +254,37 @@ test("a newer major version is refused", () => {
 	bytes[12] = 2;
 	assert.equal(codeOf(() => open(bytes)), "version");
 });
+
+test("a lookup by offset asks the source for a small read, not a full buffer", () => {
+	const sink = new mem.MemorySink();
+	const w = new Writer(sink, SAMPLE_WRITER, "seek", DEFS);
+	const payload = pattern(100, 7);
+	for (let i = 0; i < 2000; i++) {
+		w.block(1, FLAG_HAS_CRC, payload);
+	}
+	w.writeIndex();
+	w.end();
+
+	const inner = new mem.MemorySource(sink.bytes());
+	let largest = 0;
+	const rd = new R({
+		read: (dst) => {
+			largest = Math.max(largest, dst.length);
+			return inner.read(dst);
+		},
+		seek: (offset) => inner.seek(offset),
+		size: () => inner.size(),
+	});
+	const offs = rd.find(1);
+	assert.equal(offs.length, 2000);
+
+	largest = 0;
+	assert.deepEqual(rd.readPayload(rd.at(offs[1000])), payload);
+	assert.ok(largest <= 4096, `the read after a seek asked for ${largest} bytes`);
+
+	largest = 0;
+	for (let i = 0; i < 200; i++) {
+		assert.deepEqual(rd.readPayload(mustNext(rd)), payload);
+	}
+	assert.ok(largest > 4096, "sequential reads go back to full buffer refills");
+});

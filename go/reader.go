@@ -20,10 +20,11 @@ const minBTTEntrySize = 32
 
 // Reader parses a binpazer file from an io.Reader.
 type Reader struct {
-	src    io.Reader     // the original input; seeks reposition it
-	r      *bufio.Reader // buffered view of src; all reads go through it
-	seeker io.Seeker     // non-nil if src also implements io.Seeker
-	off    uint64        // logical offset: bytes consumed through r
+	src    io.Reader         // the original input; seeks reposition it
+	in     *shortFirstReader // src, with the first read after a seek kept small
+	r      *bufio.Reader     // buffered view of in; all reads go through it
+	seeker io.Seeker         // non-nil if src also implements io.Seeker
+	off    uint64            // logical offset: bytes consumed through r
 
 	inputSize int64
 	maxAlloc  int64 // per-field allocation cap used when inputSize is unknown
@@ -126,7 +127,8 @@ func (br *Reader) seekTo(abs uint64) error {
 	if _, err := br.seeker.Seek(int64(abs), io.SeekStart); err != nil {
 		return err
 	}
-	br.r.Reset(br.src)
+	br.in.short = true
+	br.r.Reset(br.in)
 	br.off = abs
 	return nil
 }
@@ -182,7 +184,8 @@ func NewReader(r io.Reader) (*Reader, error) {
 // For seekable inputs the actual input size is the (tighter) bound and
 // maxAlloc is not consulted.
 func NewReaderLimited(r io.Reader, maxAlloc int64) (*Reader, error) {
-	br := &Reader{src: r, r: bufio.NewReaderSize(r, ioBufSize), inputSize: -1, maxAlloc: maxAlloc}
+	in := &shortFirstReader{r: r}
+	br := &Reader{src: r, in: in, r: bufio.NewReaderSize(in, ioBufSize), inputSize: -1, maxAlloc: maxAlloc}
 	if br.maxAlloc <= 0 {
 		br.maxAlloc = DefaultMaxAlloc
 	}

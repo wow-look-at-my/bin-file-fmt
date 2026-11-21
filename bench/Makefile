@@ -15,8 +15,11 @@ LIB_HDR = ../c/binpazer.h ../c/binpazer_codec.h
 all: $(BUILD)/bench_c $(BUILD)/bench_cpp $(BUILD)/measure
 
 # gprof builds: the static link puts libc. The codec libraries in the histogram, and -fno-inline keeps hot helpers such as binpazer_crc32c visible.
+# A static link also needs what the codec archives themselves depend on. liblz4.a can need libxxhash without naming it, so that archive goes last when it is installed.
+PROF_CODEC_LIBS ?= $(shell pkg-config --static --libs zlib libzstd liblz4 2>/dev/null || echo "$(CODEC_LIBS)") \
+	$(shell pkg-config --exists libxxhash 2>/dev/null && pkg-config --static --libs libxxhash)
 prof:
-	$(MAKE) BUILD=build-prof EXTRA_CFLAGS="-pg -fno-inline" EXTRA_LDFLAGS="-pg -static" build-prof/bench_c build-prof/bench_cpp
+	$(MAKE) BUILD=build-prof EXTRA_CFLAGS="-pg -fno-inline" EXTRA_LDFLAGS="-pg -static" CODEC_LIBS="$(PROF_CODEC_LIBS)" build-prof/bench_c build-prof/bench_cpp
 
 $(BUILD):
 	mkdir -p $@

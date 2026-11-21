@@ -139,8 +139,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # The gprof builds link statically, and a static liblz4 can need libxxhash. pkg-config names what the static link needs.
       - name: Codec libraries
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential zlib1g-dev libzstd-dev liblz4-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential pkg-config zlib1g-dev libzstd-dev liblz4-dev libxxhash-dev
       - uses: wow-look-at-my/actions@cache-download#latest
         with:
           name: go-build-go.bgo
