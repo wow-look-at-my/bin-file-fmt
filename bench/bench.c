@@ -138,8 +138,8 @@ done:
 }
 
 static int cmd_write(const char *out_path, const char *payload_path, const char *blocks_s, const char *codec_s) {
-	uint64_t blocks;
-	uint16_t codec;
+	uint64_t blocks = 0;
+	uint16_t codec = CODEC_NONE;
 	if (parse_count(blocks_s, "block count", &blocks) || parse_codec(codec_s, &codec)) return 1;
 	if (blocks > SIZE_MAX / sizeof(binpazer_index_entry)) return fail("block count too large: %s", blocks_s);
 

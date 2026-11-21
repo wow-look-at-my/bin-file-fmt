@@ -39,7 +39,7 @@ function randomBytes(n: number, seed: number): Uint8Array {
 
 function compressible(n: number): Uint8Array {
 	const out = new Uint8Array(n);
-	for (let i = 0; i < n; i++) out[i] = (i % 97) < 60 ? (i >> 4) & 0x3f : (i * 7) & 0xff;
+	for (let i = 0; i < n; i++) out[i] = ((i >> 12) + (i % 61)) & 0xff;
 	return out;
 }
 
@@ -173,7 +173,7 @@ test("corrupted checksums, sizes and offsets throw", () => {
 	const src = new TextEncoder().encode("hello hello hello hello lz4 frame\n");
 	const frame = encode(src).slice();
 	const litLen = frame[19] >>> 4;
-	assert.ok(litLen < 15 && (frame[19] & 0x80000000) === 0);
+	assert.ok(litLen < 15 && (frame[18] & 0x80) === 0, "first block must be compressed with a short literal run");
 	frame[20 + litLen] = 0;
 	frame[21 + litLen] = 0;
 	assert.throws(() => decode(frame, 1 << 16), /match offset 0/);
@@ -194,6 +194,14 @@ test("trailing garbage after the EndMark throws", () => {
 	const padded = new Uint8Array(enc.length + 4);
 	padded.set(enc);
 	assert.throws(() => decode(padded, 1 << 16), /^Error: lz4: /);
+});
+
+test("the linked-block vector has matches across blocks", () => {
+	const frame = readVector("linked.bd.lz4").slice();
+	assert.equal(frame[4] & 0x20, 0);
+	frame[4] |= 0x20;
+	frame[6] = (xxh32(frame.subarray(4, 6)) >>> 8) & 0xff;
+	assert.throws(() => decode(frame, 1 << 20), /match offset before start/);
 });
 
 test("unsupported frame features throw", () => {
