@@ -358,7 +358,8 @@ export class Writer {
 		if (n > this.buf.length - this.bufLen) {
 			this.flush();
 			if (n >= this.buf.length) {
-				const out = this.sink.keepsChunks === true ? src.slice() : src;
+				// src is the caller's array. A sink that may keep it gets a copy, so the caller can fill the array again.
+				const out = this.sink.borrowsChunks === true ? src : src.slice();
 				this.guard(() => this.sink.write(out));
 				this.off += n;
 				return;

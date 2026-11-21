@@ -101,6 +101,7 @@ Everything degrades gracefully without a seeker: sequential walk, read-through s
 
 - `core.ts` re-exports the dependency-free core. None of them imports `node:*`, and `core-deps.test.ts` fails when one does. `index.ts` adds `codec.ts`, the only file that imports `node:zlib`.
 - IO is synchronous and injected: a `Source` (`read`, optional `seek` and `size`) and a `Sink` (`write`, optional `seek`). The library opens no file.
+- **A sink may keep the chunks it gets**, as a Node or Web stream does. So the writer never rewrites bytes it passed to a sink: `flush()` hands over a slice and keeps filling the rest of the same buffer. A full buffer is replaced, not reused. A payload larger than the buffer is the caller's array. The writer passes a copy unless the sink sets `borrowsChunks`. Reusing the buffer again corrupts every stream output in silence. The stream sinks are in `stream.ts`, and `stream.test.ts` runs them against real streams.
 - `Reader.claim()` is the allocation gate, as in Go. It checks every untrusted length against the input size, or against `maxAlloc` when the size is unknown, before anything is allocated. New parsing code goes through it.
 - The reader accepts and rejects the same inputs as the Go reader. `hardening.test.ts` ports the Go hardening cases. Keep it so when either side changes.
 - Erasable syntax only (no `enum`, no parameter properties), relative imports carry `.ts`, and `ts0` rejects `any`. Node then runs the sources directly.

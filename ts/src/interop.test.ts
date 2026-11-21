@@ -1,13 +1,14 @@
 // Live C <-> TS interop for every registry codec, driven through c/interop.c.
 
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { createWriteStream, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before } from "node:test";
 import { compressBlock, readPayloadDecompressed } from "./codec.ts";
-import { CODEC_DEFLATE, CODEC_LZ4, CODEC_STORED, CODEC_ZSTD, FLAG_HAS_CRC } from "./format.ts";
+import { CODEC_DEFLATE, CODEC_LZ4, CODEC_STORED, CODEC_ZSTD, FLAG_HAS_CRC, VERSION_MINOR_COMPRESSION } from "./format.ts";
 import { Reader } from "./reader.ts";
+import { NodeStreamSink } from "./stream.ts";
 import { FileSink, FileSource, REPO_ROOT, assert, guidOf, test } from "./testio.ts";
 import { Writer } from "./writer.ts";
 
@@ -69,5 +70,19 @@ for (const [name, id] of CODECS) {
 		}
 		const out = execFileSync(harness, ["read", path], { encoding: "utf8", stdio: "pipe" });
 		assert.match(out, /^ok /);
+	});
+
+	test(`C decodes the TS ${name} file that went out through a Node stream`, async () => {
+		const path = join(dir, `ts-stream-${name}.binpazer`);
+		const file = createWriteStream(path);
+		const types = [{ typeId: 1, guid: guidOf(0x11), name: "Payload" }];
+		const w = new Writer(new NodeStreamSink(file), guidOf(0x01), "interop", types, { versionMinor: VERSION_MINOR_COMPRESSION });
+		compressBlock(w, 1, FLAG_HAS_CRC, id, null, payload);
+		w.end();
+		await new Promise<void>((resolve, reject) => {
+			file.on("error", reject);
+			file.end(() => resolve());
+		});
+		assert.match(execFileSync(harness, ["read", path], { encoding: "utf8", stdio: "pipe" }), /^ok /);
 	});
 }

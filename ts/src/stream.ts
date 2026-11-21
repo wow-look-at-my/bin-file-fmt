@@ -24,7 +24,6 @@ function streamFailed(cause: unknown): BinpazerError {
 // It has no seek, so the file keeps the streaming sentinel. The stream queues what it cannot send yet:
 // await drained() between blocks to hold memory flat.
 export class NodeStreamSink implements Sink {
-	readonly keepsChunks = true;
 	private readonly stream: NodeWritableLike;
 	private full = false;
 	private failure: BinpazerError | null = null;
@@ -79,7 +78,6 @@ export class NodeStreamSink implements Sink {
 
 // The same rules as NodeStreamSink hold: no seek, and await drained() between blocks.
 export class WebStreamSink implements Sink {
-	readonly keepsChunks = true;
 	private readonly writer: WebWriterLike;
 	private failure: BinpazerError | null = null;
 	private last: Promise<void> = Promise.resolve();

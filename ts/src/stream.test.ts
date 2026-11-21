@@ -67,9 +67,9 @@ function concat(chunks: Uint8Array[]): Uint8Array {
 const tick = (ms = 0): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 for (const appendable of [false, true]) {
-	test(`a sink that keeps every chunk gets the right bytes (appendable ${appendable})`, async () => {
+	test(`a sink that keeps every chunk gets the right bytes while the caller reuses its payload array (appendable ${appendable})`, async () => {
 		const kept: Uint8Array[] = [];
-		await produce({ write: (b) => void kept.push(b) }, { appendable }, noWait);
+		await produce({ write: (b) => void kept.push(b) }, { appendable, reuse: true }, noWait);
 		assert.deepEqual(concat(kept), await expected({ appendable }));
 	});
 
@@ -93,6 +93,19 @@ for (const appendable of [false, true]) {
 		assert.ok(waits > 0, "the stream pushed back at least once");
 	});
 }
+
+test("only a sink that declares borrowsChunks receives the caller's own payload array", () => {
+	const payload = pattern(BIG, 9);
+	const seen = (borrows: boolean): Uint8Array[] => {
+		const chunks: Uint8Array[] = [];
+		const w = open({ write: (b) => void chunks.push(b), borrowsChunks: borrows }, {});
+		w.block(2, 0, payload);
+		w.end();
+		return chunks;
+	};
+	assert.ok(seen(true).some((c) => c.buffer === payload.buffer), "a borrowing sink gets the payload with no copy");
+	assert.ok(!seen(false).some((c) => c.buffer === payload.buffer), "any other sink gets a copy");
+});
 
 test("a streaming file differs from the seekable file only in file_length", async () => {
 	const build = (sink: Sink): void => {

@@ -78,8 +78,8 @@ export interface Source {
 export interface Sink {
 	write(src: Uint8Array): void;
 	seek?(offset: number): void;
-	// A large payload reaches the sink as the caller's own array. A sink that keeps chunks sets this to get a copy.
-	readonly keepsChunks?: boolean;
+	// Set when write is done with src before it returns. The writer then passes a large payload with no copy.
+	readonly borrowsChunks?: boolean;
 }
 
 // Guid is several bytes in canonical (RFC 4122 text) order.

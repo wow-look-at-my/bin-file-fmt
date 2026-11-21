@@ -198,10 +198,10 @@ test("a non-seekable sink keeps the streaming sentinel and buffers small writes"
 	assert.equal(n, 200);
 });
 
-test("a payload larger than the buffer reaches the sink as the caller's array", () => {
+test("a payload larger than the buffer reaches a borrowing sink as the caller's array", () => {
 	const big = pattern(100_000);
 	let passed: Uint8Array | null = null;
-	const w = new Writer({ write: (src) => { if (src.length === big.length) passed = src; } }, SAMPLE_WRITER, "pipe", DEFS);
+	const w = new Writer({ borrowsChunks: true, write: (src) => { if (src.length === big.length) passed = src; } }, SAMPLE_WRITER, "pipe", DEFS);
 	w.block(1, 0, big);
 	w.end();
 	assert.equal(passed, big);

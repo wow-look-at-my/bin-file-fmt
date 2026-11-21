@@ -83,6 +83,7 @@ export class FileSource implements Source {
 }
 
 export class FileSink implements Sink {
+	readonly borrowsChunks = true;
 	private readonly fd: number;
 	private at = 0;
 
