@@ -186,6 +186,9 @@ export class Writer {
 	// writeIndex with no argument indexes every block this writer wrote, like Go's WriteIndex.
 	writeIndex(entries?: IndexEntry[]): void {
 		this.check();
+		if (this.appendable) {
+			throw new BinpazerError("range", "an appendable file carries no Block Index");
+		}
 		const list = entries ?? this.tracked;
 		const payloadLen = 8 + list.length * 16;
 		if (payloadLen > 0xffffffff) {
@@ -211,7 +214,16 @@ export class Writer {
 
 	// end writes the footer, flushes, and back-patches the header when the sink can seek.
 	end(): void {
+		if (this.err !== null) {
+			throw this.err;
+		}
+		if (this.appendable && this.ended) {
+			return;
+		}
 		this.check();
+		if (this.appendable) {
+			this.writeBlock(TYPE_END, 0, null, new Uint8Array(0));
+		}
 		if (this.wroteIndex) {
 			const ft = new Uint8Array(16);
 			putU64(ft, 0, this.indexOffset);
@@ -242,6 +254,9 @@ export class Writer {
 	private writeBlock(typeId: number, flags: number, prefix: Uint8Array | null, body: Uint8Array): void {
 		checkU16(typeId, "type id");
 		checkU16(flags, "flags");
+		if (this.appendable) {
+			flags |= FLAG_HAS_CRC;
+		}
 		const payloadLen = (prefix === null ? 0 : prefix.length) + body.length;
 		let lengthField: number;
 		if (flags & FLAG_LARGE_MODE) {
