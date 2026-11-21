@@ -69,11 +69,13 @@ Anything one implementation can express, every other one must -- a file none of 
 | declare 1.1 up front (streaming writer) | `NewWriterVersion` | `binpazer_writer_begin_version` / `Writer(..., version_minor)` | `new Writer(..., { versionMinor })` |
 | GUID <-> canonical text | `ParseGUID` / `GUID.String` | `binpazer_guid_parse` / `_format` / `to_string` | `parseGuid` / `formatGuid` |
 | is a codec available? | `LookupCodec` / `LookupCodecGUID` | `binpazer_codec_lookup` | `lookupCodec` |
-| start an appendable file | `NewAppendWriter` | `binpazer_writer_begin_append` / `Writer(binpazer::appendable, ...)` | — |
-| read only committed blocks | `NextCommitted` | `binpazer_reader_next_committed` / `Reader::next_committed` | — |
-| continue an open appendable file | `ResumeAppendWriter` | `binpazer_writer_resume` / `Writer(binpazer::resume, ...)` | — |
+| start an appendable file | `NewAppendWriter` | `binpazer_writer_begin_append` / `Writer(binpazer::appendable, ...)` | `new Writer(..., { appendable: true })` |
+| read only committed blocks | `NextCommitted` | `binpazer_reader_next_committed` / `Reader::next_committed` | `Reader.nextCommitted` |
+| continue an open appendable file | `ResumeAppendWriter` | `binpazer_writer_resume` / `Writer(binpazer::resume, ...)` | `resumeAppendWriter` |
 
-Known and deliberate differences: Go's `NewReaderLimited` allocation cap has no C counterpart because C allocates nothing -- every buffer is the caller's. The cap is theirs already. The CLI is Go-only. `c/interop.c` is a test harness, not a tool. TypeScript has no append layer yet -- `ts/` predates 1.2 -- so the appendable rows above have no TypeScript entry. TypeScript holds every `u64` as a JS number, so an offset or a length above `Number.MAX_SAFE_INTEGER` is a `range` error there.
+Known and deliberate differences: Go's `NewReaderLimited` allocation cap has no C counterpart because C allocates nothing -- every buffer is the caller's. The cap is theirs already. The CLI is Go-only. `c/interop.c` is a test harness, not a tool. TypeScript's `nextCommitted` returns `"pending"` for both in-progress and torn bytes, and `Reader.torn` tells them apart. It needs a source with `seek` and `size`, and it asks `size()` again on every call.
+
+This is because that is how it learns that the file grew. TypeScript holds every `u64` as a JS number, so an offset or a length above `Number.MAX_SAFE_INTEGER` is a `range` error there.
 
 Its deflate and zstd go through `node:zlib`, which allocates the codec output before the copy into the caller's buffer.
 
@@ -132,7 +134,7 @@ SPEC.md "Appendable files" is the contract. Header flag the first bit marks the 
 - **Resume pads, it never overwrites in place.** A torn tail can hold a sealed block of its own (a child of a torn Group), so `ResumeAppendWriter` / `binpazer_writer_resume` cover every stale byte with sealed Padding blocks before appending. The Padding layout is byte-identical across implementations and pinned by `go/testdata/sample-resumed.binpazer`.
 - **The stays of the Block Type Table unsealed** in an appendable file. Readers in this repo older than 1.2 compute the table end without a CRC, so a sealed table breaks them.
 - **An appendable writer keeps no index** (memory must not grow with the file), flushes after every block, and refuses `WriteIndex`. `Find` on an appendable file walks committed blocks only.
-- Fixtures: `sample-appendable.binpazer` and `sample-resumed.binpazer`, from `gen <out> <compressed> <appendable> <resumed>`. The Go tests and `c/test_append.c` each compare their own writer against the files, so no CI step is involved.
+- Fixtures: `sample-appendable.binpazer` and `sample-resumed.binpazer`, from `gen <out> <compressed> <appendable> <resumed>`. The Go tests, `c/test_append.c` and `ts/src/append.test.ts` each compare their own writer against the files, so no CI step is involved.
 - CLI: `follow` and `append` are the user surface, and the read commands walk through `walkNext`, which stops at the last committed block.
 
 ## Compression (1.1)
