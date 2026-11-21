@@ -100,8 +100,9 @@ export class Bench {
 			results.push(this.record(w, "write", impl, t.runs));
 			fileBytes[impl] = fs.statSync(fileOf(impl)).size;
 		}
-		this.checkAgreement(w, fileOf);
+		const crossReadLine = this.checkAgreement(w, fileOf);
 
+		const opLines = new Map<Op, string>();
 		for (const op of w.ops.filter((o) => o !== "write")) {
 			let refLine: string | null = null;
 			for (const impl of impls) {
@@ -110,7 +111,9 @@ export class Bench {
 				else if (t.line !== refLine) throw new Error(`[${w.name}] ${op} of ${fileOf(ref)} disagrees:\n  ${IMPL_LABELS[impls[0]!]}: ${refLine}\n  ${IMPL_LABELS[impl]}: ${t.line}`);
 				results.push(this.record(w, op, impl, t.runs));
 			}
+			opLines.set(op, refLine!);
 		}
+		if (this.opts.profile) this.profileWorkload(w, payload, fileOf, ref, opLines, crossReadLine);
 		if (!this.opts.keep) this.removeMade();
 		return { name: w.name, payloadBytes: w.payloadBytes, blocks: w.blocks, codec: w.codec, fileBytes, results };
 	}
