@@ -3,6 +3,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -39,11 +40,7 @@ func runAppend(rw io.ReadWriteSeeker, o appendOptions, w io.Writer) error {
 		if !known {
 			return fmt.Errorf("type %d is not in the file's block type table", o.typeID)
 		}
-		var names []string
-		if o.flags != "" {
-			names = strings.Split(o.flags, ",")
-		}
-		flags, err := parseFlags(names)
+		flags, err := parseFlags(o.flags)
 		if err != nil {
 			return err
 		}
@@ -119,7 +116,7 @@ command does.`,
 			case cmd.Flags().Changed("data"):
 				o.payload = []byte(data)
 			case cmd.Flags().Changed("data-base64"):
-				o.payload, err = decodeBase64(dataB64)
+				o.payload, err = base64.StdEncoding.DecodeString(dataB64)
 			case payloadFile == "-":
 				o.payload, err = io.ReadAll(cmd.InOrStdin())
 			case cmd.Flags().Changed("payload"):

@@ -26,6 +26,8 @@ type Writer struct {
 	// appendable makes every block sealed and flushed, and makes End write the End block.
 	appendable bool
 	ended      bool
+	// sealedTail counts the stale bytes of a torn tail that ResumeAppendWriter covered in Padding blocks.
+	sealedTail uint64
 }
 
 var zeros [8]byte
