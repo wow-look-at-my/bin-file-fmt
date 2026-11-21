@@ -27,4 +27,22 @@ var (
 
 	// ErrCodecUnavailable means a compressed block names a codec this build does not have.
 	ErrCodecUnavailable = errors.New("binpazer: codec unavailable")
+
+	// ErrPending means the next block of an appendable file is not committed.
+	ErrPending = errors.New("binpazer: block not committed")
+
+	// ErrNotAppendable means the file does not set the appendable header flag.
+	ErrNotAppendable = errors.New("binpazer: not an appendable file")
+
+	// ErrEnded means an appendable file holds its End block and accepts no more blocks.
+	ErrEnded = errors.New("binpazer: appendable file is ended")
 )
+
+// ErrTorn means the whole next block is in the file but its CRC seal is absent or incorrect.
+var ErrTorn error = tornError{}
+
+type tornError struct{}
+
+func (tornError) Error() string { return "binpazer: torn block" }
+
+func (tornError) Is(target error) bool { return target == ErrPending }

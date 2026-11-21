@@ -51,7 +51,14 @@ func runPack(m *Manifest, baseDir string, w io.Writer) error {
 		}
 		defs = append(defs, binpazer.TypeDef{TypeID: t.TypeID, GUID: g, Name: t.Name})
 	}
-	bw, err := binpazer.NewWriter(w, wg, m.WriterName, defs)
+	if m.Open && !m.Appendable {
+		return fmt.Errorf(`"open" needs "appendable": only an appendable file can stay open`)
+	}
+	newWriter := binpazer.NewWriter
+	if m.Appendable {
+		newWriter = binpazer.NewAppendWriter
+	}
+	bw, err := newWriter(w, wg, m.WriterName, defs)
 	if err != nil {
 		return err
 	}
@@ -84,6 +91,9 @@ func runPack(m *Manifest, baseDir string, w io.Writer) error {
 		if err := bw.WriteIndex(); err != nil {
 			return err
 		}
+	}
+	if m.Open {
+		return nil // every block is flushed already; the file waits for the append command
 	}
 	return bw.End()
 }

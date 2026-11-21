@@ -3,3 +3,4 @@ test_san
 test_cpp
 *.o
 test_codec
+test_append

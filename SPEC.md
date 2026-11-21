@@ -79,7 +79,7 @@ A fixed-size part, followed by the length-prefixed `writer_name` and zero paddin
 | 16 | 16 | `writer_guid` | guid | GUID of the writing program |
 | 32 | 8 | `file_length` | u64 | total file size; `0xFFFFFFFFFFFFFFFF` = unknown/streaming |
 | 40 | 8 | `first_block_offset` | u64 | absolute offset of the first block |
-| 48 | 4 | `header_flags` | u32 | reserved, must be 0 |
+| 48 | 4 | `header_flags` | u32 | see [Header flags](#header-flags) |
 | 52 | 4 | `reserved` | u32 | must be 0 |
 | 56 | var | `writer_name` | string | human-readable name of the writing program |
 | ... | pad | `padding` | u8[] | zero pad up to `first_block_offset` (multiple of 8) |
@@ -92,10 +92,18 @@ The fixed part is many bytes. `first_block_offset` lets a reader jump straight t
 |---|---|
 | 1.0 | initial format |
 | 1.1 | [Compression](#compression): block flag bit 2 and the Compression Envelope |
+| 1.2 | [Appendable files](#appendable-files): header flag bit 0 and the End block |
 
 A small bump is a backward-compatible addition: a 1.0 reader walks a 1.1 file correctly. This is because every 1.1 addition is announced by a flag bit or a block type it already knows how to skip. A writer emits the lowest `version_minor` its content requires. A file using no 1.1 feature still declares 1.0 and is byte-identical to what a 1.0 writer produced.
 
 `signature` (`0D 0A 1A 0A`) catches the common transport corruptions: CRLF/LF translation, 7-bit stripping, and Ctrl-Z (`1A`) halting output on legacy DOS `type`.
+
+### Header flags
+
+| Bit | Name | Meaning |
+|---|---|---|
+| 0 | `appendable` | The file is an [appendable file](#appendable-files): a writer can still be adding blocks to it, and every block carries a commit seal. |
+| 1.. | reserved | must be 0; readers MUST ignore unknown bits |
 
 ## Block header
 
@@ -177,6 +185,7 @@ Predefined types occupy the top of the range, decrementing from 65534:
 | 65532 | `62696e70-617a-6572-0000-000000000003` | Writer Info (optional) |
 | 65531 | `62696e70-617a-6572-0000-000000000004` | Padding / free space (optional) |
 | 65530 | `62696e70-617a-6572-0000-000000000005` | Group (optional, nests blocks) |
+| 65529 | `62696e70-617a-6572-0000-000000000006` | End (closes an [appendable file](#appendable-files)) |
 
 User programs mint a random UUIDv4 per block type and reuse it across all files.
 
@@ -261,6 +270,68 @@ Rules:
 - Compression is per block. Mixing compressed and uncompressed blocks in one file is normal and expected. The [Block Type Table](#block-type-table), [Block Index](#block-index) and [footer](#footer) are never compressed. The structural path thus stays directly mappable.
 - Nothing about an uncompressed block changes in 1.1. A file with no compressed block is byte-identical to the 1.0 file with the same content.
 
+### Appendable files
+
+*Added in 1.2.* An appendable file is a file that a writer keeps adding blocks to, and its total length is not known. A reader can read it at the same time. The model is a JSON Lines file: a record is whole, or the reader does not see it. A line of that format ends with a newline. A block of this format ends with its CRC trailer, and that trailer is the **commit seal**.
+
+A writer marks the file with the `appendable` [header flag](#header-flags) and declares version 1.2. `file_length` stays at the unknown sentinel while the file is open.
+
+#### Committed blocks
+
+A block of an appendable file is **committed** when both conditions hold:
+
+- Every byte of the block is in the file: the header, the payload, the CRC trailer, and the alignment padding.
+- The block sets `has_crc`, and the CRC verifies.
+
+Bytes after the last committed block are **in progress**. They are not data yet. A reader MUST NOT give its caller any part of a block that is not committed.
+
+A reader that stands at a block boundary sees one of these states:
+
+| What is at the boundary | State | What the reader does |
+|---|---|---|
+| a committed block | committed | handle the block, go to the next boundary |
+| the end of the file | in progress | wait, then look again at the same offset |
+| a partial header, or a block that runs past the end of the file | in progress | wait, then look again at the same offset |
+| a header with `type_id` = `0` | in progress | wait: zeroed space is where a block will be |
+| all bytes present, but `has_crc` clear or the CRC incorrect | torn | do not use it; wait, or report it |
+| a committed [End block](#end-block) | ended | stop: no block follows |
+
+A **torn** block is the tail that an interrupted writer left, or it is damage. The bytes do not say which. A reader treats it like an in-progress block, because a writer that [resumes](#resume) the file replaces it.
+
+The end of the file without an End block means that the writer is still open, or that it stopped without closing. A reader cannot tell these apart.
+
+A reader of a pipe or a socket needs none of this. Its blocks arrive in order and its reads wait for the bytes. The End block tells it that the writer closed the stream on purpose. An end of input before the End block means the writer stopped early.
+
+#### Writer rules
+
+- Set `has_crc` on every block after the Block Type Table. The table has no seal. It is complete when all its bytes are in the file, and no block can be committed before it.
+- Write each block after the one before it. Never change a committed byte.
+- Only one writer appends at a time.
+- Write no [Block Index](#block-index) and no [footer](#footer). A file that grows has no fixed end to put a footer at.
+- List the End type in the Block Type Table, so a reader older than 1.2 can label the block.
+- The block types of the file are fixed when the file is created, because the Block Type Table is written one time.
+
+A writer does not need to write a block in one piece. A reader accepts a block only when all of it is there and the seal verifies. A block that arrives in parts is in progress until the last part lands.
+
+A commit makes a block visible to readers. It does not make the block durable. A writer that needs the block to survive a power loss must also sync the file.
+
+#### End block
+
+The End block (predefined `type_id = 65529`, GUID `...0006`) closes an appendable file. Its payload is empty and its flags are `has_crc` only. No block follows it. A writer that can seek also back-patches `file_length` after it writes the End block. An ended file accepts no more blocks.
+
+A writer that only stops, with no End block, leaves the file open. Another writer can resume it later.
+
+#### Resume
+
+A writer resumes an open appendable file in these steps:
+
+1. Read the header and the Block Type Table. Stop if the `appendable` flag is clear.
+2. Walk the committed blocks to the first boundary that holds no committed block. Stop if the walk finds the End block.
+3. If bytes follow that boundary, they are a torn tail. Cover all of them with one or more [Padding](#well-known-type-ids-and-guids) blocks (`type_id = 65531`) that are sealed like any other block. Each payload byte of a Padding block is `0x00`.
+4. Append new blocks after the last committed block or the last Padding block.
+
+The Padding blocks are not optional. A torn tail can contain a complete sealed block of its own, for example a child of a torn [Group](#group-blocks-nesting). A short new block written over the start of the tail can leave that stale block at the next boundary. A reader then takes it for committed data.
+
 ### Footer
 
 An optional fixed 16-byte footer at the very end points to the [Block Index](#block-index), so a reader can find it without a forward walk. It is written when an index is present. A reader checks the last several bytes for the magic `rezapnib`. If it matches, `index_block_offset` is the absolute offset of the Block Index block's 8-byte header.
@@ -287,6 +358,8 @@ An optional fixed 16-byte footer at the very end points to the [Block Index](#bl
 
 Readers MUST ignore unknown flag bits and reserved fields.
 
+A file with the `appendable` header flag can grow while it is read. A reader that reads such a file while a writer is open follows [Committed blocks](#committed-blocks) in step 5. It handles a block only after the block is committed. It stops at the End block.
+
 ## Writer rules
 
 - Emit the file header, then the Block Type Table, then blocks.
@@ -295,17 +368,22 @@ Readers MUST ignore unknown flag bits and reserved fields.
 - Use `large_mode` for payloads over 4 GiB, otherwise leave it clear.
 - Back-patch `file_length` (and the footer/index, if used) after writing, or use the streaming sentinel.
 - Reuse a stable GUID per block type across all files.
+- For a file that grows with no known end, write an [appendable file](#appendable-files) and follow its writer rules.
 
 ## Validation
 
 - `magic` and `signature` match exactly.
 - The first block is `type_id == 65534`.
 - No duplicate `type_id` in the Block Type Table, do not `0` or `65535`.
-- Every block's `type_id` is present in the table. Predefined ids (65530-65534) are implicitly defined by this spec and exempt -- writers MAY emit predefined blocks (e.g. the Block Index) without a table entry.
+- Every block's `type_id` is present in the table. Predefined ids (65529-65534) are implicitly defined by this spec and exempt -- writers MAY emit predefined blocks (e.g. the Block Index) without a table entry.
 - Reserved fields and bits are 0 on write (ignored on read).
 - Blocks are 8-byte aligned. The last block ends at `file_length` (when not the streaming sentinel).
 - 0x00 follows a `string`'s `byte_length` bytes`.
 - A block with the `compressed` flag carries a whole [Compression Envelope](#compression). Its stored payload is at least the bytes of a later fixed (32 with the GUID escape), `codec_id` is not 0, and `codec_flags`/`reserved` are 0. An unassigned `codec_id` is not a validation failure -- it is a file from a later revision -- but a validator Must report it.
+- In an [appendable file](#appendable-files), every block after the Block Type Table sets `has_crc`.
+- An appendable file holds no Block Index block and no footer.
+- The End block appears only in an appendable file. Its payload is empty, and no block follows it.
+- An appendable file with no End block can end in bytes that are in progress. Those bytes are not a failure. A validator reports where they start. A torn block is a failure: the file needs a [resume](#resume).
 
 ## Example
 

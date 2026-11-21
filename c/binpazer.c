@@ -6,6 +6,16 @@ const binpazer_guid BINPAZER_GUID_BLOCK_TYPE_TABLE = {
     { 0x62,0x69,0x6e,0x70, 0x61,0x7a,0x65,0x72,
       0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x01 }
 };
+const binpazer_guid BINPAZER_GUID_END = {
+    { 0x62,0x69,0x6e,0x70, 0x61,0x7a,0x65,0x72,
+      0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x06 }
+};
+
+/* The name an appendable file gives the End type in its Block Type Table. */
+static const char END_TYPE_NAME[] = "End";
+
+/* Largest extent of one Padding block that binpazer_writer_resume writes. */
+#define MAX_PAD_EXTENT ((uint64_t)1 << 20)
 
 /* ---- little-endian helpers (host-endianness independent) ---- */
 
@@ -363,15 +373,41 @@ binpazer_status binpazer_writer_begin(
                                          defs, ndefs, BINPAZER_VERSION_MINOR);
 }
 
+static binpazer_status w_begin(
+    binpazer_writer *w,
+    binpazer_write_fn write, binpazer_seek_fn seek, void *ctx,
+    const binpazer_guid *writer_guid, const char *writer_name,
+    const binpazer_type_def *defs, size_t ndefs, uint16_t version_minor, int appendable);
+
 binpazer_status binpazer_writer_begin_version(
     binpazer_writer *w,
     binpazer_write_fn write, binpazer_seek_fn seek, void *ctx,
     const binpazer_guid *writer_guid, const char *writer_name,
     const binpazer_type_def *defs, size_t ndefs, uint16_t version_minor)
 {
+    return w_begin(w, write, seek, ctx, writer_guid, writer_name, defs, ndefs, version_minor, 0);
+}
+
+binpazer_status binpazer_writer_begin_append(
+    binpazer_writer *w,
+    binpazer_write_fn write, binpazer_seek_fn seek, void *ctx,
+    const binpazer_guid *writer_guid, const char *writer_name,
+    const binpazer_type_def *defs, size_t ndefs)
+{
+    return w_begin(w, write, seek, ctx, writer_guid, writer_name, defs, ndefs,
+                   BINPAZER_VERSION_MINOR_APPENDABLE, 1);
+}
+
+static binpazer_status w_begin(
+    binpazer_writer *w,
+    binpazer_write_fn write, binpazer_seek_fn seek, void *ctx,
+    const binpazer_guid *writer_guid, const char *writer_name,
+    const binpazer_type_def *defs, size_t ndefs, uint16_t version_minor, int appendable)
+{
     memset(w, 0, sizeof *w);
     w->write = write; w->seek = seek; w->ctx = ctx;
     w->version_minor = version_minor;
+    w->appendable = appendable;
 
     size_t name_len = writer_name ? strlen(writer_name) : 0;
     uint64_t first_block = align8((uint64_t)56 + 4 + name_len + 1);
@@ -385,6 +421,7 @@ binpazer_status binpazer_writer_begin_version(
     if (writer_guid) memcpy(hdr + 16, writer_guid->bytes, 16);
     put_u64(hdr + 32, BINPAZER_FILE_LENGTH_UNKNOWN);
     put_u64(hdr + 40, first_block);
+    if (appendable) put_u32(hdr + 48, BINPAZER_HEADER_FLAG_APPENDABLE);
     if (w_raw(w, hdr, 56)) return (binpazer_status)w->err;
 
     uint8_t lp[4]; put_u32(lp, (uint32_t)name_len);
@@ -397,6 +434,8 @@ binpazer_status binpazer_writer_begin_version(
     payload_len += btt_entry_size(strlen("BlockTypeTable"));
     for (size_t i = 0; i < ndefs; i++)
         payload_len += btt_entry_size(defs[i].name ? strlen(defs[i].name) : 0);
+    /* The End entry lets a reader older than the End block label it. */
+    if (appendable) payload_len += btt_entry_size(strlen(END_TYPE_NAME));
     if (payload_len > 0xFFFFFFFFu) return (binpazer_status)(w->err = BINPAZER_ERR_RANGE);
 
     uint8_t bh[8];
@@ -406,7 +445,7 @@ binpazer_status binpazer_writer_begin_version(
     if (w_raw(w, bh, 8)) return (binpazer_status)w->err;
 
     uint8_t cnt[8];
-    put_u32(cnt + 0, (uint32_t)(ndefs + 1));
+    put_u32(cnt + 0, (uint32_t)(ndefs + 1 + (appendable ? 1 : 0)));
     put_u32(cnt + 4, 0);
     if (w_raw(w, cnt, 8)) return (binpazer_status)w->err;
 
@@ -416,6 +455,8 @@ binpazer_status binpazer_writer_begin_version(
     for (size_t i = 0; i < ndefs; i++)
         if (w_btt_entry(w, defs[i].type_id, &defs[i].guid, defs[i].name))
             return (binpazer_status)w->err;
+    if (appendable && w_btt_entry(w, BINPAZER_TYPE_END, &BINPAZER_GUID_END, END_TYPE_NAME))
+        return (binpazer_status)w->err;
 
     return w_pad(w, align8(w->offset) - w->offset);
 }
@@ -425,6 +466,8 @@ binpazer_status binpazer_writer_block(
     const void *payload, uint64_t payload_len)
 {
     if (w->err) return (binpazer_status)w->err;
+    if (w->ended) return BINPAZER_ERR_ENDED;
+    if (w->appendable) flags |= BINPAZER_FLAG_HAS_CRC; /* the CRC trailer is the commit seal */
 
     uint32_t length_field;
     if (flags & BINPAZER_FLAG_LARGE_MODE) {
@@ -460,6 +503,7 @@ binpazer_status binpazer_writer_index(
     binpazer_writer *w, const binpazer_index_entry *entries, size_t n)
 {
     if (w->err) return (binpazer_status)w->err;
+    if (w->appendable) return BINPAZER_ERR_RANGE; /* an appendable file carries no Block Index */
     uint64_t payload_len = 8 + (uint64_t)n * 16;
     if (payload_len > 0xFFFFFFFFu) return (binpazer_status)(w->err = BINPAZER_ERR_RANGE);
 
@@ -497,6 +541,8 @@ binpazer_status binpazer_writer_block_compressed(
     const void *stored, uint64_t stored_len, uint64_t uncompressed_len)
 {
     if (w->err) return (binpazer_status)w->err;
+    if (w->ended) return BINPAZER_ERR_ENDED;
+    if (w->appendable) flags |= BINPAZER_FLAG_HAS_CRC; /* the CRC trailer is the commit seal */
     if (codec_id == BINPAZER_CODEC_INVALID) return (binpazer_status)(w->err = BINPAZER_ERR_RANGE);
     if (codec_id == BINPAZER_CODEC_BY_GUID && !codec_guid) return (binpazer_status)(w->err = BINPAZER_ERR_RANGE);
     if (!w->seek && w->version_minor < BINPAZER_VERSION_MINOR_COMPRESSION)
@@ -627,8 +673,89 @@ binpazer_status binpazer_compression_parse(
     return BINPAZER_OK;
 }
 
+/* Covers the next `n` bytes of the destination with sealed Padding blocks. A
+ * torn tail can hold sealed nested blocks, and a later short block must not
+ * expose one of them as committed. */
+static binpazer_status w_pad_over(binpazer_writer *w, uint64_t n) {
+    static const uint8_t zero[4096] = {0};
+    while (n) {
+        uint64_t extent = align8(n);
+        if (extent < 16) extent = 16;
+        if (extent > MAX_PAD_EXTENT) extent = MAX_PAD_EXTENT;
+        uint64_t payload_len = extent - 12; /* header and CRC fill the rest; no alignment pad is left */
+
+        uint8_t bh[8];
+        put_u16(bh + 0, BINPAZER_TYPE_PADDING);
+        put_u16(bh + 2, BINPAZER_FLAG_HAS_CRC);
+        put_u32(bh + 4, (uint32_t)payload_len);
+        if (w_raw(w, bh, 8)) return (binpazer_status)w->err;
+        uint32_t crc = binpazer_crc32c(0, bh, 8);
+        for (uint64_t rem = payload_len; rem; ) {
+            size_t c = rem < sizeof zero ? (size_t)rem : sizeof zero;
+            if (w_raw(w, zero, c)) return (binpazer_status)w->err;
+            crc = binpazer_crc32c(crc, zero, c);
+            rem -= c;
+        }
+        uint8_t cb[4]; put_u32(cb, crc);
+        if (w_raw(w, cb, 4)) return (binpazer_status)w->err;
+
+        if (extent >= n) break;
+        n -= extent;
+    }
+    return BINPAZER_OK;
+}
+
+binpazer_status binpazer_writer_resume(
+    binpazer_writer *w,
+    binpazer_read_fn read, binpazer_write_fn write, binpazer_seek_fn seek, void *ctx,
+    binpazer_type_entry *entries, size_t entries_cap, size_t *entries_count,
+    void *scratch, size_t scratch_cap)
+{
+    memset(w, 0, sizeof *w);
+    if (!read || !write || !seek) return (binpazer_status)(w->err = BINPAZER_ERR_NOSEEK);
+    if (!scratch || scratch_cap == 0) return (binpazer_status)(w->err = BINPAZER_ERR_RANGE);
+
+    binpazer_reader r;
+    binpazer_status st = binpazer_reader_begin(&r, read, seek, ctx, NULL, 0,
+                                               entries, entries_cap, entries_count);
+    if (st != BINPAZER_OK) return (binpazer_status)(w->err = st);
+
+    for (;;) {
+        binpazer_block blk;
+        st = binpazer_reader_next_committed(&r, NULL, 0, &blk, scratch, scratch_cap);
+        if (st == BINPAZER_PENDING || st == BINPAZER_TORN) break;
+        if (st == BINPAZER_END) st = BINPAZER_ERR_ENDED;
+        if (st != BINPAZER_OK) return (binpazer_status)(w->err = st);
+        /* The seal is checked, so the block's length is safe to step over. */
+        uint64_t next = align8(blk.payload_offset + blk.payload_len + 4);
+        if (seek(ctx, next) != 0) return (binpazer_status)(w->err = BINPAZER_ERR_IO);
+        r.offset = next;
+    }
+
+    /* Count the stale bytes after the committed end: a short read is the end of the file. */
+    uint64_t end = r.offset, tail = 0;
+    for (;;) {
+        size_t got = read(ctx, scratch, scratch_cap);
+        tail += got;
+        if (got < scratch_cap) break;
+    }
+    if (seek(ctx, end) != 0) return (binpazer_status)(w->err = BINPAZER_ERR_IO);
+
+    w->write = write; w->seek = seek; w->ctx = ctx;
+    w->offset = end;
+    w->version_minor = r.version_minor;
+    w->appendable = 1;
+    w->sealed_tail = tail;
+    return w_pad_over(w, tail);
+}
+
 binpazer_status binpazer_writer_end(binpazer_writer *w) {
     if (w->err) return (binpazer_status)w->err;
+    if (w->appendable) {
+        if (w->ended) return BINPAZER_OK;
+        if (binpazer_writer_block(w, BINPAZER_TYPE_END, 0, NULL, 0)) return (binpazer_status)w->err;
+        w->ended = 1;
+    }
     if (w->wrote_index) {
         uint8_t ft[16];
         put_u64(ft + 0, w->index_offset);
@@ -684,6 +811,7 @@ binpazer_status binpazer_reader_begin(
     memcpy(r->writer_guid.bytes, hdr + 16, 16);
     r->file_length        = get_u64(hdr + 32);
     r->first_block_offset = get_u64(hdr + 40);
+    r->header_flags       = get_u32(hdr + 48);
 
     uint8_t lp[4]; if (r_raw(r, lp, 4)) return (binpazer_status)r->err;
     uint32_t name_len = get_u32(lp);
@@ -736,6 +864,7 @@ binpazer_status binpazer_reader_begin(
     uint64_t btt_end = align8(btt_start + 8 + btt_len);
     if (r->offset > btt_end) return (binpazer_status)(r->err = BINPAZER_ERR_FORMAT);
     if (r_skip(r, btt_end - r->offset)) return (binpazer_status)r->err; /* block pad */
+    r->table_end = btt_end;
 
     /* Opportunistically locate a Block Index via the footer. */
     r->has_index = 0;
@@ -756,12 +885,36 @@ binpazer_status binpazer_reader_begin(
     return BINPAZER_OK;
 }
 
+/* Fills `blk` from an 8-byte block header whose payload starts at
+ * `payload_offset`, resolving its GUID. Records the End block, after which an
+ * appendable file has no block. */
+static void r_block_from_header(
+    binpazer_reader *r, const uint8_t bh[8], uint64_t payload_offset,
+    const binpazer_type_entry *entries, size_t entries_count, binpazer_block *blk)
+{
+    blk->type_id = get_u16(bh);
+    blk->flags   = get_u16(bh + 2);
+    uint32_t lf  = get_u32(bh + 4);
+    blk->payload_len = (blk->flags & BINPAZER_FLAG_LARGE_MODE) ? (uint64_t)lf * BINPAZER_LARGE_UNIT : lf;
+    blk->payload_offset = payload_offset;
+    blk->known = 0;
+    memset(blk->guid.bytes, 0, 16);
+    for (size_t i = 0; i < entries_count; i++) {
+        if (entries[i].type_id == blk->type_id) {
+            blk->guid = entries[i].guid; blk->known = 1; break;
+        }
+    }
+    if (blk->type_id == BINPAZER_TYPE_END && (r->header_flags & BINPAZER_HEADER_FLAG_APPENDABLE))
+        r->ended = 1;
+}
+
 binpazer_status binpazer_reader_next(
     binpazer_reader *r,
     const binpazer_type_entry *entries, size_t entries_count,
     binpazer_block *blk)
 {
     if (r->err) return (binpazer_status)r->err;
+    if (r->ended) return BINPAZER_END;
     if (r->blocks_end != BINPAZER_FILE_LENGTH_UNKNOWN && r->offset >= r->blocks_end)
         return BINPAZER_END;
 
@@ -771,19 +924,62 @@ binpazer_status binpazer_reader_next(
     if (got != 8) return (binpazer_status)(r->err = BINPAZER_ERR_IO);
     r->offset += 8;
 
-    blk->type_id = get_u16(bh);
-    blk->flags   = get_u16(bh + 2);
-    uint32_t lf  = get_u32(bh + 4);
-    blk->payload_len = (blk->flags & BINPAZER_FLAG_LARGE_MODE) ? (uint64_t)lf * BINPAZER_LARGE_UNIT : lf;
-    blk->payload_offset = r->offset;
-    blk->known = 0;
-    memset(blk->guid.bytes, 0, 16);
-    for (size_t i = 0; i < entries_count; i++) {
-        if (entries[i].type_id == blk->type_id) {
-            blk->guid = entries[i].guid; blk->known = 1; break;
-        }
-    }
+    r_block_from_header(r, bh, r->offset, entries, entries_count, blk);
     return BINPAZER_OK;
+}
+
+/* Reads the block at the reader's offset and checks its commit seal. That
+ * block is through the raw read callback: the reader's offset and sticky
+ * error stay untouched, so the caller can seek back and try again. */
+static binpazer_status r_verify_committed(
+    binpazer_reader *r, uint8_t bh[8], void *scratch, size_t scratch_cap)
+{
+    if (r->read(r->ctx, bh, 8) != 8) return BINPAZER_PENDING;
+    uint16_t type_id = get_u16(bh);
+    uint16_t flags   = get_u16(bh + 2);
+    uint32_t lf      = get_u32(bh + 4);
+    /* Zeroed space is where a block will be, not a block. */
+    if (type_id == BINPAZER_TYPE_INVALID) return BINPAZER_PENDING;
+    if (!(flags & BINPAZER_FLAG_HAS_CRC)) return BINPAZER_TORN;
+
+    uint64_t left = (flags & BINPAZER_FLAG_LARGE_MODE) ? (uint64_t)lf * BINPAZER_LARGE_UNIT : lf;
+    uint64_t body_end = r->offset + 8 + left + 4;
+    uint32_t crc = binpazer_crc32c(0, bh, 8);
+    while (left) {
+        size_t n = left < (uint64_t)scratch_cap ? (size_t)left : scratch_cap;
+        if (r->read(r->ctx, scratch, n) != n) return BINPAZER_PENDING;
+        crc = binpazer_crc32c(crc, scratch, n);
+        left -= n;
+    }
+    uint8_t tail[12]; /* the CRC trailer, then the alignment padding */
+    size_t tail_len = 4 + (size_t)(align8(body_end) - body_end);
+    if (r->read(r->ctx, tail, tail_len) != tail_len) return BINPAZER_PENDING;
+    return crc == get_u32(tail) ? BINPAZER_OK : BINPAZER_TORN;
+}
+
+binpazer_status binpazer_reader_next_committed(
+    binpazer_reader *r,
+    const binpazer_type_entry *entries, size_t entries_count,
+    binpazer_block *blk, void *scratch, size_t scratch_cap)
+{
+    if (r->err) return (binpazer_status)r->err;
+    if (!r->seek) return (binpazer_status)(r->err = BINPAZER_ERR_NOSEEK);
+    if (!blk || !scratch || scratch_cap == 0) return (binpazer_status)(r->err = BINPAZER_ERR_RANGE);
+    if (!(r->header_flags & BINPAZER_HEADER_FLAG_APPENDABLE)) return BINPAZER_ERR_NOT_APPENDABLE;
+    if (r->ended) return BINPAZER_END;
+    if (r->blocks_end != BINPAZER_FILE_LENGTH_UNKNOWN && r->offset >= r->blocks_end)
+        return BINPAZER_END;
+
+    /* Seek first: a FILE* that hit the end of the file reads nothing until it is repositioned. */
+    uint64_t start = r->offset;
+    if (r->seek(r->ctx, start) != 0) return (binpazer_status)(r->err = BINPAZER_ERR_IO);
+    uint8_t bh[8];
+    binpazer_status st = r_verify_committed(r, bh, scratch, scratch_cap);
+    uint64_t at = (st == BINPAZER_OK) ? start + 8 : start;
+    if (r->seek(r->ctx, at) != 0) return (binpazer_status)(r->err = BINPAZER_ERR_IO);
+    r->offset = at;
+    if (st == BINPAZER_OK) r_block_from_header(r, bh, at, entries, entries_count, blk);
+    return st;
 }
 
 static binpazer_status r_advance_tail(binpazer_reader *r, const binpazer_block *blk) {
@@ -923,12 +1119,28 @@ binpazer_status binpazer_reader_find(
             /* No index -- walk the file. */
             if (r->seek(r->ctx, r->first_block_offset) != 0) { st = BINPAZER_ERR_IO; break; }
             r->offset = r->first_block_offset;
+            int appendable = (r->header_flags & BINPAZER_HEADER_FLAG_APPENDABLE) != 0;
+            if (appendable) {
+                /* The Block Type Table has no seal, so the committed walk starts after it. */
+                if (type_id == BINPAZER_TYPE_BLOCK_TYPE_TABLE) {
+                    if (total < cap) { out[total].type_id = type_id; out[total].offset = r->first_block_offset; }
+                    total++;
+                }
+                if (r->seek(r->ctx, r->table_end) != 0) { st = BINPAZER_ERR_IO; break; }
+                r->offset = r->table_end;
+            }
             while (r->blocks_end == BINPAZER_FILE_LENGTH_UNKNOWN || r->offset < r->blocks_end) {
                 uint64_t blk_off = r->offset;
                 uint8_t bh[8];
-                size_t got = r->read(r->ctx, bh, 8);
-                if (got == 0) break;
-                if (got != 8) { st = BINPAZER_ERR_IO; break; }
+                if (appendable) {
+                    /* Only committed blocks of an appendable file are found; the walk stops where they stop. */
+                    uint8_t tmp[512];
+                    if (r_verify_committed(r, bh, tmp, sizeof tmp) != BINPAZER_OK) break;
+                } else {
+                    size_t got = r->read(r->ctx, bh, 8);
+                    if (got == 0) break;
+                    if (got != 8) { st = BINPAZER_ERR_IO; break; }
+                }
                 r->offset += 8;
                 uint16_t tid = get_u16(bh);
                 uint16_t flags = get_u16(bh + 2);

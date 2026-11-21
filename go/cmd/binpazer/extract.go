@@ -62,7 +62,7 @@ func runExtract(br *binpazer.Reader, typeID uint16, k int, w io.Writer, stored b
 	}
 	seen := 0
 	for {
-		b, err := br.Next()
+		b, err := walkNext(br)
 		if err == io.EOF {
 			return matchRangeErr(typeID, k, seen)
 		}

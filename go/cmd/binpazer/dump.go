@@ -19,7 +19,7 @@ func runDump(br *binpazer.Reader, w io.Writer, only int, recurse bool) error {
 	tt := newTypeTable(br)
 	n := 0
 	for {
-		b, err := br.Next()
+		b, err := walkNext(br)
 		if err == io.EOF {
 			break
 		}
@@ -67,7 +67,7 @@ func runDumpJSON(br *binpazer.Reader, w io.Writer, only int, recurse bool) error
 	out := dumpJSON{Blocks: []blockJSON{}}
 	n := 0
 	for {
-		b, err := br.Next()
+		b, err := walkNext(br)
 		if err == io.EOF {
 			break
 		}

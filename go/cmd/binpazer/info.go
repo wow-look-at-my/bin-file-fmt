@@ -34,7 +34,7 @@ func runInfo(br *binpazer.Reader, w io.Writer, recurse bool) error {
 	fmt.Fprintln(w, "\nblocks:")
 	n := 0
 	for {
-		b, err := br.Next()
+		b, err := walkNext(br)
 		if err == io.EOF {
 			break
 		}
@@ -61,6 +61,9 @@ func runInfo(br *binpazer.Reader, w io.Writer, recurse bool) error {
 		}
 		n++
 	}
+	if st := appendStateOf(br); st != nil {
+		fmt.Fprintf(w, "\nappendable:  %s\n", st)
+	}
 	return nil
 }
 
@@ -86,7 +89,7 @@ func runInfoJSON(br *binpazer.Reader, w io.Writer, recurse bool) error {
 	}
 	n := 0
 	for {
-		b, err := br.Next()
+		b, err := walkNext(br)
 		if err == io.EOF {
 			break
 		}
@@ -114,6 +117,7 @@ func runInfoJSON(br *binpazer.Reader, w io.Writer, recurse bool) error {
 		n++
 	}
 	out.HasIndex = br.HasIndex()
+	out.Appendable = appendStateOf(br)
 	return writeJSON(w, out)
 }
 

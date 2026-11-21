@@ -22,22 +22,23 @@ func runUnpack(br *binpazer.Reader, outDir string) (*Manifest, error) {
 		WriterName: br.WriterName,
 	}
 	for _, t := range br.Types {
-		if t.TypeID == binpazer.TypeBlockTypeTable {
+		if t.TypeID == binpazer.TypeBlockTypeTable || (t.TypeID == binpazer.TypeEnd && br.Appendable()) {
 			continue // re-added automatically on pack
 		}
 		m.Types = append(m.Types, ManifestType{TypeID: t.TypeID, GUID: t.GUID.String(), Name: t.Name})
 	}
 	i := 0
 	for {
-		b, err := br.Next()
+		b, err := walkNext(br)
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
 			return nil, err
 		}
-		if b.TypeID == binpazer.TypeBlockIndex {
-			if err := br.SkipPayload(b); err != nil { // regenerated via "index": true
+		// Pack writes the Block Index and the End block itself, from "index" and "open".
+		if b.TypeID == binpazer.TypeBlockIndex || (b.TypeID == binpazer.TypeEnd && br.Appendable()) {
+			if err := br.SkipPayload(b); err != nil {
 				return nil, err
 			}
 			continue
@@ -54,6 +55,10 @@ func runUnpack(br *binpazer.Reader, outDir string) (*Manifest, error) {
 	}
 	// Recorded after the walk: a non-seekable input only discovers the footer.
 	m.Index = br.HasIndex()
+	if st := appendStateOf(br); st != nil {
+		m.Appendable = true
+		m.Open = !st.Ended
+	}
 	return m, nil
 }
 

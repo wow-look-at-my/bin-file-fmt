@@ -161,7 +161,7 @@ func TestValidateRuleReservedZero(t *testing.T) {
 	for name, off := range patches {
 		t.Run(name, func(t *testing.T) {
 			data := validArchive(t, false)
-			data[off] |= 0x01
+			data[off] |= 0x02 // the lowest header flag bit is assigned, so the patch takes a reserved one
 			res, err := validateJSON(t, data)
 			assertFails(t, res, err, ruleReservedZero)
 		})
