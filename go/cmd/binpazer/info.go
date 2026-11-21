@@ -1,3 +1,5 @@
+// info.go holds runInfo.
+
 package main
 
 import (

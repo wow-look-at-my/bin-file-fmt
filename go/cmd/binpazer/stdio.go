@@ -1,3 +1,5 @@
+// stdio.go holds nonSeekable.
+
 package main
 
 import (

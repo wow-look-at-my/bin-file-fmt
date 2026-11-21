@@ -1,3 +1,5 @@
+// codecbuf.go holds LookupCodec.
+
 package binpazer
 
 // Buffer-to-buffer codec entry points -- the base layer every other

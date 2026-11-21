@@ -1,3 +1,5 @@
+// root.go holds version.
+
 package main
 
 import (

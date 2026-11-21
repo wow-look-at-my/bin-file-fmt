@@ -1,3 +1,5 @@
+// reader.go holds DefaultMaxAlloc.
+
 package binpazer
 
 import (

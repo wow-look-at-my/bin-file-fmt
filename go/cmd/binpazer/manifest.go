@@ -1,3 +1,5 @@
+// manifest.go holds Manifest.
+
 package main
 
 import (

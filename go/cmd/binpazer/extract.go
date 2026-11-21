@@ -1,3 +1,5 @@
+// extract.go holds matchRangeErr.
+
 package main
 
 import (

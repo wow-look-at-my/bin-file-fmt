@@ -1,3 +1,5 @@
+// dump.go holds runDump.
+
 package main
 
 import (
