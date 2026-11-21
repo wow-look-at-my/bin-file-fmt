@@ -199,32 +199,17 @@ struct Input {
 		if (st != binpazer::Status::Ok) fail("skipping a block (status %d)", status_code(st));
 	}
 
-	// Reads a payload decoded into dst, reusing scratch for a compressed block's stored bytes.
-	uint64_t read_decoded(const binpazer::Block &b, std::vector<uint8_t> &scratch, std::vector<uint8_t> &dst) {
-		binpazer::Status st;
-		if ((b.flags & binpazer::flag::Compressed) == 0) {
-			grow(dst, b.payload_len);
-			if ((st = r.read_payload(b, dst.data(), dst.size())) != binpazer::Status::Ok)
-				fail("reading the payload at offset %" PRIu64 " (status %d)", b.payload_offset, status_code(st));
-			return b.payload_len;
-		}
-		grow(scratch, b.payload_len);
-		if ((st = r.read_payload(b, scratch.data(), scratch.size())) != binpazer::Status::Ok)
-			fail("reading the stored payload at offset %" PRIu64 " (status %d)", b.payload_offset, status_code(st));
-		auto c = binpazer::parse_compression(scratch.data(), b.payload_len);
-		if (!c) fail("parsing the envelope at offset %" PRIu64, b.payload_offset);
-		grow(dst, c->uncompressed_length);
-		// The wrapper's decompress returns a fresh vector, so the bench decodes into its own buffer.
-		binpazer_status ds = binpazer_decompress(&*c, scratch.data() + c->header_size, dst.data(), dst.size());
-		if (ds != BINPAZER_OK)
-			fail("decompressing the payload at offset %" PRIu64 " (status %d)", b.payload_offset, static_cast<int>(ds));
-		return c->uncompressed_length;
+	// Returns the logical bytes of a plain or compressed block.
+	std::vector<uint8_t> read_decoded(const binpazer::Block &b) {
+		auto p = r.read_payload_decompressed(b);
+		if (!p)
+			fail("reading the payload at offset %" PRIu64 " (status %d)", b.payload_offset, status_code(r.status()));
+		return std::move(*p);
 	}
 };
 
 void cmd_read(const char *path) {
 	Input in(path);
-	std::vector<uint8_t> scratch, dst;
 	uint64_t blocks = 0, bytes = 0;
 	uint32_t h = kFnvBasis;
 	binpazer::Block b{};
@@ -233,10 +218,10 @@ void cmd_read(const char *path) {
 			in.skip(b);
 			continue;
 		}
-		uint64_t len = in.read_decoded(b, scratch, dst);
-		h = sum_block(h, dst.data(), len);
+		const std::vector<uint8_t> p = in.read_decoded(b);
+		h = sum_block(h, p.data(), p.size());
 		blocks++;
-		bytes += len;
+		bytes += p.size();
 	}
 	print_result("read", blocks, bytes, h);
 }
