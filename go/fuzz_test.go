@@ -2,6 +2,7 @@ package binpazer
 
 import (
 	"bytes"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
@@ -55,9 +56,9 @@ func FuzzReader(f *testing.F) {
 				if err != nil {
 					break
 				}
-				if _, err := fr.ReadPayload(b); err != nil {
-					t.Fatalf("a committed block at offset %d did not read: %v", b.Offset(), err)
-				}
+				_, err = fr.ReadPayload(b)
+				require.NoError(t, err)
+
 			}
 		}
 		offs, err := br.Find(1)

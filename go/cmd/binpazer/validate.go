@@ -57,7 +57,12 @@ func init() {
 magic/signature, first-block-is-BTT, duplicate or invalid type ids,
 unknown block types, reserved fields and flag bits, 8-byte alignment,
 file_length consistency, string NUL termination and UTF-8, CRC trailers,
-and footer/Block Index consistency.
+footer/Block Index consistency, and the rules of an appendable file (every
+block sealed, no Block Index, the End block last and empty).
+
+An open appendable file can end in a block that a writer has not finished.
+Those bytes are reported, not failed. A torn block (all bytes present, seal
+incorrect) is a finding: "binpazer append" repairs it.
 
 Each violation prints as one finding (rule id + offset + detail) and the
 exit status is nonzero when any finding exists. On non-seekable stdin,

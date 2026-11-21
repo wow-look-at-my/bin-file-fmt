@@ -375,7 +375,7 @@ A file with the `appendable` header flag can grow while it is read. A reader tha
 - `magic` and `signature` match exactly.
 - The first block is `type_id == 65534`.
 - No duplicate `type_id` in the Block Type Table, do not `0` or `65535`.
-- Every block's `type_id` is present in the table. Predefined ids (65530-65534) are implicitly defined by this spec and exempt -- writers MAY emit predefined blocks (e.g. the Block Index) without a table entry.
+- Every block's `type_id` is present in the table. Predefined ids (65529-65534) are implicitly defined by this spec and exempt -- writers MAY emit predefined blocks (e.g. the Block Index) without a table entry.
 - Reserved fields and bits are 0 on write (ignored on read).
 - Blocks are 8-byte aligned. The last block ends at `file_length` (when not the streaming sentinel).
 - 0x00 follows a `string`'s `byte_length` bytes`.
