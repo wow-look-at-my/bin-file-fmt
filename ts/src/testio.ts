@@ -29,6 +29,16 @@ export function mustNext(r: Reader): Block {
 	return b;
 }
 
+export function rng(seed: number): (n: number) => number {
+	let s = seed | 0 || 1;
+	return (n) => {
+		s ^= s << 13;
+		s ^= s >>> 17;
+		s ^= s << 5;
+		return (s >>> 0) % n;
+	};
+}
+
 // pattern returns deterministic pseudo-random bytes.
 export function pattern(n: number, seed = 1): Uint8Array {
 	const p = new Uint8Array(n);

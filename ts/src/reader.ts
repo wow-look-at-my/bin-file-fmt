@@ -1,6 +1,6 @@
 // Reader parses a binpazer file from a Source and gates every untrusted length before it allocates.
 
-import { BinpazerError, DEFAULT_MAX_ALLOC, FLAG_HAS_CRC, FOOTER_MAGIC, IO_BUF_SIZE, MAGIC, TYPE_BLOCK_TYPE_TABLE, VERSION_MAJOR } from "./format.ts";
+import { BinpazerError, DEFAULT_MAX_ALLOC, FLAG_HAS_CRC, FOOTER_MAGIC, HEADER_FLAG_APPENDABLE, IO_BUF_SIZE, MAGIC, TYPE_BLOCK_TYPE_TABLE, TYPE_END, VERSION_MAJOR } from "./format.ts";
 import { align8, blockHeaderBytes, crc32c, decodePayloadLength, getU16, getU32, getU64, payloadClaim } from "./format.ts";
 import type { Guid, Source, TypeEntry } from "./format.ts";
 
@@ -56,6 +56,7 @@ export class Reader {
 	readonly fileLength: number | null;
 	readonly firstBlockOffset: number;
 	readonly types: TypeEntry[];
+	readonly headerFlags: number;
 
 	private readonly src: Source;
 	private readonly win = new Uint8Array(IO_BUF_SIZE);
@@ -64,7 +65,10 @@ export class Reader {
 	private srcEof = false;
 	private shortFill = false;
 	private cursor = 0;
-	private readonly size: number;
+	private size: number;
+	private tableEnd = 0;
+	private sawEnd = false;
+	private lastTorn = false;
 	private readonly maxAlloc: number;
 	private readonly typeIdx = new Map<number, number>();
 	private indexFound = false;
@@ -99,6 +103,7 @@ export class Reader {
 			throw new BinpazerError("range", "first_block_offset does not fit a safe integer");
 		}
 		this.firstBlockOffset = fbo;
+		this.headerFlags = getU32(fixed, 48);
 
 		const lenBuf = new Uint8Array(4);
 		this.readExact(lenBuf);
@@ -114,6 +119,7 @@ export class Reader {
 		this.skip(this.firstBlockOffset - this.cursor);
 
 		this.types = this.readBTT();
+		this.tableEnd = this.cursor;
 
 		const fl = this.fileLength;
 		if (source.seek !== undefined && fl !== null && fl >= 16 && this.size >= 0 && fl <= this.size) {
@@ -149,9 +155,24 @@ export class Reader {
 		return this.size;
 	}
 
+	// appendable reports the appendable header flag.
+	get appendable(): boolean {
+		return (this.headerFlags & HEADER_FLAG_APPENDABLE) !== 0;
+	}
+
+	// ended reports that the walk reached the End block of an appendable file.
+	get ended(): boolean {
+		return this.sawEnd;
+	}
+
+	// torn reports that the last "pending" from nextCommitted was a whole block whose seal is absent or wrong.
+	get torn(): boolean {
+		return this.lastTorn;
+	}
+
 	// next reads the next block header and returns null after the last block.
 	next(): Block | null {
-		if (this.blocksEnd !== null && this.cursor >= this.blocksEnd) {
+		if (this.sawEnd || (this.blocksEnd !== null && this.cursor >= this.blocksEnd)) {
 			return null;
 		}
 		const fl = this.fileLength;
@@ -171,7 +192,78 @@ export class Reader {
 		if (got < 8) {
 			throw this.truncated();
 		}
-		return this.parseHeader(hdr8, this.cursor - 8);
+		return this.noteEnd(this.parseHeader(hdr8, this.cursor - 8));
+	}
+
+	// nextCommitted returns the next committed block, "pending" with the reader unmoved, or null after the End block.
+	// It needs seek and size, like Go and C, because it must learn how much of a growing file is there.
+	nextCommitted(): Block | "pending" | null {
+		const seekFn = this.src.seek;
+		const sizeFn = this.src.size;
+		if (seekFn === undefined || sizeFn === undefined) {
+			throw new BinpazerError("noseek", "nextCommitted needs a source that can seek and report its size");
+		}
+		if (!this.appendable) {
+			throw new BinpazerError("not_appendable", "the file does not set the appendable header flag");
+		}
+		if (this.sawEnd || (this.blocksEnd !== null && this.cursor >= this.blocksEnd)) {
+			return null;
+		}
+		const start = this.cursor;
+		this.size = this.io(() => sizeFn.call(this.src));
+		this.seekTo(start);
+		const b = this.verifyCommitted(start);
+		if (b === null) {
+			this.seekTo(start);
+			return "pending";
+		}
+		this.seekTo(b.payloadOffset);
+		return this.noteEnd(b);
+	}
+
+	// verifyCommitted checks the seal of the block at start and returns null when it is not committed.
+	private verifyCommitted(start: number): Block | null {
+		this.lastTorn = false;
+		if (this.size < start + 8) {
+			return null;
+		}
+		const h = new Uint8Array(8);
+		this.readExact(h);
+		const typeId = getU16(h, 0);
+		const flags = getU16(h, 2);
+		const payloadLength = decodePayloadLength(getU32(h, 4), flags);
+		if (typeId === 0) {
+			return null;
+		}
+		if ((flags & FLAG_HAS_CRC) === 0) {
+			this.lastTorn = true;
+			return null;
+		}
+		if (align8(start + 8 + payloadLength + 4) > this.size) {
+			return null;
+		}
+		let crc = crc32c(0, h);
+		const chunkBuf = new Uint8Array(Math.min(payloadLength, IO_BUF_SIZE));
+		for (let rem = payloadLength; rem > 0; ) {
+			const chunk = chunkBuf.subarray(0, Math.min(rem, chunkBuf.length));
+			this.readExact(chunk);
+			crc = crc32c(crc, chunk);
+			rem -= chunk.length;
+		}
+		const seal = new Uint8Array(4);
+		this.readExact(seal);
+		if (crc !== getU32(seal, 0)) {
+			this.lastTorn = true;
+			return null;
+		}
+		return this.parseHeader(h, start);
+	}
+
+	private noteEnd(b: Block): Block {
+		if (b.typeId === TYPE_END && this.appendable) {
+			this.sawEnd = true;
+		}
+		return b;
 	}
 
 	readPayload(b: Block): Uint8Array {
@@ -229,7 +321,10 @@ export class Reader {
 		this.needSeek("find");
 		const saved = this.cursor;
 		try {
-			return this.indexFound ? this.findIndexed(typeId) : this.findWalk(typeId);
+			if (this.indexFound) {
+				return this.findIndexed(typeId);
+			}
+			return this.appendable ? this.findCommitted(typeId) : this.findWalk(typeId);
 		} finally {
 			this.seekTo(saved);
 		}
@@ -286,6 +381,28 @@ export class Reader {
 			}
 		}
 		return out;
+	}
+
+	// findCommitted walks an appendable file's committed blocks; the unsealed table counts by position.
+	private findCommitted(typeId: number): number[] {
+		const sawEnd = this.sawEnd;
+		this.sawEnd = false;
+		try {
+			const out: number[] = typeId === TYPE_BLOCK_TYPE_TABLE ? [this.firstBlockOffset] : [];
+			this.seekTo(this.tableEnd);
+			for (;;) {
+				const b = this.nextCommitted();
+				if (b === null || b === "pending") {
+					return out;
+				}
+				if (b.typeId === typeId) {
+					out.push(b.offset);
+				}
+				this.skipPayload(b);
+			}
+		} finally {
+			this.sawEnd = sawEnd;
+		}
 	}
 
 	private findWalk(typeId: number): number[] {

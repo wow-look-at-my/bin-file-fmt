@@ -389,13 +389,47 @@ export class Writer {
 			throw this.err;
 		}
 		if (this.ended) {
-			throw new BinpazerError("format", "writer already ended");
+			throw this.appendable ? new BinpazerError("ended", "the appendable file is ended") : new BinpazerError("format", "writer already ended");
 		}
 	}
 
 	private fail(e: BinpazerError): never {
 		this.err = e;
 		throw e;
+	}
+}
+
+export interface ResumedWriter {
+	writer: Writer;
+	types: TypeEntry[];
+}
+
+// resumeAppendWriter continues an open appendable file: it walks the committed blocks and seals any torn tail.
+export function resumeAppendWriter(file: Source & Sink, opts?: ReaderOptions): ResumedWriter {
+	const seek = file.seek;
+	const size = file.size;
+	if (seek === undefined || size === undefined) {
+		throw new BinpazerError("noseek", "resume needs a file that can seek and report its size");
+	}
+	const r = new Reader(file, opts);
+	for (;;) {
+		const b = r.nextCommitted();
+		if (b === "pending") {
+			break;
+		}
+		if (b === null) {
+			throw new BinpazerError("ended", "the appendable file is ended");
+		}
+		r.skipPayload(b);
+	}
+	const end = r.offset;
+	const tail = Math.max(0, size.call(file) - end);
+	seek.call(file, end);
+	resuming = { offset: end, versionMinor: r.versionMinor, tail };
+	try {
+		return { writer: new Writer(file, new Uint8Array(16), "", []), types: r.types };
+	} finally {
+		resuming = null;
 	}
 }
 
