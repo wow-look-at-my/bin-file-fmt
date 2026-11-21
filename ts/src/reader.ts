@@ -31,6 +31,16 @@ function matchesAscii(b: Uint8Array, at: number, text: string): boolean {
 	return true;
 }
 
+// looseU64 reads file_length without the safe-integer check: it is only compared, never used as a position.
+function looseU64(b: Uint8Array, at: number): number | null {
+	const lo = getU32(b, at);
+	const hi = getU32(b, at + 4);
+	if (lo === 0xffffffff && hi === 0xffffffff) {
+		return null;
+	}
+	return hi * 0x100000000 + lo;
+}
+
 function nextOffset(b: Block): number {
 	return align8(b.payloadOffset + payloadClaim(b.payloadLength, b.flags));
 }
@@ -40,7 +50,7 @@ export class Reader {
 	readonly versionMinor: number;
 	readonly writerGuid: Guid;
 	readonly writerName: string;
-	// fileLength is null for the streaming sentinel.
+	// fileLength is null for the streaming sentinel and inexact above MAX_SAFE_INTEGER.
 	readonly fileLength: number | null;
 	readonly firstBlockOffset: number;
 	readonly types: TypeEntry[];
@@ -56,6 +66,7 @@ export class Reader {
 	private readonly typeIdx = new Map<number, number>();
 	private indexFound = false;
 	private indexOff = 0;
+	private indexUnsafe = false;
 	private blocksEnd: number | null;
 
 	constructor(source: Source, opts?: ReaderOptions) {
@@ -79,7 +90,7 @@ export class Reader {
 			throw new BinpazerError("version", `unsupported major version ${this.versionMajor}`);
 		}
 		this.writerGuid = fixed.slice(16, 32);
-		this.fileLength = getU64(fixed, 32, "file_length");
+		this.fileLength = looseU64(fixed, 32);
 		const fbo = getU64(fixed, 40, "first_block_offset");
 		if (fbo === null) {
 			throw new BinpazerError("range", "first_block_offset does not fit a safe integer");
@@ -107,11 +118,7 @@ export class Reader {
 			this.seekTo(fl - 16);
 			const foot = new Uint8Array(16);
 			if (this.readUpTo(foot) === 16 && matchesAscii(foot, 8, FOOTER_MAGIC)) {
-				const io = getU64(foot, 0, "footer index_block_offset");
-				if (io !== null) {
-					this.indexOff = io;
-					this.indexFound = true;
-				}
+				this.recordIndex(foot, 0);
 			}
 			this.seekTo(saved);
 		}
@@ -147,22 +154,15 @@ export class Reader {
 		const fl = this.fileLength;
 		if (!this.indexFound && fl !== null && fl >= 16 && this.cursor === fl - 16 && this.ensure(16) >= 16) {
 			if (matchesAscii(this.win, this.winPos + 8, FOOTER_MAGIC)) {
-				const io = getU64(this.win, this.winPos, "footer index_block_offset");
-				if (io !== null) {
-					this.indexOff = io;
-					this.indexFound = true;
-					this.winPos += 16;
-					this.cursor += 16;
-					return null;
-				}
+				this.recordIndex(this.win, this.winPos);
+				this.winPos += 16;
+				this.cursor += 16;
+				return null;
 			}
 		}
 		const hdr8 = new Uint8Array(8);
 		const got = this.readUpTo(hdr8);
 		if (got === 0) {
-			if (this.blocksEnd !== null) {
-				throw new BinpazerError("truncated", `input ends at offset ${this.cursor}, file_length promises ${this.blocksEnd}`);
-			}
 			return null;
 		}
 		if (got < 8) {
@@ -254,7 +254,17 @@ export class Reader {
 		}
 	}
 
+	// recordIndex notes the footer like Go does; an unsafe offset fails only when find uses it.
+	private recordIndex(foot: Uint8Array, at: number): void {
+		this.indexFound = true;
+		this.indexUnsafe = getU32(foot, at + 4) > 0x1fffff;
+		this.indexOff = this.indexUnsafe ? -1 : (getU64(foot, at, "footer index_block_offset") ?? -1);
+	}
+
 	private findIndexed(typeId: number): number[] {
+		if (this.indexUnsafe) {
+			throw new BinpazerError("range", "footer index_block_offset does not fit a safe integer");
+		}
 		this.seekTo(this.indexOff);
 		const head = new Uint8Array(16);
 		this.readExact(head);

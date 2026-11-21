@@ -35,6 +35,12 @@ export function isByteIdenticalCodec(codec: Codec): boolean {
 	return codec === "none" || codec === "stored";
 }
 
+export function fullWorkload(name: string): Workload {
+	const w = WORKLOADS.find((x) => x.name === name);
+	if (w === undefined) throw new Error(`unknown workload "${name}"`);
+	return { ...w, ops: [...w.ops] };
+}
+
 export function scaleForQuick(w: Workload): Workload {
 	return { ...w, blocks: Math.max(2, Math.floor(w.blocks / 8)), ops: [...w.ops] };
 }

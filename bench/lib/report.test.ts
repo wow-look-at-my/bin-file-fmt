@@ -55,14 +55,19 @@ test("report layout", () => {
 	assert.ok(md.endsWith("\n") && !md.endsWith("\n\n"));
 });
 
-test("profiles render one table per summary and append to the report", () => {
+test("profiles render one rank table per workload and operation, implementations as columns", () => {
 	assert.equal(renderProfiles([]), "");
-	const p = { impl: "go", workload: "small", op: "read", tool: "pprof", totalSamplesOrMs: 1500, unit: "ms", top: [{ name: "binpazer.(*Reader).Next", selfPercent: 31.25 }] };
-	const out = renderProfiles([p]);
-	assert.ok(out.includes("### Go: small / read"));
-	assert.ok(out.includes("pprof, 1500 ms in total."));
-	assert.ok(out.includes("| `binpazer.(*Reader).Next` | 31.3 |"));
+	const go = { impl: "go", workload: "small", op: "read", tool: "pprof", totalSamplesOrMs: 1500.4, unit: "ms", top: [{ name: "binpazer.(*Reader).Next", selfPercent: 31.25 }, { name: "a|b", selfPercent: 0.2 }] };
+	const c = { impl: "c", workload: "small", op: "read", tool: "gprof", totalSamplesOrMs: 90, unit: "ms", top: [{ name: "binpazer_crc32c", selfPercent: 88.9 }] };
+	const out = renderProfiles([go, c]);
+	assert.ok(out.startsWith("## Where the CPU time goes (self time, top functions)\n\nTools: C gprof, Go pprof. Percentages are of each run's sampled CPU time."));
+	assert.ok(out.includes("### small / read\n\n| Rank | C | Go |"));
+	assert.ok(out.includes("| 1 | `binpazer_crc32c` (89%) | `binpazer.(*Reader).Next` (31%) |"));
+	assert.ok(out.includes("| 2 |  | `a\\|b` (<1%) |"));
+	assert.ok(out.includes("| sampled | 90 ms | 1500 ms |"));
+	assert.throws(() => renderProfiles([go, c, { ...go, workload: "medium" }]), /expected one profile for medium \/ read \/ c, got 0/);
 	const r = sample();
-	r.profiles = [p];
-	assert.ok(renderReport({ results: r, impls: ["c", "go"], reference: "c", commands: [] }).includes("## Profiles"));
+	assert.ok(!renderReport({ results: r, impls: ["c", "go"], reference: "c", commands: [] }).includes("Where the CPU time goes"));
+	r.profiles = [c, go];
+	assert.ok(renderReport({ results: r, impls: ["c", "go"], reference: "c", commands: [] }).includes("## Where the CPU time goes"));
 });

@@ -38,6 +38,15 @@ node bench/run.ts --quick
 node bench/run.ts --quick --impls c,cpp --only small,zstd
 ```
 
+To add CPU hot-spot tables, build the gprof programs and pass `--profile`:
+
+```sh
+make -C bench prof
+node bench/run.ts --profile
+```
+
+`make -C bench prof` builds `bench_c` and `bench_cpp` into `bench/build-prof/` with `-pg` and a static link, so gprof also samples libc and the codec libraries. After the timed runs of a workload, `--profile` runs each implementation. This happens once more for small/read, medium/write and medium/read. This also happens lz4/write and lz4/read: C and C++ under gprof, Go with `--cpuprofile` (pprof), TypeScript with `node --cpu-prof`. These profiled runs always use the full block counts, also with `--quick`, because the samplers only take samples a second. Each profiled run must print the same result line as the reference.
+
 Run `node bench/run.ts --help` for every option. To check the driver itself:
 
 ```sh
@@ -46,4 +55,6 @@ cd bench && ts0 test
 
 ## Reading the report
 
-`bench/RESULTS.md` has tables with one row per workload and operation: CPU time, peak memory, and wall time with throughput. A value in parentheses is the ratio to the reference implementation, so `0.412 (1.8x)` means 1.8 times the reference. A "Written file size" table shows the codec workloads. Compressed sizes can differ because encoder output is implementation-defined. `bench/results.json` holds the same data plus the raw stats of every repeat.
+`bench/RESULTS.md` has tables with one row per workload and operation: CPU time, peak memory, and wall time with throughput. A value in parentheses is the ratio to the reference implementation, so `0.412 (1.8x)` means 1.8 times the reference. A "Written file size" table shows the codec workloads. Compressed sizes can differ because encoder output is implementation-defined. With `--profile`, the section "Where the CPU time goes" has one table per workload and operation: implementations as columns, the top functions by self time as rows. Each comes with its share of that run's sampled CPU time.
+
+`bench/results.json` holds the same data plus the raw stats of every repeat and the full profile summaries.

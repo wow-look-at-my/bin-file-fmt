@@ -6,19 +6,24 @@ See **[SPEC.md](./SPEC.md)** for the format.
 
 ## Implementations
 
-Minimal-dependency libraries that do **no file IO and no mmap** -- the caller injects IO via callbacks (C/C++) or `io.Reader`/`io.Writer` (Go).
+Minimal-dependency libraries that do **no file IO and no mmap** -- the caller injects IO via callbacks (C/C++). The caller also libraries `io.Reader`/`io.Writer` (Go), or a `Source`/`Sink` object (TypeScript).
 
 | Dir | Language | IO | Test |
 |---|---|---|---|
 | [`c/`](./c) | C11, allocation-free | `read`/`write` (+ optional `seek`) function pointers | `make -C c test` |
 | [`cpp/`](./cpp) | C++17, header-only convenience wrapper over the C core | `std::function` callbacks | `make -C cpp test` |
 | [`go/`](./go) | pure Go library (the CLI uses cobra) | `io.Reader` / `io.Writer` (`io.Seeker` optional) | `go-toolchain` (in `go/`) |
+| [`ts/`](./ts) | TypeScript, no npm dependency; the core also runs in a browser | `Source` / `Sink` objects (`seek` optional) | `ts0 test` (in `ts/`) |
 
-All three implement **every codec the format defines**, so no implementation can write a file another cannot read. In C and C++ the codecs are a second file you link (`c/binpazer_codec.c`, over zlib/libzstd/liblz4). The core links nothing but libc, and keeps a test binary that proves it.
+Each one implements **every codec the format defines**, so no implementation can write a file another cannot read. In C and C++ the codecs are a second file you link (`c/binpazer_codec.c`, over zlib/libzstd/liblz4). The core links nothing but libc, and keeps a test binary that proves it. TypeScript makes the same split: `ts/src/core.ts` imports nothing, and `ts/src/index.ts` adds the codecs.
 
-All write byte-identical files. The Go tests verify this against a C-generated fixture ([`go/testdata/sample.binpazer`](./go/testdata)). CI regenerates the fixture from C and `cmp`s it on every push. Compressed blocks are the deliberate exception. A codec id names a decodable format, not one encoder. Implementations agree on what a file *means* rather than on the bytes their compressors emit.
+All write byte-identical files. The Go and TypeScript tests verify this against a C-generated fixture ([`go/testdata/sample.binpazer`](./go/testdata)). CI regenerates the fixture from C and `cmp`s it on every push. Compressed blocks are the deliberate exception. A codec id names a decodable format, not one encoder. Implementations agree on what a file *means* rather than on the bytes their compressors emit.
 
 CI checks that directly, by having each implementation decode files the other wrote with every codec.
+
+## Benchmarks
+
+[`bench/`](./bench) runs the same workloads through every implementation and compares CPU time and peak memory. [`bench/RESULTS.md`](./bench/RESULTS.md) holds the measured comparison and the hot functions of each implementation. [`bench/README.md`](./bench/README.md) says how to run it.
 
 The Go library also ships a convenience layer for the shape most binpazer files take. Content blocks, a directory naming where they landed, then the index -- so building one is not twenty lines of bookkeeping:
 

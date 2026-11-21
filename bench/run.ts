@@ -36,7 +36,8 @@ function main(argv: string[]): number {
 
 	const profBuild = opts.profile && (opts.impls.includes("c") || opts.impls.includes("cpp")) ? ["make -C bench prof"] : [];
 	const builds = [...new Set(["make -C bench", ...profBuild, ...opts.impls.map((i) => BUILD_COMMANDS[i])])];
-	const commands = [...builds, describeArgv(["node", "bench/run.ts", ...argv])];
+	// A subshell keeps each `cd` from leaking into the next command.
+	const commands = [...builds.map((c) => (c.startsWith("cd ") ? `(${c})` : c)),describeArgv(["node", "bench/run.ts", ...argv])];
 	writeFileAtomic(opts.jsonPath, JSON.stringify(results, null, "\t") + "\n");
 	writeFileAtomic(opts.reportPath, renderReport({ results, impls: opts.impls, reference: referenceImpl(opts.impls), commands }));
 	process.stderr.write(`wrote ${opts.jsonPath}\nwrote ${opts.reportPath}\n`);

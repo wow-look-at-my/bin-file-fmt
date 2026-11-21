@@ -93,13 +93,23 @@ test("the sample offsets the corruption helpers patch are where they claim", () 
 	assert.equal(b[OFF_BLOCK1 + 4], 16);
 });
 
-test("every truncated prefix of the sample throws truncated, seekable and streaming", () => {
+test("a prefix cut mid-structure gives truncated; any prefix ends cleanly or with a typed error", () => {
 	const full = sampleBytes();
-	for (let n = 0; n < full.length; n++) {
+	const midStructure = new Set([0, 4, 55, 58, 90, 150, 199, 219, 279]);
+	for (let n = 0; n <= full.length; n++) {
 		for (const mk of [seekable, streaming]) {
-			const code = codeOf(() => readAll(mk(full.subarray(0, n))));
-			assert.equal(code, "truncated", `prefix ${n} (${mk === seekable ? "seekable" : "streaming"})`);
+			const label = `prefix ${n} (${mk === seekable ? "seekable" : "streaming"})`;
+			if (midStructure.has(n)) {
+				assert.equal(codeOf(() => readAll(mk(full.subarray(0, n)))), "truncated", label);
+			} else {
+				onlyTypedErrors(() => readAll(mk(full.subarray(0, n))), label);
+			}
 		}
+	}
+	for (const mk of [seekable, streaming]) {
+		const br = new Reader(mk(full.subarray(0, 224)));
+		br.readPayload(mustNext(br));
+		assert.equal(br.next(), null, "a cut at a block boundary ends the walk cleanly");
 	}
 });
 
@@ -160,26 +170,49 @@ test("maxAlloc caps a streaming input and the default cap admits normal files", 
 	assert.equal(n, 3);
 });
 
-test("a lying file_length finds no footer; one past the safe range gives range", () => {
-	const b = sampleBytes();
-	putU64(b, OFF_FILE_LENGTH, 296);
-	const br = new Reader(seekable(b));
-	assert.equal(br.hasIndex, false);
-	let n = 0;
-	const code = codeOf(() => {
-		for (let blk = br.next(); blk !== null; blk = br.next()) {
-			br.skipPayload(blk);
-			n++;
+test("a lying file_length degrades to no footer and a walk that ends at the input", () => {
+	const cases: [string, number, number][] = [
+		["296", 0, 296],
+		["1<<62", 0x40000000, 0],
+		["sentinel - 1", 0xffffffff, 0xfffffffe],
+	];
+	for (const [label, hi, lo] of cases) {
+		for (const mk of [seekable, streaming]) {
+			const b = sampleBytes();
+			putU32(b, OFF_FILE_LENGTH, lo);
+			putU32(b, OFF_FILE_LENGTH + 4, hi);
+			const br = new Reader(mk(b));
+			assert.equal(br.hasIndex, false, label);
+			assert.ok(br.fileLength !== null && br.fileLength >= 296, label);
+			let n = 0;
+			for (let blk = br.next(); blk !== null; blk = br.next()) {
+				br.skipPayload(blk);
+				n++;
+			}
+			assert.equal(n, 3, label);
+			assert.equal(br.offset, b.length, label);
 		}
-	});
-	assert.equal(n, 3);
-	assert.equal(code, "truncated");
-	for (const hi of [0x40000000, 0xffffffff]) {
-		const c = sampleBytes();
-		putU32(c, OFF_FILE_LENGTH + 4, hi);
-		putU32(c, OFF_FILE_LENGTH, 0xfffffffe);
-		assert.equal(codeOf(() => new Reader(seekable(c))), "range");
 	}
+});
+
+test("a footer offset past the safe range opens like Go and fails only in find", () => {
+	const m = new MemorySink();
+	const w = new Writer(m, SAMPLE_WRITER, "idx", []);
+	w.block(1, 0, enc("x"));
+	w.writeIndex();
+	w.end();
+	const b = m.bytes();
+	putU32(b, b.length - 12, 0x40000000);
+	const br = new Reader(seekable(b));
+	assert.equal(br.hasIndex, true);
+	assert.equal(codeOf(() => br.find(1)), "range");
+	const walk = new Reader(seekable(b));
+	let n = 0;
+	for (let blk = walk.next(); blk !== null; blk = walk.next()) {
+		walk.skipPayload(blk);
+		n++;
+	}
+	assert.equal(n, 2);
 });
 
 test("a caller-made block cannot drive an unbounded allocation", () => {

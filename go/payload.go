@@ -100,6 +100,8 @@ func (br *Reader) PayloadReader(b *Block) (io.Reader, error) {
 type payloadReader struct {
 	br  *Reader
 	rem uint64
+	// crc, when set, accumulates the CRC-32C of every byte read.
+	crc *uint32
 }
 
 func (pr *payloadReader) Read(p []byte) (int, error) {
@@ -112,6 +114,9 @@ func (pr *payloadReader) Read(p []byte) (int, error) {
 	n, err := pr.br.r.Read(p)
 	pr.br.off += uint64(n)
 	pr.rem -= uint64(n)
+	if pr.crc != nil {
+		*pr.crc = crc32.Update(*pr.crc, crcTable, p[:n])
+	}
 	if err == io.EOF {
 		if pr.rem > 0 {
 			err = pr.br.wrapEOF(io.ErrUnexpectedEOF) // input cut mid-payload

@@ -28,7 +28,6 @@ class Reader {
 			scale *= 128;
 			if (scale > 2 ** 63) throw new Error("pprof: varint longer than 10 bytes");
 		}
-		if (!Number.isSafeInteger(result)) throw new Error(`pprof: varint ${result} exceeds 2^53`);
 		return result;
 	}
 
@@ -68,6 +67,7 @@ function ints(fields: Field[], num: number): number[] {
 			while (r.pos < f.bytes!.length) out.push(r.varint());
 		} else throw new Error(`pprof: field ${num} has wire type ${f.wire}, want an integer`);
 	}
+	for (const v of out) if (!Number.isSafeInteger(v)) throw new Error(`pprof: field ${num} holds ${v}, above 2^53`);
 	return out;
 }
 

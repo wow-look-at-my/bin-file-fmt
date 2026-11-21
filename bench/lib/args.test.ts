@@ -45,6 +45,14 @@ test("explicit values win and --opt=value works", () => {
 	assert.equal(o.jsonPath, "/cwd/r.json");
 	assert.equal(o.bins.cpp, "/x/cpp");
 	assert.equal(o.keep, true);
+	assert.equal(o.profile, false);
+});
+
+test("--profile and the gprof build paths", () => {
+	const o = parse(["--profile", "--cpp-prof-bin", "p/cpp"]);
+	assert.equal(o.profile, true);
+	assert.equal(o.profBins.c, "/repo/bench/build-prof/bench_c");
+	assert.equal(o.profBins.cpp, "/cwd/p/cpp");
 });
 
 test("--help returns null", () => {

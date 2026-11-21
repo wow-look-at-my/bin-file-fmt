@@ -13,7 +13,7 @@ import type { OpResult, ProfileSummary, Results, WorkloadResult } from "./report
 import { formatResultLine, parseResultLine, validateResultLine } from "./resultline.ts";
 import { summarize } from "./stats.ts";
 import type { RunStats } from "./stats.ts";
-import { IMPL_LABELS, isByteIdenticalCodec, lookupCount, referenceImpl } from "./workloads.ts";
+import { IMPL_LABELS, fullWorkload, isByteIdenticalCodec, lookupCount, referenceImpl } from "./workloads.ts";
 import type { Impl, Op, Workload } from "./workloads.ts";
 
 // Throws naming the missing file and the command that builds it.
@@ -100,7 +100,7 @@ export class Bench {
 			results.push(this.record(w, "write", impl, t.runs));
 			fileBytes[impl] = fs.statSync(fileOf(impl)).size;
 		}
-		const crossReadLine = this.checkAgreement(w, fileOf);
+		this.checkAgreement(w, fileOf);
 
 		const opLines = new Map<Op, string>();
 		for (const op of w.ops.filter((o) => o !== "write")) {
@@ -113,49 +113,69 @@ export class Bench {
 			}
 			opLines.set(op, refLine!);
 		}
-		if (this.opts.profile) this.profileWorkload(w, payload, fileOf, ref, opLines, crossReadLine);
+		if (this.opts.profile) this.profileWorkload(w, payload, ref, opLines);
 		if (!this.opts.keep) this.removeMade();
 		return { name: w.name, payloadBytes: w.payloadBytes, blocks: w.blocks, codec: w.codec, fileBytes, results };
 	}
 
-	// Profiled runs come after the timed runs and pass the same result-line and agreement checks.
-	profileWorkload(w: Workload, payload: string, fileOf: (impl: Impl) => string, ref: Impl, opLines: Map<Op, string>, crossReadLine: string | null): void {
-		for (const op of profileOps(w)) {
+	// Untimed run whose result line must pass validation.
+	untimed(w: Workload, impl: Impl, op: Op, args: string[]): string {
+		const argv = this.argv(impl, op, args);
+		return this.checkedLine(w, op, runDirect(argv).stdout, argv);
+	}
+
+	// Profiled runs follow the timed runs and use the full block counts even under --quick, so the Hz samplers collect samples.
+	profileWorkload(timed: Workload, payload: string, ref: Impl, opLines: Map<Op, string>): void {
+		const ops = profileOps(timed);
+		if (ops.length === 0) return;
+		const w = fullWorkload(timed.name);
+		const base = path.join(this.opts.workDir, "prof");
+		this.made.add(base);
+		fs.mkdirSync(base, { recursive: true });
+		// The reference writes the file every profiled read-side run uses, and reading it gives the agreed line.
+		const refFile = path.join(base, `${w.name}.ref.binpazer`);
+		this.untimed(w, ref, "write", this.opArgs(w, "write", refFile, payload));
+		const expected = new Map<Op, string>();
+		expected.set("write", formatResultLine({ op: "write", blocks: w.blocks, bytes: w.blocks * w.payloadBytes, checksum: "00000000" }));
+		const refRead = this.untimed(w, ref, "read", [refFile]);
+		if (w.blocks === timed.blocks && opLines.has("read") && opLines.get("read") !== refRead) throw new Error(`[${w.name}] untimed read of ${refFile} gives ${refRead}, timed runs gave ${opLines.get("read")}`);
+		expected.set("read", refRead);
+		for (const op of ops) {
 			if (!w.ops.includes(op)) throw new Error(`[${w.name}] profiled operation ${op} is not a timed operation of this workload`);
 			for (const impl of this.opts.impls) {
-				const dir = path.join(this.opts.workDir, "prof", `${w.name}.${op}.${impl}`);
+				const dir = path.join(base, `${w.name}.${op}.${impl}`);
 				fs.rmSync(dir, { recursive: true, force: true });
-				fs.mkdirSync(dir, { recursive: true });
-				this.made.add(path.join(this.opts.workDir, "prof"));
+				fs.mkdirSync(dir);
 				const out = path.join(dir, "out.binpazer");
-				const args = this.opArgs(w, op, op === "write" ? out : fileOf(ref), payload);
-				const run = profiledRun(this.opts, impl, w.name, op, args, dir);
+				const run = profiledRun(this.opts, impl, w.name, op, this.opArgs(w, op, op === "write" ? out : refFile, payload), dir);
 				const line = this.checkedLine(w, op, run.stdout, run.argv);
-				const want = op === "write" ? formatResultLine({ op: "write", blocks: w.blocks, bytes: w.blocks * w.payloadBytes, checksum: "00000000" }) : opLines.get(op)!;
-				if (line !== want) throw new Error(`[${w.name}] profiled ${op} by ${IMPL_LABELS[impl]} disagrees with the timed runs:\n  timed: ${want}\n  profiled: ${line}`);
-				if (op === "write") this.checkProfiledWrite(w, impl, out, fileOf(impl), ref, crossReadLine);
+				const want = expected.get(op);
+				if (want === undefined) expected.set(op, line);
+				else if (line !== want) throw new Error(`[${w.name}] profiled ${op} by ${IMPL_LABELS[impl]} disagrees:\n  expected: ${want}\n  profiled: ${line}`);
+				if (op === "write") this.checkProfiledWrite(w, impl, out, refFile, ref, refRead);
 				this.profiles.push(run.summary);
 				const s = run.summary;
 				process.stderr.write(`[${w.name}] profile ${op} ${IMPL_LABELS[impl]}: ${s.tool}, ${s.totalSamplesOrMs.toFixed(0)} ms sampled, top ${s.top[0]!.name}\n`);
+				fs.rmSync(out, { force: true });
 			}
 		}
+		fs.rmSync(refFile);
 	}
 
-	// A profiled write must produce the same bytes (codec none or stored) or a file that decodes to the agreed line.
-	checkProfiledWrite(w: Workload, impl: Impl, out: string, timedFile: string, ref: Impl, crossReadLine: string | null): void {
+	// A profiled write must produce the reference's bytes (codec none or stored) or a file the reference decodes to the agreed line.
+	checkProfiledWrite(w: Workload, impl: Impl, out: string, refFile: string, ref: Impl, refRead: string): void {
 		if (isByteIdenticalCodec(w.codec)) {
 			const a = sha256File(out);
-			const b = sha256File(timedFile);
-			if (a !== b) throw new Error(`[${w.name}] profiled write differs from the timed write: ${out} sha256 ${a}, ${timedFile} sha256 ${b}`);
+			const b = sha256File(refFile);
+			if (a !== b) throw new Error(`[${w.name}] profiled ${IMPL_LABELS[impl]} write differs from the reference file: ${out} sha256 ${a}, ${refFile} sha256 ${b}`);
 			return;
 		}
-		const argv = this.argv(ref, "read", [out]);
-		const line = this.checkedLine(w, "read", runDirect(argv).stdout, argv);
-		if (line !== crossReadLine) throw new Error(`[${w.name}] ${IMPL_LABELS[ref]} reading the profiled ${IMPL_LABELS[impl]} write (${out}) gives ${line}, want ${crossReadLine}`);
+		const line = this.untimed(w, ref, "read", [out]);
+		if (line !== refRead) throw new Error(`[${w.name}] ${IMPL_LABELS[ref]} reading the profiled ${IMPL_LABELS[impl]} write (${out}) gives ${line}, want ${refRead}`);
 	}
 
-	// Byte identity for codecs that require it; otherwise every implementation reads every file to the same line, which it returns.
-	checkAgreement(w: Workload, fileOf: (impl: Impl) => string): string | null {
+	// Byte identity for codecs that require it; otherwise every implementation reads every file to the same line.
+	checkAgreement(w: Workload, fileOf: (impl: Impl) => string): void {
 		const { impls } = this.opts;
 		if (isByteIdenticalCodec(w.codec)) {
 			const base = impls[0]!;
@@ -164,7 +184,7 @@ export class Bench {
 				const h = sha256File(fileOf(impl));
 				if (h !== baseHash) throw new Error(`[${w.name}] written files differ (codec ${w.codec} must be byte-identical): ${fileOf(base)} sha256 ${baseHash}, ${fileOf(impl)} sha256 ${h}`);
 			}
-			return null;
+			return;
 		}
 		let first: { writer: Impl; reader: Impl; line: string } | null = null;
 		for (const writer of impls) {
@@ -183,7 +203,6 @@ export class Bench {
 			}
 		}
 		process.stderr.write(`[${w.name}] cross-read: ${impls.length * impls.length} reader/writer pairs agree\n`);
-		return first!.line;
 	}
 
 	removeMade(): void {
