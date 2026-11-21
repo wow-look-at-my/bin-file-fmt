@@ -40,6 +40,8 @@ export interface ProfileSummary {
 	totalSamplesOrMs: number;
 	unit: string;
 	top: { name: string; selfPercent: number }[];
+	// How many profiled runs the sum covers.
+	runs?: number;
 }
 
 export interface Results {
@@ -164,7 +166,7 @@ export function renderProfiles(profiles: ProfileSummary[]): string {
 	const tools = impls.map((i) => `${implLabel(i)} ${profiles.find((p) => p.impl === i)!.tool}`);
 	const parts = [
 		"## Where the CPU time goes (self time, top functions)",
-		`Tools: ${tools.join(", ")}. Percentages are of each run's sampled CPU time. The profiled runs are separate runs from the timed ones.`,
+		`Tools: ${tools.join(", ")}. A percentage is a share of the sampled CPU time. The profiled runs are separate runs from the timed ones. A fast operation is profiled several times and the samples are summed, because a sampler takes few samples from a short run.`,
 	];
 	const keys: string[] = [];
 	for (const p of profiles) {
@@ -186,6 +188,7 @@ export function renderProfiles(profiles: ProfileSummary[]): string {
 			})]);
 		}
 		rows.push(["sampled", ...cols.map((c) => `${c.totalSamplesOrMs.toFixed(0)} ${c.unit}`)]);
+		if (cols.some((c) => c.runs !== undefined)) rows.push(["runs summed", ...cols.map((c) => (c.runs === undefined ? "" : String(c.runs)))]);
 		parts.push(`### ${k}`);
 		parts.push(renderTable(["Rank", ...impls.map(implLabel)], rows));
 	}

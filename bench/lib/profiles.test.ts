@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { cleanName, parseCpuProfile, parseGprofFlat, profileOps, shortGoName, summarizeProfile } from "./profiles.ts";
+import { addSelfTimes } from "./profrun.ts";
 import { WORKLOADS } from "./workloads.ts";
 
 const GPROF = `Flat profile:
@@ -84,4 +85,15 @@ test("profiled pairs per workload", () => {
 	assert.deepEqual(profileOps(byName("lz4")), ["write", "read"]);
 	assert.deepEqual(profileOps(byName("zstd")), []);
 	for (const w of WORKLOADS) for (const op of profileOps(w)) assert.ok(w.ops.includes(op), `${w.name} times ${op}`);
+});
+
+test("self times of repeated runs sum per function", () => {
+	const sum = new Map<string, number>();
+	assert.equal(addSelfTimes(sum, new Map()), 0);
+	assert.equal(addSelfTimes(sum, new Map([["crc", 10], ["read", 20]])), 30);
+	assert.equal(addSelfTimes(sum, new Map([["crc", 10], ["write", 5]])), 45);
+	assert.deepEqual([...sum.entries()].sort(), [["crc", 20], ["read", 20], ["write", 5]]);
+	const s = summarizeProfile(sum, { impl: "c", workload: "small", op: "read", tool: "gprof" }, "test");
+	assert.equal(s.totalSamplesOrMs, 45);
+	assert.equal(s.top[0]!.selfPercent + s.top[1]!.selfPercent + s.top[2]!.selfPercent, 100);
 });

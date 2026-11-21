@@ -60,7 +60,9 @@ test("profiles render one rank table per workload and operation, implementations
 	const go = { impl: "go", workload: "small", op: "read", tool: "pprof", totalSamplesOrMs: 1500.4, unit: "ms", top: [{ name: "binpazer.(*Reader).Next", selfPercent: 31.25 }, { name: "a|b", selfPercent: 0.2 }] };
 	const c = { impl: "c", workload: "small", op: "read", tool: "gprof", totalSamplesOrMs: 90, unit: "ms", top: [{ name: "binpazer_crc32c", selfPercent: 88.9 }] };
 	const out = renderProfiles([go, c]);
-	assert.ok(out.startsWith("## Where the CPU time goes (self time, top functions)\n\nTools: C gprof, Go pprof. Percentages are of each run's sampled CPU time."));
+	assert.ok(out.startsWith("## Where the CPU time goes (self time, top functions)\n\nTools: C gprof, Go pprof. A percentage is a share of the sampled CPU time."));
+	assert.ok(!out.includes("runs summed"));
+	assert.ok(renderProfiles([{ ...go, runs: 3 }, { ...c, runs: 12 }]).includes("| runs summed | 12 | 3 |"));
 	assert.ok(out.includes("### small / read\n\n| Rank | C | Go |"));
 	assert.ok(out.includes("| 1 | `binpazer_crc32c` (89%) | `binpazer.(*Reader).Next` (31%) |"));
 	assert.ok(out.includes("| 2 |  | `a\\|b` (<1%) |"));
