@@ -23,6 +23,9 @@ type Writer struct {
 	// versionMinor is what the header declares; usedCompression records that the content has outgrown it.
 	versionMinor    uint16
 	usedCompression bool
+	// appendable makes every block sealed and flushed, and makes End write the End block.
+	appendable bool
+	ended      bool
 }
 
 var zeros [8]byte
@@ -74,12 +77,13 @@ func NewWriter(w io.Writer, writerGUID GUID, name string, defs []TypeDef) (*Writ
 	return NewWriterVersion(w, writerGUID, name, defs, VersionMinor)
 }
 
-// NewWriterVersion is NewWriter with an explicit header version_minor. That
-// NewWriterVersion is for a non-seekable destination whose content will use a
-// feature from a later minor revision (compressed blocks:
-// VersionMinorCompression).
+// NewWriterVersion is NewWriter with an explicit header version_minor.
 func NewWriterVersion(w io.Writer, writerGUID GUID, name string, defs []TypeDef, versionMinor uint16) (*Writer, error) {
-	bw := &Writer{dst: w, w: bufio.NewWriterSize(w, ioBufSize), versionMinor: versionMinor}
+	return newWriter(w, writerGUID, name, defs, versionMinor, false)
+}
+
+func newWriter(w io.Writer, writerGUID GUID, name string, defs []TypeDef, versionMinor uint16, appendable bool) (*Writer, error) {
+	bw := &Writer{dst: w, w: bufio.NewWriterSize(w, ioBufSize), versionMinor: versionMinor, appendable: appendable}
 	if s, ok := w.(io.Seeker); ok {
 		bw.seeker = s
 	}
@@ -95,6 +99,9 @@ func NewWriterVersion(w io.Writer, writerGUID GUID, name string, defs []TypeDef,
 	copy(hdr[16:32], writerGUID[:])
 	binary.LittleEndian.PutUint64(hdr[32:], FileLengthUnknown)
 	binary.LittleEndian.PutUint64(hdr[40:], firstBlock)
+	if appendable {
+		binary.LittleEndian.PutUint32(hdr[48:], HeaderFlagAppendable)
+	}
 	bw.write(hdr[:])
 
 	var lp [4]byte
@@ -108,6 +115,12 @@ func NewWriterVersion(w io.Writer, writerGUID GUID, name string, defs []TypeDef,
 	for _, d := range defs {
 		payloadLen += bttEntrySize(len(d.Name))
 	}
+	entryCount := len(defs) + 1
+	if appendable {
+		// The End entry lets a reader older than the End block label it.
+		payloadLen += bttEntrySize(len(endTypeName))
+		entryCount++
+	}
 	if payloadLen > 0xFFFFFFFF {
 		bw.err = errors.New("binpazer: block type table too large")
 		return bw, bw.err
@@ -120,21 +133,40 @@ func NewWriterVersion(w io.Writer, writerGUID GUID, name string, defs []TypeDef,
 	bw.write(bh[:])
 
 	var cnt [8]byte
-	binary.LittleEndian.PutUint32(cnt[0:], uint32(len(defs)+1))
+	binary.LittleEndian.PutUint32(cnt[0:], uint32(entryCount))
 	bw.write(cnt[:])
 
 	bw.writeBTTEntry(TypeBlockTypeTable, BlockTypeTableGUID, "BlockTypeTable")
 	for _, d := range defs {
 		bw.writeBTTEntry(d.TypeID, d.GUID, d.Name)
 	}
+	if appendable {
+		bw.writeBTTEntry(TypeEnd, EndGUID, endTypeName)
+	}
 	bw.pad(align8(bw.off) - bw.off)
+	if appendable {
+		bw.flush() // a reader can open the file before the first block lands
+	}
 	return bw, bw.err
+}
+
+// flush hands every buffered byte to the destination.
+func (bw *Writer) flush() {
+	if bw.err == nil {
+		bw.err = bw.w.Flush()
+	}
 }
 
 // Block writes one block.
 func (bw *Writer) Block(typeID, flags uint16, payload []byte) error {
 	if bw.err != nil {
 		return bw.err
+	}
+	if bw.ended {
+		return ErrEnded
+	}
+	if bw.appendable {
+		flags |= FlagHasCRC // the CRC trailer is the commit seal
 	}
 	var lengthField uint32
 	if flags&FlagLargeMode != 0 {
@@ -156,7 +188,10 @@ func (bw *Writer) Block(typeID, flags uint16, payload []byte) error {
 		lengthField = uint32(len(payload))
 	}
 
-	bw.idx = append(bw.idx, IndexEntry{TypeID: typeID, Offset: bw.off})
+	if !bw.appendable {
+		// An appendable writer keeps no index, so its memory does not grow with the file.
+		bw.idx = append(bw.idx, IndexEntry{TypeID: typeID, Offset: bw.off})
+	}
 
 	var bh [8]byte
 	binary.LittleEndian.PutUint16(bh[0:], typeID)
@@ -172,6 +207,9 @@ func (bw *Writer) Block(typeID, flags uint16, payload []byte) error {
 		bw.write(cb[:])
 	}
 	bw.pad(align8(bw.off) - bw.off)
+	if bw.appendable {
+		bw.flush() // the block is committed when Block returns
+	}
 	return bw.err
 }
 
@@ -183,6 +221,9 @@ func (bw *Writer) Offset() uint64 { return bw.off }
 func (bw *Writer) WriteIndex() error {
 	if bw.err != nil {
 		return bw.err
+	}
+	if bw.appendable {
+		return errors.New("binpazer: an appendable file carries no Block Index")
 	}
 	payloadLen := uint64(8) + uint64(len(bw.idx))*16
 	if payloadLen > 0xFFFFFFFF {
@@ -218,6 +259,15 @@ func (bw *Writer) WriteIndex() error {
 func (bw *Writer) End() error {
 	if bw.err != nil {
 		return bw.err
+	}
+	if bw.appendable {
+		if bw.ended {
+			return nil
+		}
+		if err := bw.Block(TypeEnd, 0, nil); err != nil {
+			return err
+		}
+		bw.ended = true
 	}
 	if bw.wroteIndex {
 		var ft [16]byte

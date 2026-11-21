@@ -34,6 +34,7 @@ type Reader struct {
 	WriterName       string
 	FileLength       uint64
 	FirstBlockOffset uint64
+	HeaderFlags      uint32
 	Types            []TypeEntry
 
 	typeIdx map[uint16]int // type_id -> first index in Types, built by readBTT
@@ -41,6 +42,7 @@ type Reader struct {
 	hasIndex    bool
 	indexOffset uint64
 	blocksEnd   uint64 // end of the block stream (excludes a trailing footer)
+	ended       bool   // the End block of an appendable file was read
 }
 
 // Block is a parsed block header.
@@ -220,6 +222,7 @@ func NewReaderLimited(r io.Reader, maxAlloc int64) (*Reader, error) {
 	copy(br.WriterGUID[:], hdr[16:32])
 	br.FileLength = binary.LittleEndian.Uint64(hdr[32:])
 	br.FirstBlockOffset = binary.LittleEndian.Uint64(hdr[40:])
+	br.HeaderFlags = binary.LittleEndian.Uint32(hdr[48:])
 
 	lp := make([]byte, 4)
 	if err := br.read(lp); err != nil {
@@ -355,7 +358,7 @@ func (br *Reader) readBTT() error {
 // location) instead of misparsing the footer as a block header. This mirrors
 // the position-based footer detection the seekable probe already performs.
 func (br *Reader) Next() (*Block, error) {
-	if br.blocksEnd != FileLengthUnknown && br.off >= br.blocksEnd {
+	if br.ended || (br.blocksEnd != FileLengthUnknown && br.off >= br.blocksEnd) {
 		return nil, io.EOF
 	}
 	if !br.hasIndex && br.FileLength != FileLengthUnknown && br.FileLength >= 16 &&
@@ -389,6 +392,7 @@ func (br *Reader) Next() (*Block, error) {
 	}
 	b.payloadOff = br.off
 	br.resolveType(b)
+	br.noteEnd(b)
 	return b, nil
 }
 
@@ -397,6 +401,13 @@ func (br *Reader) resolveType(b *Block) {
 	if i, ok := br.typeIdx[b.TypeID]; ok {
 		b.GUID = br.Types[i].GUID
 		b.Known = true
+	}
+}
+
+// noteEnd records the End block, after which an appendable file has no block.
+func (br *Reader) noteEnd(b *Block) {
+	if b.TypeID == TypeEnd && br.Appendable() {
+		br.ended = true
 	}
 }
 
@@ -441,110 +452,8 @@ func (br *Reader) Offset() uint64 { return br.off }
 
 func (br *Reader) InputSize() int64 { return br.inputSize }
 
-// Find returns the file offsets of all blocks with the given type id. It uses
-// the Block Index when present (seeking straight to it) and otherwise walks the
-// file. It requires a seekable reader and preserves the reader's position.
-func (br *Reader) Find(typeID uint16) ([]uint64, error) {
-	if br.seeker == nil {
-		return nil, errors.New("binpazer: Find requires a seekable reader")
-	}
-	saved := br.off
-	offsets, ferr := br.find(typeID)
-	_ = br.seekTo(saved) // best-effort restore; a find error takes precedence
-	if ferr != nil {
-		return nil, ferr
-	}
-	return offsets, nil
-}
+// Appendable reports whether the header sets the appendable flag.
+func (br *Reader) Appendable() bool { return br.HeaderFlags&HeaderFlagAppendable != 0 }
 
-func (br *Reader) find(typeID uint16) ([]uint64, error) {
-	var offsets []uint64
-	if br.hasIndex {
-		if err := br.seekTo(br.indexOffset); err != nil {
-			return nil, err
-		}
-		bh := make([]byte, 8)
-		cc := make([]byte, 8)
-		if err := br.read(bh); err != nil {
-			return nil, err
-		}
-		if err := br.read(cc); err != nil {
-			return nil, err
-		}
-		entryCount := binary.LittleEndian.Uint32(cc)
-		e := make([]byte, 16)
-		for i := uint32(0); i < entryCount; i++ {
-			if err := br.read(e); err != nil {
-				return nil, err
-			}
-			if binary.LittleEndian.Uint16(e) == typeID {
-				offsets = append(offsets, binary.LittleEndian.Uint64(e[8:]))
-			}
-		}
-		return offsets, nil
-	}
-
-	// No index -- walk the file.
-	if err := br.seekTo(br.FirstBlockOffset); err != nil {
-		return nil, err
-	}
-	for br.blocksEnd == FileLengthUnknown || br.off < br.blocksEnd {
-		blkOff := br.off
-		bh := make([]byte, 8)
-		n, err := io.ReadFull(br.r, bh)
-		if n == 0 && err == io.EOF {
-			break
-		}
-		br.off += uint64(n)
-		if err != nil {
-			return nil, br.wrapEOF(err)
-		}
-		tid := binary.LittleEndian.Uint16(bh)
-		flags := binary.LittleEndian.Uint16(bh[2:])
-		plen := decodePayloadLen(uint64(binary.LittleEndian.Uint32(bh[4:])), flags)
-		if err := br.claim(payloadClaim(plen, flags), "block payload"); err != nil {
-			return nil, err
-		}
-		if tid == typeID {
-			offsets = append(offsets, blkOff)
-		}
-		crc := uint64(0)
-		if flags&FlagHasCRC != 0 {
-			crc = 4
-		}
-		next := align8(blkOff + 8 + plen + crc)
-		if err := br.seekTo(next); err != nil {
-			return nil, err
-		}
-	}
-	return offsets, nil
-}
-
-// At seeks to a block (e.g. an offset from Find) and reads its header,
-// resolving its GUID against the type table. Requires a seekable reader.
-// Afterwards, ReadPayload reads that block.
-func (br *Reader) At(offset uint64) (*Block, error) {
-	if br.seeker == nil {
-		return nil, errors.New("binpazer: At requires a seekable reader")
-	}
-	if br.inputSize >= 0 && offset > uint64(br.inputSize) {
-		return nil, fmt.Errorf("binpazer: block offset %d is beyond the %d-byte input: %w", offset, br.inputSize, ErrTruncated)
-	}
-	if err := br.seekTo(offset); err != nil {
-		return nil, err
-	}
-	bh := make([]byte, 8)
-	if err := br.read(bh); err != nil {
-		return nil, err
-	}
-	b := &Block{}
-	b.TypeID = binary.LittleEndian.Uint16(bh)
-	b.Flags = binary.LittleEndian.Uint16(bh[2:])
-	b.PayloadLen = decodePayloadLen(uint64(binary.LittleEndian.Uint32(bh[4:])), b.Flags)
-	if err := br.claim(payloadClaim(b.PayloadLen, b.Flags), "block payload"); err != nil {
-		return nil, err
-	}
-	b.payloadOff = br.off
-	br.resolveType(b)
-	return b, nil
-}
+// Ended reports whether the walk has reached the End block of an appendable file.
+func (br *Reader) Ended() bool { return br.ended }
