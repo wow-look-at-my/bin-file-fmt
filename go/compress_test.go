@@ -374,6 +374,59 @@ func TestGUIDCodecEscape(t *testing.T) {
 
 }
 
+// TestCompressedBlockCRCVerified: a has_crc compressed block is checked against
+// its CRC trailer on both decode paths. The damage is in the trailer itself, so
+// every codec stream still decodes and only the CRC check can catch it.
+func TestCompressedBlockCRCVerified(t *testing.T) {
+	payload := []byte(strings.Repeat("crc covers the stored bytes. ", 300))
+	for _, tc := range []struct {
+		name  string
+		codec uint16
+	}{
+		{"stored", CodecStored},
+		{"deflate", CodecDeflate},
+		{"zstd", CodecZstd},
+		{"lz4", CodecLZ4},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			file := writeTo(t, compressDefs, func(w *Writer) {
+				require.NoError(t, w.CompressedBlock(1, FlagHasCRC, tc.codec, payload))
+				require.NoError(t, w.Block(1, 0, []byte("after")))
+			})
+
+			r := readerOver(t, file)
+			b, err := r.Next()
+			require.NoError(t, err)
+			got, err := r.ReadDecompressedPayload(b)
+			require.NoError(t, err)
+			require.Equal(t, payload, got)
+			// The reader lands on the next block after the trailer.
+			b2, err := r.Next()
+			require.NoError(t, err)
+			after, err := r.ReadPayload(b2)
+			require.NoError(t, err)
+			require.Equal(t, "after", string(after))
+
+			bad := append([]byte(nil), file...)
+			bad[b.Offset()+8+b.PayloadLen] ^= 0xFF
+
+			r = readerOver(t, bad)
+			b, err = r.Next()
+			require.NoError(t, err)
+			_, err = r.ReadDecompressedPayload(b)
+			require.ErrorIs(t, err, ErrCRCMismatch)
+
+			r = readerOver(t, bad)
+			b, err = r.Next()
+			require.NoError(t, err)
+			dr, err := r.DecompressedPayloadReader(b)
+			require.NoError(t, err)
+			_, err = io.ReadAll(dr)
+			require.ErrorIs(t, err, ErrCRCMismatch)
+		})
+	}
+}
+
 func TestCompressedNonSeekableNeedsDeclaredVersion(t *testing.T) {
 	var buf bytes.Buffer // an io.Writer with no Seek
 	w, err := NewWriter(&buf, GUID{1}, "test", compressDefs)
