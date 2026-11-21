@@ -1,16 +1,15 @@
 // The TS writer reproduces the C fixtures byte for byte, and the TS reader reads them back.
 
-import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { test } from "node:test";
 import { readPayloadDecompressed } from "./codec.ts";
 import { parseEnvelope } from "./envelope.ts";
 import { BLOCK_TYPE_TABLE_GUID, CODEC_BY_GUID, CODEC_STORED, FLAG_COMPRESSED, FLAG_CRITICAL, FLAG_HAS_CRC, TYPE_BLOCK_TYPE_TABLE } from "./format.ts";
 import type { Source } from "./format.ts";
 import { MemorySink, MemorySource } from "./memory.ts";
 import { Reader } from "./reader.ts";
-import { BIG_PAYLOAD, MESH_PAYLOAD, NOTE_PAYLOAD, SAMPLE_CODEC, SAMPLE_MESH, SAMPLE_NOTE, SAMPLE_WRITER, TESTDATA, enc, streamSource, writeCompressedSample, writeSample } from "./testio.ts";
+import { BIG_PAYLOAD, MESH_PAYLOAD, NOTE_PAYLOAD, SAMPLE_CODEC, SAMPLE_MESH, SAMPLE_NOTE, SAMPLE_WRITER, TESTDATA, assert, enc, streamSource, test } from "./testio.ts";
+import { writeCompressedSample, writeSample } from "./testio.ts";
 
 const sample = new Uint8Array(readFileSync(join(TESTDATA, "sample.binpazer")));
 const sampleCompressed = new Uint8Array(readFileSync(join(TESTDATA, "sample-compressed.binpazer")));
