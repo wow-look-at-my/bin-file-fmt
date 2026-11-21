@@ -104,6 +104,7 @@ Everything degrades gracefully without a seeker: sequential walk, read-through s
 - `Reader.claim()` is the allocation gate, as in Go. It checks every untrusted length against the input size, or against `maxAlloc` when the size is unknown, before anything is allocated. New parsing code goes through it.
 - The reader accepts and rejects the same inputs as the Go reader. `hardening.test.ts` ports the Go hardening cases. Keep it so when either side changes.
 - Erasable syntax only (no `enum`, no parameter properties), relative imports carry `.ts`, and `ts0` rejects `any`. Node then runs the sources directly.
+- `writer.ts` writes appendable files too (`new Writer(..., { appendable: true })`, `resumeAppendWriter`), and `Reader.nextCommitted` follows them. `append.test.ts` pins both against the shared fixtures.
 
 ## Benchmarks (bench/)
 
@@ -129,9 +130,9 @@ Decision to preserve: the `unknown_type_id` rule **exempts predefined ids 65529-
 
 SPEC.md "Appendable files" is the contract. Header flag the first bit marks the file, the CRC trailer of each block is its commit seal, and the End block (`65529`) closes it. Invariants to keep:
 
-- **Committed means whole and sealed.** `NextCommitted` / `binpazer_reader_next_committed` surface a block only when its full extent, padding included, is in the file and the CRC verifies. Pending and torn leave the reader at the block start with no sticky error, so the caller polls. Never surface a block on its length alone.
-- **`TestFollowIsSafeAtEveryPrefix` (and `test_every_prefix` in C and C++) is the safety proof**: at every length the file can have, a reader sees exactly the whole blocks. A change to the read path must keep it green.
-- **Resume pads, it never overwrites in place.** A torn tail can hold a sealed block of its own (a child of a torn Group), so `ResumeAppendWriter` / `binpazer_writer_resume` cover every stale byte with sealed Padding blocks before appending. The Padding layout is byte-identical across implementations and pinned by `go/testdata/sample-resumed.binpazer`.
+- **Committed means whole and sealed.** `NextCommitted` / `binpazer_reader_next_committed` / `Reader.nextCommitted` surface a block only when its full extent, padding included, is in the file and the CRC verifies. Pending and torn leave the reader at the block start with no sticky error, so the caller polls. Never surface a block on its length alone.
+- **`TestFollowIsSafeAtEveryPrefix` (and `test_every_prefix` in C and C++, and "at every prefix a follower sees exactly the whole blocks" in `ts/src/append.test.ts`) is the safety proof**: at every length the file can have, a reader sees exactly the whole blocks. A change to the read path must keep it green.
+- **Resume pads, it never overwrites in place.** A torn tail can hold a sealed block of its own (a child of a torn Group). So the resume writers -- `ResumeAppendWriter` / `binpazer_writer_resume` / `resumeAppendWriter` -- cover every stale byte with sealed Padding blocks before appending. The Padding layout is byte-identical across implementations and pinned by `go/testdata/sample-resumed.binpazer`.
 - **The stays of the Block Type Table unsealed** in an appendable file. Readers in this repo older than 1.2 compute the table end without a CRC, so a sealed table breaks them.
 - **An appendable writer keeps no index** (memory must not grow with the file), flushes after every block, and refuses `WriteIndex`. `Find` on an appendable file walks committed blocks only.
 - Fixtures: `sample-appendable.binpazer` and `sample-resumed.binpazer`, from `gen <out> <compressed> <appendable> <resumed>`. The Go tests, `c/test_append.c` and `ts/src/append.test.ts` each compare their own writer against the files, so no CI step is involved.
