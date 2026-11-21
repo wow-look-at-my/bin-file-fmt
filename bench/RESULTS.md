@@ -35,67 +35,67 @@ node bench/run.ts --profile
 
 | Workload / operation | C | C++ | Go | TypeScript |
 |---|---:|---:|---:|---:|
-| small / write | 0.111 | 0.142 (1.3x) | 0.114 (1.0x) | 0.433 (3.9x) |
-| small / read | 0.061 | 0.096 (1.6x) | 0.153 (2.5x) | 0.801 (13.1x) |
-| small / find | 0.349 | 0.380 (1.1x) | 0.739 (2.1x) | 1.453 (4.2x) |
-| medium / write | 0.165 | 0.155 (0.94x) | 0.081 (0.49x) | 0.431 (2.6x) |
-| medium / read | 0.102 | 0.106 (1.0x) | 0.152 (1.5x) | 0.360 (3.5x) |
-| medium / stream | 0.098 | 0.106 (1.1x) | 0.137 (1.4x) | 0.403 (4.1x) |
-| large / write | 0.210 | 0.227 (1.1x) | 0.114 (0.54x) | 0.528 (2.5x) |
-| large / read | 0.167 | 0.185 (1.1x) | 0.164 (0.98x) | 0.659 (3.9x) |
-| large / stream | 0.173 | 0.167 (0.97x) | 0.072 (0.41x) | 0.502 (2.9x) |
-| stored / write | 0.071 | 0.067 (0.94x) | 0.166 (2.3x) | 0.320 (4.5x) |
-| stored / read | 0.061 | 0.119 (2.0x) | 0.389 (6.4x) | 0.277 (4.6x) |
-| deflate / write | 1.282 | 1.252 (0.98x) | 1.304 (1.0x) | 1.186 (0.93x) |
-| deflate / read | 0.209 | 0.215 (1.0x) | 0.860 (4.1x) | 0.344 (1.6x) |
-| zstd / write | 0.328 | 0.308 (0.94x) | 1.117 (3.4x) | 0.525 (1.6x) |
-| zstd / read | 0.040 | 0.045 (1.1x) | 0.487 (12.3x) | 0.331 (8.3x) |
-| lz4 / write | 0.099 | 0.136 (1.4x) | 0.408 (4.1x) | 0.952 (9.6x) |
-| lz4 / read | 0.035 | 0.045 (1.3x) | 0.430 (12.4x) | 0.301 (8.6x) |
+| small / write | 0.104 | 0.099 (0.96x) | 0.096 (0.93x) | 0.382 (3.7x) |
+| small / read | 0.072 | 0.072 (1.0x) | 0.157 (2.2x) | 0.823 (11.5x) |
+| small / find | 0.298 | 0.309 (1.0x) | 0.620 (2.1x) | 1.146 (3.8x) |
+| medium / write | 0.142 | 0.146 (1.0x) | 0.096 (0.68x) | 0.347 (2.4x) |
+| medium / read | 0.103 | 0.102 (0.99x) | 0.142 (1.4x) | 0.354 (3.4x) |
+| medium / stream | 0.103 | 0.107 (1.0x) | 0.161 (1.6x) | 0.361 (3.5x) |
+| large / write | 0.192 | 0.210 (1.1x) | 0.172 (0.90x) | 0.498 (2.6x) |
+| large / read | 0.142 | 0.166 (1.2x) | 0.121 (0.85x) | 0.457 (3.2x) |
+| large / stream | 0.143 | 0.141 (0.99x) | 0.064 (0.44x) | 0.523 (3.7x) |
+| stored / write | 1.134 | 0.110 (0.10x) | 0.271 (0.24x) | 1.642 (1.4x) |
+| stored / read | 0.058 | 0.119 (2.0x) | 0.348 (6.0x) | 0.437 (7.5x) |
+| deflate / write | 1.183 | 1.245 (1.1x) | 1.131 (0.96x) | 0.922 (0.78x) |
+| deflate / read | 0.160 | 0.164 (1.0x) | 0.637 (4.0x) | 0.245 (1.5x) |
+| zstd / write | 0.241 | 0.246 (1.0x) | 0.661 (2.7x) | 0.324 (1.3x) |
+| zstd / read | 0.030 | 0.032 (1.1x) | 0.320 (10.8x) | 0.175 (5.9x) |
+| lz4 / write | 0.089 | 0.079 (0.89x) | 0.314 (3.5x) | 0.623 (7.0x) |
+| lz4 / read | 0.025 | 0.029 (1.1x) | 0.335 (13.2x) | 0.187 (7.4x) |
 
 ## Peak memory (max RSS, median, MiB)
 
 | Workload / operation | C | C++ | Go | TypeScript |
 |---|---:|---:|---:|---:|
-| small / write | 4.9 | 7.7 (1.6x) | 18.4 (3.8x) | 80.9 (16.5x) |
-| small / read | 2.1 | 4.1 (1.9x) | 9.6 (4.6x) | 49.4 (23.5x) |
-| small / find | 4.9 | 8.1 (1.7x) | 11.6 (2.4x) | 61.7 (12.6x) |
-| medium / write | 2.2 | 4.2 (1.9x) | 5.2 (2.4x) | 48.0 (22.1x) |
-| medium / read | 2.1 | 4.3 (2.0x) | 13.3 (6.4x) | 78.3 (37.5x) |
-| medium / stream | 2.0 | 4.2 (2.2x) | 11.4 (5.8x) | 47.8 (24.4x) |
-| large / write | 9.9 | 11.7 (1.2x) | 13.5 (1.4x) | 61.6 (6.2x) |
-| large / read | 9.8 | 12.3 (1.2x) | 22.3 (2.3x) | 85.8 (8.7x) |
-| large / stream | 2.1 | 4.2 (2.0x) | 6.7 (3.2x) | 47.8 (22.6x) |
-| stored / write | 3.9 | 5.8 (1.5x) | 16.4 (4.2x) | 80.1 (20.6x) |
-| stored / read | 3.8 | 5.6 (1.5x) | 17.9 (4.7x) | 79.0 (20.6x) |
-| deflate / write | 3.5 | 6.0 (1.7x) | 12.4 (3.5x) | 80.5 (22.7x) |
-| deflate / read | 3.2 | 5.6 (1.7x) | 12.1 (3.7x) | 80.6 (24.8x) |
-| zstd / write | 4.3 | 6.8 (1.6x) | 64.6 (15.2x) | 124.5 (29.3x) |
-| zstd / read | 3.5 | 5.8 (1.6x) | 25.0 (7.1x) | 91.9 (26.1x) |
-| lz4 / write | 3.3 | 5.8 (1.8x) | 24.1 (7.3x) | 65.2 (19.7x) |
-| lz4 / read | 3.3 | 5.6 (1.7x) | 20.2 (6.2x) | 79.7 (24.4x) |
+| small / write | 4.9 | 7.7 (1.6x) | 18.7 (3.8x) | 80.4 (16.4x) |
+| small / read | 2.1 | 4.1 (2.0x) | 10.0 (4.8x) | 49.3 (23.6x) |
+| small / find | 4.9 | 8.1 (1.7x) | 11.4 (2.3x) | 61.8 (12.6x) |
+| medium / write | 2.2 | 4.2 (1.9x) | 5.1 (2.4x) | 47.9 (22.2x) |
+| medium / read | 2.1 | 4.2 (2.0x) | 11.5 (5.5x) | 78.3 (37.5x) |
+| medium / stream | 2.0 | 4.1 (2.1x) | 13.0 (6.6x) | 47.6 (24.1x) |
+| large / write | 9.9 | 11.6 (1.2x) | 13.6 (1.4x) | 61.6 (6.2x) |
+| large / read | 9.8 | 12.2 (1.2x) | 22.2 (2.3x) | 86.0 (8.7x) |
+| large / stream | 2.0 | 4.2 (2.1x) | 6.9 (3.5x) | 47.7 (24.3x) |
+| stored / write | 3.9 | 5.8 (1.5x) | 17.3 (4.4x) | 80.9 (20.8x) |
+| stored / read | 3.8 | 5.6 (1.5x) | 30.6 (8.0x) | 79.2 (20.6x) |
+| deflate / write | 3.5 | 6.0 (1.7x) | 13.3 (3.7x) | 80.2 (22.6x) |
+| deflate / read | 3.2 | 5.6 (1.7x) | 12.0 (3.7x) | 80.0 (24.7x) |
+| zstd / write | 4.4 | 6.7 (1.5x) | 63.1 (14.4x) | 124.6 (28.5x) |
+| zstd / read | 3.5 | 5.8 (1.6x) | 26.3 (7.4x) | 92.6 (26.2x) |
+| lz4 / write | 3.3 | 5.8 (1.7x) | 23.7 (7.2x) | 65.9 (19.9x) |
+| lz4 / read | 3.3 | 5.5 (1.7x) | 22.8 (7.0x) | 79.6 (24.4x) |
 
 ## Wall time and throughput (median)
 
 | Workload / operation | C | C++ | Go | TypeScript |
 |---|---:|---:|---:|---:|
-| small / write | 0.151 s, 324 MiB/s | 0.186 s, 262 MiB/s | 0.111 s, 441 MiB/s | 0.399 s, 122 MiB/s |
-| small / read | 0.062 s, 792 MiB/s | 0.096 s, 506 MiB/s | 0.115 s, 426 MiB/s | 0.653 s, 75 MiB/s |
-| small / find | 0.351 s, 139 MiB/s | 0.391 s, 125 MiB/s | 0.660 s, 74 MiB/s | 1.318 s, 37 MiB/s |
-| medium / write | 0.255 s, 490 MiB/s | 0.262 s, 477 MiB/s | 0.119 s, 1052 MiB/s | 0.497 s, 251 MiB/s |
-| medium / read | 0.103 s, 1211 MiB/s | 0.109 s, 1146 MiB/s | 0.097 s, 1284 MiB/s | 0.348 s, 359 MiB/s |
-| medium / stream | 0.101 s, 1237 MiB/s | 0.110 s, 1134 MiB/s | 0.089 s, 1404 MiB/s | 0.388 s, 322 MiB/s |
-| large / write | 0.298 s, 644 MiB/s | 0.313 s, 614 MiB/s | 0.187 s, 1024 MiB/s | 0.614 s, 313 MiB/s |
-| large / read | 0.172 s, 1115 MiB/s | 0.186 s, 1032 MiB/s | 0.121 s, 1588 MiB/s | 0.653 s, 294 MiB/s |
-| large / stream | 0.173 s, 1111 MiB/s | 0.168 s, 1145 MiB/s | 0.069 s, 2781 MiB/s | 0.481 s, 399 MiB/s |
-| stored / write | 0.094 s, 684 MiB/s | 0.093 s, 688 MiB/s | 0.129 s, 496 MiB/s | 0.336 s, 191 MiB/s |
-| stored / read | 0.061 s, 1048 MiB/s | 0.119 s, 537 MiB/s | 0.222 s, 288 MiB/s | 0.276 s, 232 MiB/s |
-| deflate / write | 1.301 s, 49 MiB/s | 1.270 s, 50 MiB/s | 1.278 s, 50 MiB/s | 1.198 s, 53 MiB/s |
-| deflate / read | 0.212 s, 302 MiB/s | 0.216 s, 296 MiB/s | 0.600 s, 107 MiB/s | 0.331 s, 193 MiB/s |
-| zstd / write | 0.341 s, 188 MiB/s | 0.322 s, 199 MiB/s | 0.925 s, 69 MiB/s | 0.534 s, 120 MiB/s |
-| zstd / read | 0.040 s, 1585 MiB/s | 0.045 s, 1417 MiB/s | 0.242 s, 264 MiB/s | 0.311 s, 206 MiB/s |
-| lz4 / write | 0.107 s, 598 MiB/s | 0.144 s, 444 MiB/s | 0.398 s, 161 MiB/s | 0.923 s, 69 MiB/s |
-| lz4 / read | 0.035 s, 1822 MiB/s | 0.046 s, 1404 MiB/s | 0.242 s, 265 MiB/s | 0.294 s, 218 MiB/s |
+| small / write | 0.136 s, 360 MiB/s | 0.168 s, 291 MiB/s | 0.095 s, 514 MiB/s | 0.347 s, 141 MiB/s |
+| small / read | 0.072 s, 678 MiB/s | 0.073 s, 668 MiB/s | 0.116 s, 422 MiB/s | 0.678 s, 72 MiB/s |
+| small / find | 0.299 s, 163 MiB/s | 0.315 s, 155 MiB/s | 0.569 s, 86 MiB/s | 1.007 s, 48 MiB/s |
+| medium / write | 0.246 s, 508 MiB/s | 0.221 s, 565 MiB/s | 0.144 s, 866 MiB/s | 0.434 s, 288 MiB/s |
+| medium / read | 0.103 s, 1213 MiB/s | 0.102 s, 1222 MiB/s | 0.092 s, 1364 MiB/s | 0.343 s, 364 MiB/s |
+| medium / stream | 0.107 s, 1166 MiB/s | 0.108 s, 1161 MiB/s | 0.109 s, 1146 MiB/s | 0.362 s, 346 MiB/s |
+| large / write | 0.264 s, 727 MiB/s | 0.295 s, 650 MiB/s | 0.246 s, 780 MiB/s | 0.574 s, 334 MiB/s |
+| large / read | 0.143 s, 1345 MiB/s | 0.171 s, 1122 MiB/s | 0.099 s, 1932 MiB/s | 0.454 s, 423 MiB/s |
+| large / stream | 0.152 s, 1267 MiB/s | 0.142 s, 1354 MiB/s | 0.061 s, 3158 MiB/s | 0.507 s, 379 MiB/s |
+| stored / write | 1.184 s, 54 MiB/s | 0.131 s, 490 MiB/s | 0.388 s, 165 MiB/s | 1.717 s, 37 MiB/s |
+| stored / read | 0.059 s, 1080 MiB/s | 0.122 s, 527 MiB/s | 0.225 s, 285 MiB/s | 0.437 s, 146 MiB/s |
+| deflate / write | 1.204 s, 53 MiB/s | 1.268 s, 50 MiB/s | 1.087 s, 59 MiB/s | 0.920 s, 70 MiB/s |
+| deflate / read | 0.161 s, 396 MiB/s | 0.165 s, 389 MiB/s | 0.428 s, 149 MiB/s | 0.236 s, 271 MiB/s |
+| zstd / write | 0.246 s, 261 MiB/s | 0.250 s, 256 MiB/s | 0.552 s, 116 MiB/s | 0.326 s, 197 MiB/s |
+| zstd / read | 0.030 s, 2161 MiB/s | 0.033 s, 1966 MiB/s | 0.142 s, 450 MiB/s | 0.165 s, 389 MiB/s |
+| lz4 / write | 0.096 s, 665 MiB/s | 0.086 s, 740 MiB/s | 0.305 s, 210 MiB/s | 0.610 s, 105 MiB/s |
+| lz4 / read | 0.028 s, 2317 MiB/s | 0.029 s, 2174 MiB/s | 0.165 s, 387 MiB/s | 0.179 s, 358 MiB/s |
 
 ## Written file size (bytes)
 
@@ -123,58 +123,58 @@ Tools: C gprof, C++ gprof, Go pprof, TypeScript v8 cpu-prof. Percentages are of 
 
 | Rank | C | C++ | Go | TypeScript |
 |---|---:|---:|---:|---:|
-| 1 | `binpazer_crc32c` (50%) | `read` (50%) | `cosmo.Syscall6` (16%) | `readPayload` (39%) |
-| 2 | `_IO_file_xsgetn` (17%) | `(anonymous namespace)::run` (17%) | `atomic.(*Uint8).Load` (11%) | `crc32c` (17%) |
-| 3 | `binpazer_reader_next` (17%) | `binpazer_crc32c` (17%) | `runtime.memmove` (11%) | `(garbage collector)` (10%) |
-| 4 | `r_raw` (17%) | `fread` (17%) | `bufio.(*Reader).Read` (5%) | `readUpTo` (6%) |
-| 5 | `align8` (<1%) | `(anonymous namespace)::File::File` (<1%) | `go.(*Reader).ReadDecompressedPayload` (5%) | `(anonymous) bench.js:1518` (3%) |
-| 6 | `binpazer_reader_begin` (<1%) | `(anonymous namespace)::File::~File` (<1%) | `go.(*Reader).resolveType` (5%) | `next` (3%) |
-| sampled | 60 ms | 60 ms | 190 ms | 803 ms |
+| 1 | `read` (80%) | `read` (43%) | `cosmo.Syscall6` (12%) | `readPayload` (55%) |
+| 2 | `mix` (20%) | `(anonymous namespace)::Input::next` (14%) | `runtime.madvise` (12%) | `crc32c` (10%) |
+| 3 | `align8` (<1%) | `__memset_avx512_unaligned_erms` (14%) | `runtime.unlock2` (12%) | `(garbage collector)` (9%) |
+| 4 | `binpazer_crc32c` (<1%) | `binpazer_crc32c` (14%) | `bufio.(*Reader).Read` (6%) | `read` (3%) |
+| 5 | `binpazer_reader_begin` (<1%) | `get_u32` (14%) | `go.(*Block).nextOffset` (6%) | `readUpTo` (3%) |
+| 6 | `binpazer_reader_next` (<1%) | `(anonymous namespace)::File::File` (<1%) | `go.(*Reader).read` (6%) | `(anonymous) bench.js:1518` (3%) |
+| sampled | 50 ms | 70 ms | 170 ms | 630 ms |
 
 ### medium / write
 
 | Rank | C | C++ | Go | TypeScript |
 |---|---:|---:|---:|---:|
-| 1 | `write` (71%) | `write` (78%) | `crc32.castagnoliSSE42Triple` (40%) | `crc32c` (70%) |
-| 2 | `binpazer_crc32c` (14%) | `binpazer_crc32c` (11%) | `cosmo.Syscall6` (20%) | `writeBuffer` (17%) |
-| 3 | `get_u32` (14%) | `get_u32` (11%) | `crc32.castagnoliShift` (20%) | `(program)` (3%) |
-| 4 | `align8` (<1%) | `(anonymous namespace)::File::File` (<1%) | `scan.scanSpanPackedAVX512` (20%) | `compileForInternalLoader` (1%) |
-| 5 | `binpazer_writer_begin` (<1%) | `(anonymous namespace)::File::close` (<1%) |  | `(garbage collector)` (1%) |
-| 6 | `binpazer_writer_begin_version` (<1%) | `(anonymous namespace)::File::~File` (<1%) |  | `write` (1%) |
-| sampled | 70 ms | 90 ms | 50 ms | 497 ms |
+| 1 | `write` (71%) | `write` (50%) | `cosmo.Syscall6` (50%) | `crc32c` (68%) |
+| 2 | `binpazer_crc32c` (29%) | `get_u32` (33%) | `go.(*Writer).Block` (25%) | `writeBuffer` (19%) |
+| 3 | `align8` (<1%) | `binpazer_crc32c` (17%) | `runtime.pMask.read` (25%) | `(program)` (4%) |
+| 4 | `binpazer_writer_begin` (<1%) | `(anonymous namespace)::File::File` (<1%) |  | `compileForInternalLoader` (2%) |
+| 5 | `binpazer_writer_begin_version` (<1%) | `(anonymous namespace)::File::close` (<1%) |  | `wrappedFn` (1%) |
+| 6 | `binpazer_writer_block` (<1%) | `(anonymous namespace)::File::~File` (<1%) |  | `compileSourceTextModule` (1%) |
+| sampled | 140 ms | 60 ms | 40 ms | 293 ms |
 
 ### medium / read
 
 | Rank | C | C++ | Go | TypeScript |
 |---|---:|---:|---:|---:|
-| 1 | `binpazer_crc32c` (33%) | `read` (38%) | `runtime.futex` (29%) | `crc32c` (61%) |
-| 2 | `get_u32` (33%) | `binpazer_crc32c` (25%) | `crc32.castagnoliSSE42Triple` (21%) | `readPayload` (12%) |
-| 3 | `read` (33%) | `__memcpy_avx512_unaligned_erms` (13%) | `runtime.madvise` (14%) | `read` (10%) |
-| 4 | `align8` (<1%) | `get_u32` (13%) | `runtime.memclrNoHeapPointers` (7%) | `readUpTo` (4%) |
-| 5 | `binpazer_reader_begin` (<1%) | `void*&& std::forward<void*>` (13%) | `runtime.memmove` (7%) | `(program)` (3%) |
-| 6 | `binpazer_reader_next` (<1%) | `(anonymous namespace)::File::File` (<1%) | `runtime.scanblock` (7%) | `readPayloadInto` (1%) |
-| sampled | 30 ms | 80 ms | 140 ms | 386 ms |
+| 1 | `read` (43%) | `read` (63%) | `cosmo.Syscall6` (18%) | `crc32c` (61%) |
+| 2 | `binpazer_crc32c` (29%) | `binpazer_crc32c` (25%) | `crc32.castagnoliShift` (18%) | `read` (12%) |
+| 3 | `get_u32` (29%) | `get_u32` (13%) | `runtime.madvise` (18%) | `readPayload` (7%) |
+| 4 | `align8` (<1%) | `(anonymous namespace)::File::File` (<1%) | `crc32.castagnoliSSE42Triple` (9%) | `(program)` (4%) |
+| 5 | `binpazer_reader_begin` (<1%) | `(anonymous namespace)::File::~File` (<1%) | `runtime.(*mspan).moveInlineMarks` (9%) | `readUpTo` (3%) |
+| 6 | `binpazer_reader_next` (<1%) | `(anonymous namespace)::Input::Input` (<1%) | `runtime.findRunnable` (9%) | `next` (2%) |
+| sampled | 70 ms | 80 ms | 110 ms | 339 ms |
 
 ### lz4 / write
 
 | Rank | C | C++ | Go | TypeScript |
 |---|---:|---:|---:|---:|
-| 1 | `LZ4_compress_fast_continue` (80%) | `LZ4_compress_fast_continue` (70%) | `lz4block.(*Compressor).CompressBlock` (28%) | `compressBlock` (82%) |
-| 2 | `write` (20%) | `write` (20%) | `lz4block.(*Compressor).get` (28%) | `crc32c` (8%) |
-| 3 | `align8` (<1%) | `binpazer_crc32c` (10%) | `lz4block.(*Compressor).put` (11%) | `lz4FrameCompress` (3%) |
-| 4 | `binpazer_codec_lookup` (<1%) | `(anonymous namespace)::File::File` (<1%) | `runtime.memmove` (8%) | `(program)` (2%) |
-| 5 | `binpazer_compress` (<1%) | `(anonymous namespace)::File::close` (<1%) | `binary.littleEndian.Uint32` (3%) | `writeBuffer` (1%) |
-| 6 | `binpazer_compress_bound` (<1%) | `(anonymous namespace)::File::~File` (<1%) | `cosmo.Syscall6` (3%) | `compress` (1%) |
-| sampled | 50 ms | 100 ms | 360 ms | 840 ms |
+| 1 | `LZ4_compress_fast_continue` (100%) | `LZ4_compress_fast_continue` (88%) | `lz4block.(*Compressor).CompressBlock` (32%) | `compressBlock` (82%) |
+| 2 | `align8` (<1%) | `get_u32` (13%) | `lz4block.(*Compressor).get` (11%) | `crc32c` (10%) |
+| 3 | `binpazer_codec_lookup` (<1%) | `(anonymous namespace)::File::File` (<1%) | `lz4block.blockHash` (11%) | `lz4FrameCompress` (3%) |
+| 4 | `binpazer_compress` (<1%) | `(anonymous namespace)::File::close` (<1%) | `binary.littleEndian.Uint32` (7%) | `(program)` (2%) |
+| 5 | `binpazer_compress_bound` (<1%) | `(anonymous namespace)::File::~File` (<1%) | `lz4block.(*Compressor).put` (7%) | `compileForInternalLoader` (1%) |
+| 6 | `binpazer_crc32c` (<1%) | `(anonymous namespace)::Input::next` (<1%) | `runtime.memclrNoHeapPointers` (7%) | `writeBuffer` (<1%) |
+| sampled | 70 ms | 80 ms | 280 ms | 586 ms |
 
 ### lz4 / read
 
 | Rank | C | C++ | Go | TypeScript |
 |---|---:|---:|---:|---:|
-| 1 | `LZ4_decompress_safe_withPrefix64k` (50%) | `LZ4_decompress_safe_withPrefix64k` (100%) | `runtime.futex` (29%) | `decodeBlock` (42%) |
-| 2 | `read` (50%) | `(anonymous namespace)::File::File` (<1%) | `lz4block.decodeBlock` (16%) | `crc32c` (31%) |
-| 3 | `align8` (<1%) | `(anonymous namespace)::File::~File` (<1%) | `cosmo.Syscall6` (6%) | `read` (7%) |
-| 4 | `binpazer_codec_lookup` (<1%) | `(anonymous namespace)::Input::Input` (<1%) | `runtime.memmove` (6%) | `(program)` (5%) |
-| 5 | `binpazer_compression_parse` (<1%) | `(anonymous namespace)::Input::next` (<1%) | `runtime.unlock2` (6%) | `readPayloadDecompressed` (2%) |
-| 6 | `binpazer_crc32c` (<1%) | `(anonymous namespace)::Input::read_decoded` (<1%) | `atomic.(*Uint8).Load` (3%) | `compileForInternalLoader` (2%) |
-| sampled | 20 ms | 10 ms | 310 ms | 380 ms |
+| 1 | `binpazer_crc32c` (100%) | `LZ4_decompress_safe_withPrefix64k` (50%) | `runtime.madvise` (19%) | `crc32c` (42%) |
+| 2 | `align8` (<1%) | `get_u32` (50%) | `runtime.memmove` (19%) | `decodeBlock` (33%) |
+| 3 | `binpazer_codec_lookup` (<1%) | `(anonymous namespace)::File::File` (<1%) | `lz4block.decodeBlock` (10%) | `(program)` (5%) |
+| 4 | `binpazer_compression_parse` (<1%) | `(anonymous namespace)::File::~File` (<1%) | `runtime.futex` (10%) | `read` (5%) |
+| 5 | `binpazer_decompress` (<1%) | `(anonymous namespace)::Input::Input` (<1%) | `runtime.typePointers.next` (10%) | `compileForInternalLoader` (4%) |
+| 6 | `binpazer_reader_begin` (<1%) | `(anonymous namespace)::Input::next` (<1%) | `crc32.castagnoliSSE42Triple` (5%) | `readPayload` (1%) |
+| sampled | 10 ms | 20 ms | 210 ms | 172 ms |

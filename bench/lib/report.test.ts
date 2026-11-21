@@ -14,7 +14,7 @@ function sample(): Results {
 	return {
 		mode: "quick",
 		repeats: 1,
-		environment: { cpuModel: "Test CPU", logicalCores: 4, totalMemoryBytes: 8 * 1024 ** 3, kernel: "6.0", os: "TestOS", node: "v22", cc: "cc 13", cxx: "c++ 13" },
+		environment: { workDirFilesystem: "tmpfs", cpuModel: "Test CPU", logicalCores: 4, totalMemoryBytes: 8 * 1024 ** 3, kernel: "6.0", os: "TestOS", node: "v22", cc: "cc 13", cxx: "c++ 13" },
 		workloads: [
 			{ name: "small", payloadBytes: 256, blocks: 2, codec: "none", fileBytes: { c: 900, go: 900 }, results: [op("write", "c", 0.1, 1024), op("write", "go", 0.18, 4096), op("read", "c", 0.2, 1024), op("read", "go", 0.1, 2048)] },
 			{ name: "zstd", payloadBytes: 256, blocks: 2, codec: "zstd", fileBytes: { c: 1234567, go: 1300000 }, results: [op("write", "c", 0.1, 1024), op("write", "go", 0.1, 1024)] },

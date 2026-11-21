@@ -20,6 +20,7 @@ export interface WorkloadResult {
 }
 
 export interface Environment {
+	workDirFilesystem: string;
 	cpuModel: string;
 	logicalCores: number;
 	totalMemoryBytes: number;
@@ -137,6 +138,7 @@ function renderEnvironment(input: ReportInput): string {
 		["memory", `${(e.totalMemoryBytes / 1024 ** 3).toFixed(1)} GiB`],
 		["os", e.os ?? "unknown (no /etc/os-release)"],
 		["kernel", e.kernel],
+		["work dir filesystem", e.workDirFilesystem],
 		["node", e.node],
 		["cc", e.cc],
 		["c++", e.cxx],
@@ -223,6 +225,7 @@ export function renderReport(input: ReportInput): string {
 		"- Max RSS is the kernel's ru_maxrss for the process.",
 		"- Read, stream and find all read the file that the reference implementation wrote.",
 		"- Throughput is logical (decoded) bytes divided by the median wall time.",
+		"- Every write and read goes through the filesystem of the work directory. A RAM-backed one keeps the block device out of the numbers.",
 		"- Compressed file sizes can differ because encoder output is implementation-defined. Every implementation decodes every other implementation's file to the same result.",
 		"- For codec none and stored, the files that every implementation writes are byte-identical.",
 	].join("\n"));

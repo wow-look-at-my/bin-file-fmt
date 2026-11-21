@@ -12,7 +12,7 @@ import { referenceImpl } from "./lib/workloads.ts";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
 function main(argv: string[]): number {
-	const opts = parseArgs(argv, repoRoot, process.cwd());
+	const opts = parseArgs(argv, repoRoot, process.cwd(), process.env);
 	if (opts === null) {
 		process.stdout.write(USAGE + "\n");
 		return 0;

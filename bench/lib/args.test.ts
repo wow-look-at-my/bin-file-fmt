@@ -12,6 +12,14 @@ function parse(argv: string[]): Options {
 	return o;
 }
 
+test("the work directory comes from the option, then the environment, then the default", () => {
+	const env = { BINPAZER_BENCH_WORK_DIR: "/ram/bench" };
+	assert.equal(parseArgs([], "/repo", "/cwd", env)?.workDir, "/ram/bench");
+	assert.equal(parseArgs(["--work-dir", "w"], "/repo", "/cwd", env)?.workDir, "/cwd/w");
+	assert.equal(parseArgs([], "/repo", "/cwd", { BINPAZER_BENCH_WORK_DIR: "" })?.workDir, "/repo/bench/work");
+	assert.equal(parseArgs(["--render"], "/repo", "/cwd")?.render, true);
+});
+
 test("defaults select everything in full mode", () => {
 	const o = parse([]);
 	assert.equal(o.quick, false);

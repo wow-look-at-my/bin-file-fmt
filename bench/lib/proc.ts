@@ -97,8 +97,10 @@ function osName(): string | null {
 	return m[1]!.trim().replace(/^"(.*)"$/, "$1");
 }
 
-export function collectEnvironment(goBin: string | null): Environment {
+export function collectEnvironment(goBin: string | null, workDir: string): Environment {
 	const env: Environment = {
+		// Every write and read goes through this filesystem, so the report names it.
+		workDirFilesystem: firstLine(["stat", "-f", "-c", "%T", workDir]),
 		cpuModel: cpuModel(),
 		logicalCores: os.availableParallelism(),
 		totalMemoryBytes: os.totalmem(),

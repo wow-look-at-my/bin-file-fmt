@@ -25,7 +25,7 @@ export const USAGE = `usage: node bench/run.ts [options]
 	--repeats <n>        timed runs per operation (default 5, or 1 with --quick)
 	--impls <list>       subset of ${IMPLS.join(",")} (default: all)
 	--only <list>        subset of ${WORKLOADS.map((w) => w.name).join(",")} (default: all)
-	--work-dir <dir>     payload and output files (default bench/work)
+	--work-dir <dir>     payload and output files (default $BINPAZER_BENCH_WORK_DIR, else bench/work)
 	--keep               keep the payload and .binpazer files
 	--json <path>        results file (default bench/results.json)
 	--report <path>      markdown report (default bench/RESULTS.md)
@@ -46,7 +46,7 @@ function splitList(opt: string, v: string): string[] {
 }
 
 // Returns null when --help is given. Relative paths resolve against cwd; defaults resolve against repoRoot.
-export function parseArgs(argv: string[], repoRoot: string, cwd: string): Options | null {
+export function parseArgs(argv: string[], repoRoot: string, cwd: string, env: Record<string, string | undefined> = {}): Options | null {
 	const values = new Map<string, string>();
 	const flags = new Set<string>();
 	for (let i = 0; i < argv.length; i++) {
@@ -90,7 +90,8 @@ export function parseArgs(argv: string[], repoRoot: string, cwd: string): Option
 		const v = values.get(name);
 		return v === undefined ? def : fromCwd(v);
 	};
-	const workDir = opt("--work-dir", path.join(repoRoot, "bench", "work"));
+	const envWorkDir = env.BINPAZER_BENCH_WORK_DIR;
+	const workDir = opt("--work-dir", envWorkDir !== undefined && envWorkDir !== "" ? fromCwd(envWorkDir) : path.join(repoRoot, "bench", "work"));
 	const outBase = quick ? workDir : path.join(repoRoot, "bench");
 	return {
 		quick,
