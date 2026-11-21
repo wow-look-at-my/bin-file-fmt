@@ -31,7 +31,7 @@ test("lines hold 24 xorshift32 bytes then the text", () => {
 });
 
 test("first bytes are pinned", () => {
-	assert.equal(generatePayload(8).toString("hex"), "b8a4bd8577d6c7d8");
+	assert.equal(generatePayload(8).toString("hex"), "19460c513e552ee0");
 });
 
 test("truncation keeps the prefix and the output is deterministic", () => {

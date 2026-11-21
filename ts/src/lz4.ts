@@ -176,7 +176,7 @@ export function lz4FrameCompress(src: Uint8Array, dst: Uint8Array): number {
 	if (dst.length < HEADER_LEN + 4) throw new RangeError("lz4: destination too small");
 	writeU32(dst, 0, MAGIC);
 	dst[4] = 0x68; // version 01, independent blocks, content size present
-	dst[5] = 0x70; // block max a later size MiB
+	dst[5] = 0x70; // largest block max size id
 	writeU32(dst, 6, n >>> 0);
 	writeU32(dst, 10, Math.floor(n / 0x100000000));
 	dst[14] = (xxh32(dst.subarray(4, 14)) >>> 8) & 0xff;

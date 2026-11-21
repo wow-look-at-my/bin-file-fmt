@@ -1,0 +1,7 @@
+{
+	"entry": "bench.ts",
+	"outfile": "dist/bench.js",
+	"target": "node",
+	"format": "esm",
+	"strict": true
+}
