@@ -118,8 +118,44 @@ export class Bench {
 		return { name: w.name, payloadBytes: w.payloadBytes, blocks: w.blocks, codec: w.codec, fileBytes, results };
 	}
 
-	// Byte identity for codecs that require it; otherwise every implementation reads every file to the same line.
-	checkAgreement(w: Workload, fileOf: (impl: Impl) => string): void {
+	// Profiled runs come after the timed runs and pass the same result-line and agreement checks.
+	profileWorkload(w: Workload, payload: string, fileOf: (impl: Impl) => string, ref: Impl, opLines: Map<Op, string>, crossReadLine: string | null): void {
+		for (const op of profileOps(w)) {
+			if (!w.ops.includes(op)) throw new Error(`[${w.name}] profiled operation ${op} is not a timed operation of this workload`);
+			for (const impl of this.opts.impls) {
+				const dir = path.join(this.opts.workDir, "prof", `${w.name}.${op}.${impl}`);
+				fs.rmSync(dir, { recursive: true, force: true });
+				fs.mkdirSync(dir, { recursive: true });
+				this.made.add(path.join(this.opts.workDir, "prof"));
+				const out = path.join(dir, "out.binpazer");
+				const args = this.opArgs(w, op, op === "write" ? out : fileOf(ref), payload);
+				const run = profiledRun(this.opts, impl, w.name, op, args, dir);
+				const line = this.checkedLine(w, op, run.stdout, run.argv);
+				const want = op === "write" ? formatResultLine({ op: "write", blocks: w.blocks, bytes: w.blocks * w.payloadBytes, checksum: "00000000" }) : opLines.get(op)!;
+				if (line !== want) throw new Error(`[${w.name}] profiled ${op} by ${IMPL_LABELS[impl]} disagrees with the timed runs:\n  timed: ${want}\n  profiled: ${line}`);
+				if (op === "write") this.checkProfiledWrite(w, impl, out, fileOf(impl), ref, crossReadLine);
+				this.profiles.push(run.summary);
+				const s = run.summary;
+				process.stderr.write(`[${w.name}] profile ${op} ${IMPL_LABELS[impl]}: ${s.tool}, ${s.totalSamplesOrMs.toFixed(0)} ms sampled, top ${s.top[0]!.name}\n`);
+			}
+		}
+	}
+
+	// A profiled write must produce the same bytes (codec none or stored) or a file that decodes to the agreed line.
+	checkProfiledWrite(w: Workload, impl: Impl, out: string, timedFile: string, ref: Impl, crossReadLine: string | null): void {
+		if (isByteIdenticalCodec(w.codec)) {
+			const a = sha256File(out);
+			const b = sha256File(timedFile);
+			if (a !== b) throw new Error(`[${w.name}] profiled write differs from the timed write: ${out} sha256 ${a}, ${timedFile} sha256 ${b}`);
+			return;
+		}
+		const argv = this.argv(ref, "read", [out]);
+		const line = this.checkedLine(w, "read", runDirect(argv).stdout, argv);
+		if (line !== crossReadLine) throw new Error(`[${w.name}] ${IMPL_LABELS[ref]} reading the profiled ${IMPL_LABELS[impl]} write (${out}) gives ${line}, want ${crossReadLine}`);
+	}
+
+	// Byte identity for codecs that require it; otherwise every implementation reads every file to the same line, which it returns.
+	checkAgreement(w: Workload, fileOf: (impl: Impl) => string): string | null {
 		const { impls } = this.opts;
 		if (isByteIdenticalCodec(w.codec)) {
 			const base = impls[0]!;
