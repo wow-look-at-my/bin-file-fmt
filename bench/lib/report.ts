@@ -74,7 +74,8 @@ export function renderTable(headers: string[], rows: string[][], rightAlignFrom 
 export function formatRatio(value: number, reference: number): string {
 	if (reference <= 0) return "ref 0";
 	const r = value / reference;
-	return `${r >= 1 ? r.toFixed(1) : r.toFixed(2)}x`;
+	const two = r.toFixed(2);
+	return `${r < 1 && two !== "1.00" ? two : r.toFixed(1)}x`;
 }
 
 export function withRatio(text: string, value: number, reference: number, isReference: boolean): string {
@@ -175,7 +176,7 @@ export function renderReport(input: ReportInput): string {
 		"- Max RSS is the kernel's ru_maxrss for the process.",
 		"- Read, stream and find all read the file that the reference implementation wrote.",
 		"- Throughput is logical (decoded) bytes divided by the median wall time.",
-		"- Compressed file sizes differ because encoder output is implementation-defined. Every implementation decodes every other implementation's file to the same result.",
+		"- Compressed file sizes can differ because encoder output is implementation-defined. Every implementation decodes every other implementation's file to the same result.",
 		"- For codec none and stored, the files that every implementation writes are byte-identical.",
 	].join("\n"));
 	let out = parts.join("\n\n") + "\n";

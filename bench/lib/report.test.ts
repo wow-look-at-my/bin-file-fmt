@@ -32,6 +32,8 @@ test("ratio notation", () => {
 	assert.equal(formatRatio(0.412, 0.2289), "1.8x");
 	assert.equal(formatRatio(0.05, 0.2), "0.25x");
 	assert.equal(formatRatio(1, 0), "ref 0");
+	assert.equal(formatRatio(0.998, 1), "1.0x");
+	assert.equal(formatRatio(0.99, 1), "0.99x");
 	assert.equal(withRatio("0.412", 0.412, 0.2289, false), "0.412 (1.8x)");
 	assert.equal(withRatio("0.229", 0.2289, 0.2289, true), "0.229");
 });
