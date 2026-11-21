@@ -40,7 +40,7 @@ body, _, _ := r.OpenAt(dir.Entries[name], typeFile)   // seek + type check + dec
 
 It composes the primitives and adds no format feature. These files are ordinary binpazer files that the C and C++ implementations read as-is.
 
-The readers are hardened against hostile input. Every length/count field is bounded against the real input size (or an explicit cap for non-seekable streams) *before* anything is allocated, failure modes are typed sentinel errors (`ErrBadMagic`, `ErrCRCMismatch`, `ErrTruncated`. `ErrCapacityExceeded` in Go. `BINPAZER_ERR_*` codes in C/C++). The Go reader is fuzzed.
+The readers are hardened against hostile input. `ErrCapacityExceeded` in Go. `BINPAZER_ERR_*` codes in C/C++). The Go reader is fuzzed.
 
 ## The `binpazer` CLI
 
@@ -60,7 +60,7 @@ curl -fSsL --location-trusted -H "Authorization: Bearer $BUILDHOST_TOKEN" \
 
 (add `&branch=<branch>` for a branch tip. `--location-trusted` keeps the auth header across the redirect to the static download host.)
 
-Any positional file argument accepts `-` for stdin (and `-o -`/`--out -` for stdout), so the tool composes in pipelines. On non-seekable input, per-field allocation claims are capped at 1 GiB (tune with `--max-alloc`). The real file size bounds seekable input. `--json` on `info`, `validate`, `dump`, and `find` emits a single machine-readable JSON object. `binpazer --version` prints the version.
+Any positional file argument accepts `-` for stdin (and `-o -`/`--out -` for stdout), so the tool composes in pipelines. On non-seekable input, per-field allocation claims are capped at 1 GiB (tune with `--max-alloc`). The real file size bounds seekable input. `--json` emits a single machine-readable JSON object. `binpazer --version` prints the version.
 
 | Command | What it does |
 |---|---|
@@ -95,8 +95,8 @@ binpazer pack manifest.json -o demo.binpazer
 
 - `writer_guid` / `writer_name` -- the file-header identity.
 - `types` -- the Block Type Table entries: `type_id`, `guid`, optional `name`.
-- `blocks` -- written in order. Each has a `type_id`, optional `flags` (any of `critical`, `safe_to_copy`, `has_crc`, `large_mode`), and exactly one content source: `data` (UTF-8 text), `data_base64`, or `file` (a path relative to the manifest).
-- `codec` on a block -- `stored`, `deflate`, `zstd` or `lz4` -- compresses that block's payload (SPEC.md "Compression"). The manifest always holds the block's LOGICAL bytes, so `unpack` writes decoded payloads and records the codec that produced them. Re-packing reproduces the file exactly. There is no `compressed` flag name: compression is named by its codec or it does not happen.
+- `blocks` -- written in order. Each has a `type_id`, optional `flags`, and exactly one content source.
+- The manifest always holds the block's LOGICAL bytes, so `unpack` writes decoded payloads and records the codec that produced them. Re-packing reproduces the file exactly. There is no `compressed` flag name: compression is named by its codec or it does not happen.
 - `"index": true` -- append a footer of the Block Index + so readers can jump by type.
 
 `pack - -o -` reads the manifest from stdin and writes the archive to stdout (byte-identical to file output. The status line moves to stderr).
@@ -178,4 +178,4 @@ hello, file!
 - `length` is a byte count, or -- with the `large_mode` flag -- a count of 4096-byte (page) units, for payloads over 4 GiB and up to ~16 TiB.
 - Strings are length-prefixed **and** null-terminated.
 - An optional **Block Index** plus a 16-byte footer let a reader seek straight to a block instead of walking it. Random access, which a `.tar.gz` has no way to offer.
-- Payloads may be **compressed per block** (1.1): a Compression Envelope names the codec (`stored`, `deflate`, `zstd`, `lz4`, or a GUID for anything else), so one member decodes without touching the others. `length` still counts stored bytes, so older readers keep walking such files correctly, and a file that compresses nothing is byte-identical to a 1.0 file.
+- Payloads may be **compressed per block** (1.1): a Compression Envelope names the codec, so one member decodes without touching the others. `length` still counts stored bytes, so older readers keep walking such files correctly, and a file that compresses nothing is byte-identical to a 1.0 file.
