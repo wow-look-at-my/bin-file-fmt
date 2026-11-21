@@ -5,6 +5,8 @@ export const FOOTER_MAGIC = "rezapnib";
 export const VERSION_MAJOR = 1;
 export const VERSION_MINOR = 0;
 export const VERSION_MINOR_COMPRESSION = 1;
+export const VERSION_MINOR_APPENDABLE = 2;
+export const HEADER_FLAG_APPENDABLE = 1;
 export const LARGE_UNIT = 4096;
 
 export const TYPE_INVALID = 0;
@@ -14,6 +16,7 @@ export const TYPE_BLOCK_INDEX = 65533;
 export const TYPE_WRITER_INFO = 65532;
 export const TYPE_PADDING = 65531;
 export const TYPE_GROUP = 65530;
+export const TYPE_END = 65529;
 
 export const FLAG_CRITICAL = 1;
 export const FLAG_SAFE_TO_COPY = 2;
@@ -49,7 +52,9 @@ export type ErrorCode =
 	| "bad_envelope"
 	| "short_buffer"
 	| "codec_unavailable"
-	| "io";
+	| "io"
+	| "not_appendable"
+	| "ended";
 
 export class BinpazerError extends Error {
 	readonly code: ErrorCode;
@@ -103,6 +108,7 @@ export const BLOCK_INDEX_GUID: Guid = wellKnown(2);
 export const WRITER_INFO_GUID: Guid = wellKnown(3);
 export const PADDING_GUID: Guid = wellKnown(4);
 export const GROUP_GUID: Guid = wellKnown(5);
+export const END_GUID: Guid = wellKnown(6);
 
 const HEX = "0123456789abcdef";
 

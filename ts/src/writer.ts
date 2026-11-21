@@ -10,14 +10,19 @@ import {
 	FLAG_CRITICAL,
 	FLAG_HAS_CRC,
 	FLAG_LARGE_MODE,
+	END_GUID,
 	FOOTER_MAGIC,
+	HEADER_FLAG_APPENDABLE,
 	IO_BUF_SIZE,
 	LARGE_UNIT,
 	MAGIC,
 	TYPE_BLOCK_INDEX,
 	TYPE_BLOCK_TYPE_TABLE,
+	TYPE_END,
+	TYPE_PADDING,
 	VERSION_MAJOR,
 	VERSION_MINOR,
+	VERSION_MINOR_APPENDABLE,
 	VERSION_MINOR_COMPRESSION,
 	align8,
 	checkGuid,
@@ -27,14 +32,30 @@ import {
 	putU32,
 	putU64,
 } from "./format.ts";
-import type { Guid, IndexEntry, Sink, TypeDef } from "./format.ts";
+import type { Guid, IndexEntry, Sink, Source, TypeDef, TypeEntry } from "./format.ts";
+import { Reader } from "./reader.ts";
+import type { ReaderOptions } from "./reader.ts";
 
 const encoder = new TextEncoder();
 const ZEROS = new Uint8Array(8);
+const PAD_ZEROS = new Uint8Array(4096);
+const END_TYPE_NAME = "End";
+// MAX_PAD_EXTENT caps one resume Padding block, as C and Go do.
+const MAX_PAD_EXTENT = 1 << 20;
 
 export interface WriterOptions {
 	versionMinor?: number;
+	appendable?: boolean;
 }
+
+interface ResumeState {
+	offset: number;
+	versionMinor: number;
+	tail: number;
+}
+
+// resuming hands ResumeAppendWriter's state to the constructor.
+let resuming: ResumeState | null = null;
 
 export class Writer {
 	private readonly sink: Sink;
@@ -48,10 +69,24 @@ export class Writer {
 	private ended = false;
 	private readonly versionMinor: number;
 	private usedCompression = false;
+	private readonly appendable: boolean;
+	private sealed = 0;
 
 	constructor(sink: Sink, writerGuid: Guid, writerName: string, defs: TypeDef[], opts?: WriterOptions) {
 		this.sink = sink;
-		this.versionMinor = opts?.versionMinor ?? VERSION_MINOR;
+		const resume = resuming;
+		if (resume !== null) {
+			resuming = null;
+			this.appendable = true;
+			this.versionMinor = resume.versionMinor;
+			this.off = resume.offset;
+			this.sealed = resume.tail;
+			this.padOver(resume.tail);
+			this.flush();
+			return;
+		}
+		this.appendable = opts?.appendable === true;
+		this.versionMinor = this.appendable ? VERSION_MINOR_APPENDABLE : (opts?.versionMinor ?? VERSION_MINOR);
 		checkU16(this.versionMinor, "version_minor");
 		checkGuid(writerGuid, "writer GUID");
 		const name = encoder.encode(writerName);
@@ -73,6 +108,9 @@ export class Writer {
 		hdr.set(writerGuid, 16);
 		hdr.fill(0xff, 32, 40);
 		putU64(hdr, 40, firstBlock);
+		if (this.appendable) {
+			putU32(hdr, 48, HEADER_FLAG_APPENDABLE);
+		}
 		this.write(hdr);
 		this.writeString(name);
 		this.pad(firstBlock - this.off);
@@ -81,6 +119,10 @@ export class Writer {
 		for (const n of defNames) {
 			payloadLen += bttEntrySize(n.length);
 		}
+		const endName = encoder.encode(END_TYPE_NAME);
+		if (this.appendable) {
+			payloadLen += bttEntrySize(endName.length);
+		}
 		if (payloadLen > 0xffffffff) {
 			this.fail(new BinpazerError("range", "block type table too large"));
 		}
@@ -88,11 +130,22 @@ export class Writer {
 		putU16(bh, 0, TYPE_BLOCK_TYPE_TABLE);
 		putU16(bh, 2, FLAG_CRITICAL);
 		putU32(bh, 4, payloadLen);
-		putU32(bh, 8, defs.length + 1);
+		putU32(bh, 8, defs.length + (this.appendable ? 2 : 1));
 		this.write(bh);
 		this.writeBTTEntry(TYPE_BLOCK_TYPE_TABLE, BLOCK_TYPE_TABLE_GUID, btName);
 		defs.forEach((d, i) => this.writeBTTEntry(d.typeId, d.guid, defNames[i]));
+		if (this.appendable) {
+			this.writeBTTEntry(TYPE_END, END_GUID, endName);
+		}
 		this.pad(align8(this.off) - this.off);
+		if (this.appendable) {
+			this.flush();
+		}
+	}
+
+	// sealedTail is the count of stale bytes ResumeAppendWriter covered with Padding blocks.
+	get sealedTail(): number {
+		return this.sealed;
 	}
 
 	// offset is the file offset where the next block starts.
