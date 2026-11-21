@@ -300,6 +300,8 @@ public:
     bool     ok()     const { return w_.err == BINPAZER_OK; }
     Status   status() const { return static_cast<Status>(w_.err); }
     bool     appendable() const { return w_.appendable != 0; }
+    // Stale bytes that a resumed writer covered with Padding blocks.
+    uint64_t sealed_tail() const { return w_.sealed_tail; }
     // The file's Block Type Table, read by a resumed writer; empty otherwise.
     const std::vector<TypeEntry> &types() const { return types_; }
 

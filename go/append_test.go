@@ -65,6 +65,20 @@ func TestAppendCrossImplWrite(t *testing.T) {
 	assert.Equal(t, want, appendSampleBytes(t, true), "Go appendable output differs from the C fixture")
 }
 
+// The resume fixture of gen_resumed in c/gen.c: it pins the Padding bytes of a resume across implementations.
+func TestResumeCrossImplWrite(t *testing.T) {
+	want, err := os.ReadFile("testdata/sample-resumed.binpazer")
+	require.NoError(t, err)
+
+	torn := append([]byte{2, 0, byte(FlagHasCRC), 0, 0, 0, 0x10, 0}, bytes.Repeat([]byte{0xAB}, 13)...)
+	mf := &memFile{buf: append(appendSampleBytes(t, false), torn...)}
+	bw, _, err := ResumeAppendWriter(mf)
+	require.NoError(t, err)
+	require.NoError(t, bw.Block(2, 0, []byte("after the crash")))
+	require.NoError(t, bw.End())
+	assert.Equal(t, want, mf.buf, "Go resume output differs from the C fixture")
+}
+
 func TestAppendHeaderAndSeals(t *testing.T) {
 	data := appendSampleBytes(t, false)
 	br, err := NewReader(bytes.NewReader(data))

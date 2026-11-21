@@ -313,6 +313,7 @@ static void test_resume() {
         c.pos = clean;
         binpazer::Writer w(binpazer::resume, c.read(), c.write(), c.seek());
         CHECK(w.ok() && w.appendable() && w.offset() == clean && f.len == clean, "resume: clean file");
+        CHECK(w.sealed_tail() == 0, "resume: a clean file has no sealed tail");
         check_resumed_types(w);
         CHECK(w.block(kTypeNote, 0, std::string_view("after restart")) == Status::Ok, "resume: append");
         CHECK(w.write_index() != Status::Ok && w.ok(), "resume: index refused");
@@ -337,6 +338,7 @@ static void test_resume() {
         CHECK(w.offset() >= clean + tail && w.offset() % 8 == 0 && w.offset() == f.len,
               "resume: padding covers every stale byte");
         CHECK(std::memcmp(f.data.data(), saved.data(), clean) == 0, "resume: committed bytes are untouched");
+        CHECK(w.sealed_tail() == tail, "resume: the sealed tail is counted");
         CHECK(w.block(kTypeNote, 0, std::string_view("recovered")) == Status::Ok, "resume: append after a torn tail");
         CHECK(follow(f, n, "recovered", &at) == Status::Pending && n == 4 && at == f.len,
               "resume: the file is whole again");

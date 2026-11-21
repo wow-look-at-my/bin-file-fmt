@@ -22,6 +22,13 @@ func FuzzReader(f *testing.F) {
 	for _, n := range []int{4, 56, 60, 100, 150, 224, 279} {
 		f.Add(sample[:n]) // truncated prefixes
 	}
+	// Appendable files: whole, cut inside a block, and with a seal that does not verify.
+	appendable := appendSampleBytes(f, true)
+	f.Add(appendable)
+	f.Add(appendable[:len(appendable)-21])
+	torn := bytes.Clone(appendable)
+	torn[len(torn)-20] ^= 0xFF
+	f.Add(torn)
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		br, err := NewReader(bytes.NewReader(data))
@@ -39,6 +46,18 @@ func FuzzReader(f *testing.F) {
 				}
 			} else if err := br.SkipPayload(b); err != nil {
 				break
+			}
+		}
+		// The committed walk of an appendable file, on a reader of its own.
+		if fr, err := NewReader(bytes.NewReader(data)); err == nil {
+			for {
+				b, err := fr.NextCommitted()
+				if err != nil {
+					break
+				}
+				if _, err := fr.ReadPayload(b); err != nil {
+					t.Fatalf("a committed block at offset %d did not read: %v", b.Offset(), err)
+				}
 			}
 		}
 		offs, err := br.Find(1)

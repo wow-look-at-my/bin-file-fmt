@@ -411,7 +411,49 @@ static void test_resume_hides_ghost(void) {
     free(f.data);
 }
 
-int main(void) {
+/* Compares `f` with a fixture file byte for byte. A missing fixture is a failure. */
+static void check_fixture(const memfile *f, const char *dir, const char *name) {
+    char path[1024];
+    snprintf(path, sizeof path, "%s/%s", dir, name);
+    FILE *fp = fopen(path, "rb");
+    if (!fp) { printf("FAIL: cannot open fixture %s\n", path); failures++; return; }
+    static uint8_t want[8192];
+    size_t n = fread(want, 1, sizeof want, fp);
+    fclose(fp);
+    if (n != f->len || memcmp(want, f->data, n) != 0) {
+        printf("FAIL: output differs from fixture %s (%zu bytes written, fixture has %zu)\n", path, f->len, n);
+        failures++;
+    }
+}
+
+/* The Go and C++ suites compare their own writers against the same fixture
+ * files. A pass here in all means the writers agree byte for byte. */
+static void test_fixtures(const char *dir) {
+    memfile f = new_file();
+    write_sample(&f, 1);
+    check_fixture(&f, dir, "sample-appendable.binpazer");
+
+    /* The resume fixture: the open sample, a torn tail, then resume, a record and the End block. */
+    f.len = 0;
+    write_sample(&f, 0);
+    static const uint8_t torn[21] = {
+        TYPE_NOTE, 0, BINPAZER_FLAG_HAS_CRC, 0, 0, 0, 0x10, 0,
+        0xAB, 0xAB, 0xAB, 0xAB, 0xAB, 0xAB, 0xAB, 0xAB, 0xAB, 0xAB, 0xAB, 0xAB, 0xAB,
+    };
+    memcpy(f.data + f.len, torn, sizeof torn);
+    f.len += sizeof torn;
+    cursor c = { &f, 0 };
+    binpazer_writer w;
+    CHECK(resume(&w, &c) == BINPAZER_OK, "fixture: resume");
+    CHECK(binpazer_writer_block(&w, TYPE_NOTE, 0, "after the crash", 15) == BINPAZER_OK, "fixture: append");
+    CHECK(binpazer_writer_end(&w) == BINPAZER_OK, "fixture: end");
+    check_fixture(&f, dir, "sample-resumed.binpazer");
+    free(f.data);
+}
+
+int main(int argc, char **argv) {
+    /* The fixtures sit beside the Go tests; the default path is right for `make -C c test`. */
+    test_fixtures(argc > 1 ? argv[1] : "../go/testdata");
     test_header_and_end();
     test_non_seekable_end();
     test_every_prefix();
