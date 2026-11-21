@@ -34,7 +34,7 @@ export function parseStatsLine(text: string): RunStats {
 	const o = v as Record<string, unknown>;
 	const num = (k: (typeof STAT_FIELDS)[number]): number => {
 		const x = o[k];
-		if (typeof x !== "number" || !Number.isFinite(x) || x < 0 && k !== "exit") throw new Error(`measure stats line has bad "${k}": ${JSON.stringify(line)}`);
+		if (typeof x !== "number" || !Number.isFinite(x) || (x < 0 && k !== "exit")) throw new Error(`measure stats line has bad "${k}": ${JSON.stringify(line)}`);
 		return x;
 	};
 	return { wall_s: num("wall_s"), user_s: num("user_s"), sys_s: num("sys_s"), max_rss_kb: num("max_rss_kb"), exit: num("exit") };
@@ -52,6 +52,7 @@ export function summarize(runs: RunStats[], logicalBytes: number): Summary {
 	if (runs.length === 0) throw new Error("summarize needs at least one run");
 	const cpu = runs.map((r) => r.user_s + r.sys_s);
 	const wallS = median(runs.map((r) => r.wall_s));
+	if (wallS <= 0) throw new Error(`median wall time is ${wallS} s, so throughput is undefined`);
 	return {
 		cpuS: median(cpu),
 		userS: median(runs.map((r) => r.user_s)),
@@ -60,6 +61,6 @@ export function summarize(runs: RunStats[], logicalBytes: number): Summary {
 		cpuMinS: Math.min(...cpu),
 		cpuMaxS: Math.max(...cpu),
 		maxRssKb: median(runs.map((r) => r.max_rss_kb)),
-		throughputMiBs: wallS > 0 ? logicalBytes / (1024 * 1024) / wallS : Infinity,
+		throughputMiBs: logicalBytes / (1024 * 1024) / wallS,
 	};
 }
