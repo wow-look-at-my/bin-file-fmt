@@ -198,7 +198,7 @@ $ binpazer follow log.binpazer &
 $ binpazer append log.binpazer --type 1 --data "disk at 91%"
 {"index":0,"type_id":1,"type_name":"Event","flags":["has_crc"],"offset":192,"payload_len":11,"payload_base64":"ZGlzayBhdCA5MSU="}
 $ binpazer append log.binpazer --end
-{"index":1,"type_id":65529,"type_name":"End","flags":["has_crc"],"offset":208,"payload_len":0,"payload_base64":""}
+{"index":1,"type_id":65529,"type_name":"End","flags":["has_crc"],"offset":216,"payload_len":0,"payload_base64":""}
 ```
 
 `follow --no-wait` prints what is committed now and exits. The other read commands also stop at the last committed block of an open file, and `info` and `validate` say where the unfinished bytes start.
