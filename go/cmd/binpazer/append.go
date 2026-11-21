@@ -24,21 +24,12 @@ type appendOptions struct {
 
 // runAppend resumes the file, adds the block if there is one, and ends the file if asked.
 func runAppend(rw io.ReadWriteSeeker, o appendOptions, w io.Writer) error {
-	size, err := rw.Seek(0, io.SeekEnd)
-	if err != nil {
-		return err
-	}
-	if _, err := rw.Seek(0, io.SeekStart); err != nil {
-		return err
-	}
 	bw, types, err := binpazer.ResumeAppendWriter(rw)
 	if err != nil {
 		return err
 	}
-	// Resume starts after the Padding it wrote, so the gap to the size is what
-	// it sealed.
-	if sealed := int64(bw.Offset()) - size; sealed > 0 || uint64(size) > bw.Offset() {
-		fmt.Fprintf(w, "sealed a torn tail: the file had stale bytes after its last committed block\n")
+	if n := bw.SealedTail(); n > 0 {
+		fmt.Fprintf(w, "sealed a torn tail: %d stale bytes followed the last committed block\n", n)
 	}
 	if o.hasBlock {
 		known := false
@@ -48,7 +39,11 @@ func runAppend(rw io.ReadWriteSeeker, o appendOptions, w io.Writer) error {
 		if !known {
 			return fmt.Errorf("type %d is not in the file's block type table", o.typeID)
 		}
-		flags, err := parseFlags(o.flags)
+		var names []string
+		if o.flags != "" {
+			names = strings.Split(o.flags, ",")
+		}
+		flags, err := parseFlags(names)
 		if err != nil {
 			return err
 		}
