@@ -147,14 +147,6 @@ void cmd_write(const char *out_path, const char *payload_path, const char *block
 	const std::vector<uint8_t> payload = load_payload(payload_path);
 	const uint64_t plen = payload.size();
 
-	// The wrapper's compress_block allocates per call, so the bench encodes into one reused scratch buffer.
-	std::vector<uint8_t> scratch;
-	if (codec != kCodecNone) {
-		uint64_t cap = binpazer_compress_bound(codec, nullptr, plen);
-		if (cap == 0 && plen != 0) fail("compress bound for codec %s", codec_s);
-		grow(scratch, cap ? cap : 1);
-	}
-
 	File f(out_path, "wb");
 	binpazer::Guid wg{ { 0xB0 } };
 	std::vector<binpazer::TypeDef> defs{ { kTypePayload, binpazer::Guid{ { 0x11 } }, "Payload" } };
@@ -163,15 +155,9 @@ void cmd_write(const char *out_path, const char *payload_path, const char *block
 				   [&](uint64_t o) { return f.seek(o); });
 		if (!w.ok()) fail("writer begin (status %d)", status_code(w.status()));
 		for (uint64_t i = 0; i < blocks; i++) {
-			binpazer::Status st;
-			if (codec == kCodecNone) {
-				st = w.block(kTypePayload, binpazer::flag::HasCrc, payload.data(), plen);
-			} else {
-				uint64_t n = scratch.size();
-				binpazer_status cs = binpazer_compress(codec, nullptr, payload.data(), plen, scratch.data(), &n);
-				if (cs != BINPAZER_OK) fail("compressing block %" PRIu64 " (status %d)", i, static_cast<int>(cs));
-				st = w.compressed_block(kTypePayload, binpazer::flag::HasCrc, codec, scratch.data(), n, plen);
-			}
+			binpazer::Status st = codec == kCodecNone
+				? w.block(kTypePayload, binpazer::flag::HasCrc, payload.data(), plen)
+				: w.compress_block(kTypePayload, binpazer::flag::HasCrc, codec, payload.data(), plen);
 			if (st != binpazer::Status::Ok) fail("writing block %" PRIu64 " (status %d)", i, status_code(st));
 		}
 		binpazer::Status st = w.write_index();
