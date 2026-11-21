@@ -72,3 +72,55 @@ func TestStreamWalkNoFooter(t *testing.T) {
 	assert.Equal(t, 3, n)
 	assert.False(t, stream.HasIndex())
 }
+
+// largestRead records the largest read the reader asks its input for.
+type largestRead struct {
+	*bytes.Reader
+	max int
+}
+
+func (l *largestRead) Read(p []byte) (int, error) {
+	if len(p) > l.max {
+		l.max = len(p)
+	}
+	return l.Reader.Read(p)
+}
+
+// TestSeekKeepsFirstReadSmall: a lookup by offset asks the input for at most
+// seekReadAhead bytes, where a plain buffer refill asks for the whole buffer.
+func TestSeekKeepsFirstReadSmall(t *testing.T) {
+	payload := bytes.Repeat([]byte("p"), 100)
+	const blocks = 2000
+	file := writeTo(t, compressDefs, func(w *Writer) {
+		for i := 0; i < blocks; i++ {
+			require.NoError(t, w.Block(1, FlagHasCRC, payload))
+		}
+	})
+	require.Greater(t, len(file), 2*ioBufSize)
+
+	in := &largestRead{Reader: bytes.NewReader(file)}
+	r, err := NewReader(in)
+	require.NoError(t, err)
+	offs, err := r.Find(1)
+	require.NoError(t, err)
+	require.Len(t, offs, blocks)
+
+	in.max = 0
+	b, err := r.At(offs[blocks/2])
+	require.NoError(t, err)
+	got, err := r.ReadPayload(b)
+	require.NoError(t, err)
+	assert.Equal(t, payload, got)
+	assert.LessOrEqual(t, in.max, seekReadAhead)
+
+	// Reading on from there goes back to full refills.
+	in.max = 0
+	for i := 0; i < 200; i++ {
+		b, err = r.Next()
+		require.NoError(t, err)
+		got, err = r.ReadPayload(b)
+		require.NoError(t, err)
+		require.Equal(t, payload, got)
+	}
+	assert.Greater(t, in.max, seekReadAhead)
+}

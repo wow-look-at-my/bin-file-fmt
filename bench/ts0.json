@@ -1,0 +1,7 @@
+{
+	"entry": "run.ts",
+	"outdir": "build/driver",
+	"target": "node",
+	"format": "esm",
+	"strict": true
+}

@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"sync"
 
@@ -289,12 +290,22 @@ func (br *Reader) DecompressedPayload(b *Block) (Compression, io.Reader, error) 
 	if err != nil {
 		return c, nil, err
 	}
+	dr := &decompressReader{rem: c.UncompressedLen, want: c.UncompressedLen}
 	stored := &payloadReader{br: br, rem: c.StoredLen}
+	if b.Flags&FlagHasCRC != 0 {
+		// The envelope parsed with every reserved field zero, so re-encoding it gives the bytes on disk.
+		hb := b.headerBytes()
+		dr.crc = crc32.Update(crc32.Update(0, crcTable, hb[:]), crcTable, encodeEnvelopeHeader(c))
+		dr.br, dr.b, dr.stored = br, b, stored
+		// Set before the codec starts: a decoder may read stored from its own goroutine.
+		stored.crc = &dr.crc
+	}
 	dec, err := codec.NewReader(stored)
 	if err != nil {
 		return c, nil, err
 	}
-	return c, &decompressReader{dec: dec, rem: c.UncompressedLen, want: c.UncompressedLen}, nil
+	dr.dec = dec
+	return c, dr, nil
 }
 
 // decompressReader bounds a codec's output at the envelope's declared length
@@ -304,6 +315,26 @@ type decompressReader struct {
 	rem  uint64
 	want uint64
 	got  uint64
+
+	// Set only for a has_crc block.
+	br     *Reader
+	b      *Block
+	stored *payloadReader
+	crc    uint32
+}
+
+// verifyStored reads the codec bytes the decoder left behind, then the CRC trailer.
+// Call it only after dec is closed, so no decoder goroutine still reads stored.
+func (dr *decompressReader) verifyStored() error {
+	if dr.stored == nil {
+		return nil
+	}
+	stored := dr.stored
+	dr.stored = nil
+	if _, err := io.Copy(io.Discard, stored); err != nil {
+		return err
+	}
+	return dr.br.verifyCRC(dr.b, dr.crc)
 }
 
 func (dr *decompressReader) Read(p []byte) (int, error) {
@@ -316,6 +347,10 @@ func (dr *decompressReader) Read(p []byte) (int, error) {
 			return 0, fmt.Errorf("binpazer: decoded payload exceeds the envelope's %d bytes: %w", dr.want, ErrBadEnvelope)
 		}
 		if err != nil && err != io.EOF {
+			return 0, err
+		}
+		// Like WritePayloadTo, a CRC failure arrives after the last decoded byte.
+		if err := dr.verifyStored(); err != nil {
 			return 0, err
 		}
 		return 0, io.EOF
