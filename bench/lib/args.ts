@@ -12,6 +12,7 @@ export interface Options {
 	workDir: string;
 	keep: boolean;
 	profile: boolean;
+	render: boolean;
 	profBins: { c: string; cpp: string };
 	jsonPath: string;
 	reportPath: string;
@@ -32,10 +33,11 @@ export const USAGE = `usage: node bench/run.ts [options]
 	--ts-bin <path>      the TypeScript bench .js file (run with node)
 	--profile            one extra profiled run per implementation for the hot-spot tables
 	--c-prof-bin, --cpp-prof-bin <path>   gprof builds (default bench/build-prof/bench_c, bench_cpp)
+	--render             run nothing: rebuild the report (--report) from an existing results file (--json)
 	--help               print this text`;
 
 const VALUE_OPTIONS = ["--repeats", "--impls", "--only", "--work-dir", "--json", "--report", "--c-bin", "--cpp-bin", "--go-bin", "--ts-bin", "--c-prof-bin", "--cpp-prof-bin"];
-const FLAG_OPTIONS = ["--quick", "--keep", "--profile", "--help"];
+const FLAG_OPTIONS = ["--quick", "--keep", "--profile", "--render", "--help"];
 
 function splitList(opt: string, v: string): string[] {
 	const parts = v.split(",").map((s) => s.trim());
@@ -98,6 +100,7 @@ export function parseArgs(argv: string[], repoRoot: string, cwd: string): Option
 		workDir,
 		keep: flags.has("--keep"),
 		profile: flags.has("--profile"),
+		render: flags.has("--render"),
 		profBins: {
 			c: opt("--c-prof-bin", path.join(repoRoot, "bench", "build-prof", "bench_c")),
 			cpp: opt("--cpp-prof-bin", path.join(repoRoot, "bench", "build-prof", "bench_cpp")),

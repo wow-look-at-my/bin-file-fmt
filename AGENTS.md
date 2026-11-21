@@ -87,7 +87,7 @@ Everything degrades gracefully without a seeker: sequential walk, read-through s
 - `payload.go` -- streaming: `WritePayloadTo` (64 KiB chunks, incremental CRC) and `PayloadReader` (bounded reader, `SkipPayload` realigns afterwards). The CLI never buffers whole payloads. Keep it that way (RSS stays ~3 MB on files).
 - `container.go` -- convenience layer for the shape most files take (content blocks + a directory naming their offsets + index/footer). Pure composition of the primitives -- it adds no format feature, so files it writes are ordinary binpazer files C and C++ already read. It is exempt from the parity table for that reason. New sugar belongs here, not in reader.go/writer.go.
 - `writer.go` -- buffered writer + index/footer emission, `group.go` -- `ParseGroupPayload` for nested blocks (`binpazer_group_parse` in C, `binpazer::parse_group` in C++ -- same tolerance for a damaged group: the intact prefix comes back with the error). This also covers `guid.go` -- GUID parse/format.
-- All reads go through a `bufio.Reader`, so the raw input position can be ahead of the logical offset: reposition **only** via `seekTo(abs)` (never a raw relative seek).
+- All reads go through a `bufio.Reader`, so the raw input position can be ahead of the logical offset: reposition **only** via `seekTo(abs)` (never a raw relative seek). `seekTo` also keeps the first read after it small (`readahead.go`), so a lookup by offset does not refill the whole buffer for one small block. The TypeScript reader does the same in `fill()`.
 
 ## TypeScript package (ts/)
 
