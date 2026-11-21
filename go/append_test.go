@@ -303,6 +303,51 @@ func TestFollowNeedsAnAppendableSeekableFile(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestFindListsCommittedBlocksOnly(t *testing.T) {
+	data := appendSampleBytes(t, true)
+	ends := blockEnds(t, data)
+	// The file as it stood while the last record was part of the way in.
+	open := data[:ends[2]-3]
+
+	br, err := NewReader(bytes.NewReader(open))
+	require.NoError(t, err)
+	at := br.Offset()
+	offs, err := br.Find(2)
+	require.NoError(t, err)
+	assert.Equal(t, []uint64{at, ends[0]}, offs, "the record still being written is not found")
+	assert.Equal(t, at, br.Offset(), "Find keeps the reader's position")
+
+	tbl, err := br.Find(TypeBlockTypeTable)
+	require.NoError(t, err)
+	assert.Equal(t, []uint64{br.FirstBlockOffset}, tbl)
+
+	b, err := br.FindLast(2)
+	require.NoError(t, err)
+	p, err := br.ReadPayload(b)
+	require.NoError(t, err)
+	assert.Equal(t, appendSamplePayloads[1], string(p))
+
+	br, err = NewReader(bytes.NewReader(data))
+	require.NoError(t, err)
+	offs, err = br.Find(TypeEnd)
+	require.NoError(t, err)
+	assert.Equal(t, []uint64{ends[2]}, offs)
+	assert.False(t, br.Ended(), "a Find that passes the End block does not end the caller's walk")
+}
+
+func TestResumeReportsTheSealedTail(t *testing.T) {
+	clean := appendSampleBytes(t, false)
+	bw, _, err := ResumeAppendWriter(&memFile{buf: bytes.Clone(clean)})
+	require.NoError(t, err)
+	assert.Zero(t, bw.SealedTail())
+
+	// A tail that is a whole number of aligned words leaves the file length unchanged, so only the count tells.
+	bw, _, err = ResumeAppendWriter(&memFile{buf: append(bytes.Clone(clean), bytes.Repeat([]byte{0xAB}, 24)...)})
+	require.NoError(t, err)
+	assert.EqualValues(t, 24, bw.SealedTail())
+	assert.EqualValues(t, len(clean)+24, bw.Offset())
+}
+
 func TestResumeAppendsAfterCommittedBlocks(t *testing.T) {
 	mf := &memFile{buf: appendSampleBytes(t, false)}
 	before := len(mf.buf)

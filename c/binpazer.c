@@ -463,6 +463,7 @@ binpazer_status binpazer_writer_resume(
     w->offset = end;
     w->version_minor = r.version_minor;
     w->appendable = 1;
+    w->sealed_tail = tail;
     return w_pad_over(w, tail);
 }
 
@@ -581,6 +582,7 @@ binpazer_status binpazer_reader_begin(
     uint64_t btt_end = align8(btt_start + 8 + btt_len);
     if (r->offset > btt_end) return (binpazer_status)(r->err = BINPAZER_ERR_FORMAT);
     if (r_skip(r, btt_end - r->offset)) return (binpazer_status)r->err; /* block pad */
+    r->table_end = btt_end;
 
     /* Opportunistically locate a Block Index via the footer. */
     r->has_index = 0;
@@ -836,6 +838,15 @@ binpazer_status binpazer_reader_find(
             if (r->seek(r->ctx, r->first_block_offset) != 0) { st = BINPAZER_ERR_IO; break; }
             r->offset = r->first_block_offset;
             int appendable = (r->header_flags & BINPAZER_HEADER_FLAG_APPENDABLE) != 0;
+            if (appendable) {
+                /* The Block Type Table has no seal, so the committed walk starts after it. */
+                if (type_id == BINPAZER_TYPE_BLOCK_TYPE_TABLE) {
+                    if (total < cap) { out[total].type_id = type_id; out[total].offset = r->first_block_offset; }
+                    total++;
+                }
+                if (r->seek(r->ctx, r->table_end) != 0) { st = BINPAZER_ERR_IO; break; }
+                r->offset = r->table_end;
+            }
             while (r->blocks_end == BINPAZER_FILE_LENGTH_UNKNOWN || r->offset < r->blocks_end) {
                 uint64_t blk_off = r->offset;
                 uint8_t bh[8];

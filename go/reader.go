@@ -41,6 +41,7 @@ type Reader struct {
 
 	hasIndex    bool
 	indexOffset uint64
+	tableEnd    uint64 // offset of the first block after the Block Type Table
 	blocksEnd   uint64 // end of the block stream (excludes a trailing footer)
 	ended       bool   // the End block of an appendable file was read
 }
@@ -290,6 +291,7 @@ func (br *Reader) readBTT() error {
 		return err
 	}
 	bttEnd := align8(br.FirstBlockOffset + 8 + bttLen)
+	br.tableEnd = bttEnd
 
 	cc := make([]byte, 8)
 	if err := br.read(cc); err != nil {

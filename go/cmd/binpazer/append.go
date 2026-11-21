@@ -3,6 +3,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -16,7 +17,7 @@ import (
 type appendOptions struct {
 	hasBlock bool
 	typeID   uint16
-	flags    []string
+	flags    string // comma-separated flag names
 	codec    string
 	payload  []byte
 	end      bool
@@ -74,7 +75,7 @@ func runAppend(rw io.ReadWriteSeeker, o appendOptions, w io.Writer) error {
 func init() {
 	var (
 		typeID          uint16
-		flags           []string
+		flags           string
 		codec           string
 		data, dataB64   string
 		payloadFile     string
@@ -111,7 +112,7 @@ command does.`,
 			if set > 1 {
 				return fmt.Errorf("set at most one of --%s", strings.Join(sourceFlagNames, ", --"))
 			}
-			if !o.hasBlock && (set > 0 || cmd.Flags().Changed("flag") || codec != "") {
+			if !o.hasBlock && (set > 0 || flags != "" || codec != "") {
 				return fmt.Errorf("--type is required to append a block")
 			}
 			var err error
@@ -119,7 +120,7 @@ command does.`,
 			case cmd.Flags().Changed("data"):
 				o.payload = []byte(data)
 			case cmd.Flags().Changed("data-base64"):
-				o.payload, err = decodeBase64(dataB64)
+				o.payload, err = base64.StdEncoding.DecodeString(dataB64)
 			case payloadFile == "-":
 				o.payload, err = io.ReadAll(cmd.InOrStdin())
 			case cmd.Flags().Changed("payload"):
@@ -140,7 +141,7 @@ command does.`,
 		},
 	}
 	cmd.Flags().Uint16Var(&typeID, "type", 0, "type id of the block to append")
-	cmd.Flags().StringSliceVar(&flags, "flag", nil, "block flag to set; repeat it or separate names with commas (has_crc is always set)")
+	cmd.Flags().StringVar(&flags, "flags", "", "block flags to set, separated by commas (has_crc is always set)")
 	cmd.Flags().StringVar(&codec, "codec", "", "compress the payload with this codec")
 	cmd.Flags().StringVar(&data, "data", "", "payload as text")
 	cmd.Flags().StringVar(&dataB64, "data-base64", "", "payload as base64")

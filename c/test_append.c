@@ -242,6 +242,32 @@ static void test_growing_file(void) {
     free(f.data);
 }
 
+/* Find lists committed blocks only, and leaves the caller's walk as it was. */
+static void test_find(void) {
+    memfile f = new_file();
+    write_sample(&f, 1);
+    uint64_t ends[8], first = 0;
+    CHECK(block_ends(&f, ends, 8, &first) == 4, "find: sample");
+    size_t full = f.len;
+    f.len = (size_t)ends[2] - 3; /* the last record is part of the way. */
+
+    cursor c = { &f, 0 };
+    binpazer_reader r;
+    CHECK(binpazer_reader_begin(&r, cur_read, cur_seek, &c, NULL, 0, NULL, 0, NULL) == BINPAZER_OK, "find: begin");
+    binpazer_index_entry found[8]; size_t n = 0;
+    CHECK(binpazer_reader_find(&r, TYPE_NOTE, found, 8, &n) == BINPAZER_OK && n == 2, "find: two committed records");
+    CHECK(found[0].offset == first && found[1].offset == ends[0], "find: record offsets");
+    CHECK(r.offset == first, "find: position kept");
+    CHECK(binpazer_reader_find(&r, BINPAZER_TYPE_BLOCK_TYPE_TABLE, found, 8, &n) == BINPAZER_OK && n == 1 &&
+          found[0].offset == r.first_block_offset, "find: the type table");
+
+    f.len = full;
+    CHECK(binpazer_reader_find(&r, BINPAZER_TYPE_END, found, 8, &n) == BINPAZER_OK && n == 1 &&
+          found[0].offset == ends[2], "find: the End block");
+    CHECK(!r.ended, "find: passing the End block does not end the caller's walk");
+    free(f.data);
+}
+
 static void test_torn(void) {
     memfile f = new_file();
     write_sample(&f, 0);
@@ -302,6 +328,7 @@ static void test_resume(void) {
     cursor c = { &f, 0 };
     binpazer_writer w;
     CHECK(resume(&w, &c) == BINPAZER_OK && w.offset == clean && f.len == clean, "resume: clean file");
+    CHECK(w.sealed_tail == 0, "resume: a clean file has no sealed tail");
     CHECK(binpazer_writer_block(&w, TYPE_NOTE, 0, "after restart", 13) == BINPAZER_OK, "resume: append");
     CHECK(follow(&f, &n, "after restart", NULL) == BINPAZER_PENDING && n == 4, "resume: old and new records");
 
@@ -319,6 +346,7 @@ static void test_resume(void) {
 
         cursor tc = { &f, 0 };
         CHECK(resume(&w, &tc) == BINPAZER_OK, "resume: torn tail");
+        CHECK(w.sealed_tail == tail, "resume: the sealed tail is counted");
         CHECK(w.offset >= clean + tail && w.offset % 8 == 0 && w.offset == f.len, "resume: padding covers every stale byte");
         CHECK(memcmp(f.data, saved, clean) == 0, "resume: committed bytes are untouched");
         CHECK(binpazer_writer_block(&w, TYPE_NOTE, 0, "recovered", 9) == BINPAZER_OK, "resume: append after a torn tail");
@@ -388,6 +416,7 @@ int main(void) {
     test_non_seekable_end();
     test_every_prefix();
     test_growing_file();
+    test_find();
     test_torn();
     test_not_appendable();
     test_resume();

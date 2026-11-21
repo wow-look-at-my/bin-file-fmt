@@ -31,8 +31,37 @@ type follower struct {
 	wait      bool
 	interval  time.Duration
 	noPayload bool
+	maxAlloc  int64 // cap on one decoded payload
 	out       io.Writer
 	errOut    io.Writer
+}
+
+// payload moves the reader past the block and returns its decoded payload and its codec name.
+// The payload is nil when the run leaves payloads out.
+func (f *follower) payload(br *binpazer.Reader, b *binpazer.Block) ([]byte, string, error) {
+	if b.Flags&binpazer.FlagCompressed == 0 {
+		if f.noPayload {
+			return nil, "", br.SkipPayload(b)
+		}
+		p, err := br.ReadPayload(b)
+		return p, "", err
+	}
+	c, r, err := br.DecompressedPayload(b)
+	if err != nil {
+		return nil, "", err
+	}
+	var p []byte
+	if !f.noPayload {
+		// The envelope's length is untrusted, so it is held to the allocation cap before the decode.
+		if c.UncompressedLen > uint64(f.maxAlloc) {
+			return nil, "", fmt.Errorf("block at offset %d decodes to %d bytes, over the %d-byte cap: %w",
+				b.Offset(), c.UncompressedLen, f.maxAlloc, binpazer.ErrCapacityExceeded)
+		}
+		if p, err = io.ReadAll(r); err != nil {
+			return nil, "", err
+		}
+	}
+	return p, codecName(c.CodecID), br.SkipPayload(b)
 }
 
 // emit prints one committed block as a JSON line and moves the reader past it.
@@ -41,25 +70,12 @@ func (f *follower) emit(br *binpazer.Reader, tt *typeTable, b *binpazer.Block, n
 		Index: n, TypeID: b.TypeID, TypeName: tt.name(b.TypeID),
 		Flags: displayFlagNames(b.Flags), Offset: b.Offset(), PayloadLen: b.PayloadLen,
 	}
-	if b.Flags&binpazer.FlagCompressed != 0 {
-		// The reader is rewound after this peek, so the payload read below starts at the envelope.
-		if c, err := br.Compression(b); err == nil {
-			line.Codec = codecName(c.CodecID)
-		}
-		var err error
-		if b, err = br.At(b.Offset()); err != nil {
-			return err
-		}
+	p, codec, err := f.payload(br, b)
+	if err != nil {
+		return err
 	}
-	if f.noPayload {
-		if err := br.SkipPayload(b); err != nil {
-			return err
-		}
-	} else {
-		p, err := br.ReadDecompressedPayload(b)
-		if err != nil {
-			return err
-		}
+	line.Codec = codec
+	if !f.noPayload {
 		s := base64.StdEncoding.EncodeToString(p)
 		line.PayloadB64 = &s
 	}
@@ -168,8 +184,11 @@ repairs it; with --no-wait it is an error.`,
 				return fmt.Errorf("--interval must be greater than zero")
 			}
 			f := &follower{
-				wait: !noWait, interval: interval, noPayload: noPayload,
+				wait: !noWait, interval: interval, noPayload: noPayload, maxAlloc: *maxAlloc,
 				out: cmd.OutOrStdout(), errOut: cmd.ErrOrStderr(),
+			}
+			if f.maxAlloc <= 0 {
+				f.maxAlloc = binpazer.DefaultMaxAlloc
 			}
 			br, c, err := f.openFollowed(cmd, args[0], *maxAlloc)
 			if err != nil {

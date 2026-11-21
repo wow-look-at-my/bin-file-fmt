@@ -26,6 +26,7 @@ type Writer struct {
 	// appendable makes every block sealed and flushed, and makes End write the End block.
 	appendable bool
 	ended      bool
+	sealedTail uint64
 }
 
 var zeros [8]byte

@@ -91,12 +91,19 @@ func (br *Reader) find(typeID uint16) ([]uint64, error) {
 	return offsets, nil
 }
 
-// findCommitted walks an appendable file from the current offset and stops where the committed blocks stop.
+// findCommitted walks the blocks of an appendable file and stops where the committed blocks stop.
 func (br *Reader) findCommitted(typeID uint16) ([]uint64, error) {
 	ended := br.ended
 	defer func() { br.ended = ended }() // the walk must not change what the caller's position has seen
 	br.ended = false
 	var offsets []uint64
+	// The Block Type Table has no seal, so the committed walk starts after it.
+	if typeID == TypeBlockTypeTable {
+		offsets = append(offsets, br.FirstBlockOffset)
+	}
+	if err := br.seekTo(br.tableEnd); err != nil {
+		return nil, err
+	}
 	for {
 		b, err := br.NextCommitted()
 		if err == io.EOF || errors.Is(err, ErrPending) {

@@ -12,7 +12,7 @@ import (
 )
 
 func isPredefined(id uint16) bool {
-	return id >= binpazer.TypeGroup && id <= binpazer.TypeBlockTypeTable
+	return id >= binpazer.TypeEnd && id <= binpazer.TypeBlockTypeTable
 }
 
 // runValidate checks the input against every rule of SPEC.md's "Validation"
@@ -39,6 +39,7 @@ func runValidate(r io.Reader, maxAlloc int64) *validateResult {
 	}
 
 	indexBlockSeen, clean := v.walk(br)
+	v.appendFileChecks(br, clean)
 	v.lengthChecks(br, clean)
 	if br.InputSize() >= 0 {
 		v.indexChecks(br, indexBlockSeen)
@@ -87,6 +88,9 @@ pass/fail/skipped status.`,
 				if rs.Status == "skipped" && !strings.HasPrefix(rs.Reason, "not evaluated") {
 					fmt.Fprintf(w, "skipped: %s (%s)\n", rs.Rule, rs.Reason)
 				}
+			}
+			if p := res.InProgress; p != nil {
+				fmt.Fprintf(w, "in progress: the writer has not ended the file; unfinished bytes start at offset %d\n", p.Offset)
 			}
 			if res.OK {
 				fmt.Fprintln(w, "OK: file is spec-conformant")

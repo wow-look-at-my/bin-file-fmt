@@ -120,6 +120,7 @@ typedef struct {
     uint16_t          version_minor;    /* as declared in the header at begin */
     int               appendable;       /* every block is sealed; end writes the End block */
     int               ended;            /* the End block is written */
+    uint64_t          sealed_tail;      /* stale bytes that binpazer_writer_resume covered with Padding */
 } binpazer_writer;
 
 /* One block-type-table entry supplied by the caller. */
@@ -219,6 +220,7 @@ typedef struct {
     int              ended;              /* the End block of an appendable file was read */
     int              has_index;          /* a Block Index was located via the footer */
     uint64_t         index_offset;       /* offset of the Block Index block */
+    uint64_t         table_end;          /* offset of the first block after the Block Type Table */
     uint64_t         blocks_end;         /* end of the block stream (excludes a trailing footer) */
 } binpazer_reader;
 
