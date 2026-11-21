@@ -193,18 +193,17 @@ type sampleWriter struct {
 }
 
 func (s *sampleWriter) Write(p []byte) (int, error) {
-	for i, c := range p {
-		pos := s.n + uint64(i)
-		if pos == 0 {
-			s.first = c
-		}
-		if pos == s.mid {
-			s.at = c
-		}
+	if len(p) == 0 {
+		return 0, nil
 	}
-	if len(p) > 0 {
-		s.last = p[len(p)-1]
+	if s.n == 0 {
+		s.first = p[0]
 	}
+	// Index the chunk directly: a per-byte scan would bill the bench, not the library.
+	if s.mid >= s.n && s.mid-s.n < uint64(len(p)) {
+		s.at = p[s.mid-s.n]
+	}
+	s.last = p[len(p)-1]
 	s.n += uint64(len(p))
 	return len(p), nil
 }
