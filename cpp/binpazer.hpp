@@ -30,16 +30,25 @@ using TypeEntry = binpazer_type_entry;
 inline const Guid &block_type_table_guid() { return BINPAZER_GUID_BLOCK_TYPE_TABLE; }
 
 enum class Status : int {
-    Ok          = BINPAZER_OK,
-    End         = BINPAZER_END,
-    ErrIo       = BINPAZER_ERR_IO,
-    ErrMagic    = BINPAZER_ERR_MAGIC,
-    ErrVersion  = BINPAZER_ERR_VERSION,
-    ErrFormat   = BINPAZER_ERR_FORMAT,
-    ErrRange    = BINPAZER_ERR_RANGE,
-    ErrCrc      = BINPAZER_ERR_CRC,
-    ErrCapacity = BINPAZER_ERR_CAPACITY,
+    Ok               = BINPAZER_OK,
+    End              = BINPAZER_END,
+    Pending          = BINPAZER_PENDING,
+    Torn             = BINPAZER_TORN,
+    ErrIo            = BINPAZER_ERR_IO,
+    ErrMagic         = BINPAZER_ERR_MAGIC,
+    ErrVersion       = BINPAZER_ERR_VERSION,
+    ErrFormat        = BINPAZER_ERR_FORMAT,
+    ErrRange         = BINPAZER_ERR_RANGE,
+    ErrCrc           = BINPAZER_ERR_CRC,
+    ErrCapacity      = BINPAZER_ERR_CAPACITY,
+    ErrNoSeek        = BINPAZER_ERR_NOSEEK,
+    ErrNotAppendable = BINPAZER_ERR_NOT_APPENDABLE,
+    ErrEnded         = BINPAZER_ERR_ENDED,
 };
+
+// Tags that select the appendable Writer constructors.
+inline constexpr struct appendable_t { explicit appendable_t() = default; } appendable{};
+inline constexpr struct resume_t { explicit resume_t() = default; } resume{};
 
 namespace flag {
 enum : uint16_t {
@@ -152,6 +161,8 @@ struct IoCtx { ReadFn read; WriteFn write; SeekFn seek; };
 inline size_t tramp_read(void *c, void *b, size_t n)        { return static_cast<IoCtx *>(c)->read(b, n); }
 inline size_t tramp_write(void *c, const void *b, size_t n) { return static_cast<IoCtx *>(c)->write(b, n); }
 inline int    tramp_seek(void *c, uint64_t o)              { return static_cast<IoCtx *>(c)->seek(o) ? 0 : -1; }
+// Type ids are 16-bit, so no conformant Block Type Table holds more entries.
+inline constexpr size_t kMaxTypeEntries = 65536;
 } // namespace detail
 
 class Writer {
@@ -182,13 +193,60 @@ public:
                                       cdefs.data(), cdefs.size(), version_minor);
     }
 
+    // Starts an appendable file. Every block gets flag::HasCrc as its commit
+    // seal, end() writes the End block, and write_index() is refused.
+    Writer(appendable_t, WriteFn write, const Guid &writer_guid, std::string_view name,
+           const std::vector<TypeDef> &defs, SeekFn seek = {}) {
+        io_.write = std::move(write);
+        io_.seek  = std::move(seek);
+        name_     = std::string(name);
+
+        std::vector<binpazer_type_def> cdefs;
+        cdefs.reserve(defs.size());
+        for (const auto &d : defs)
+            cdefs.push_back(binpazer_type_def{d.type_id, d.guid, d.name.c_str()});
+
+        binpazer_writer_begin_append(&w_, detail::tramp_write,
+                                     io_.seek ? detail::tramp_seek : nullptr, &io_,
+                                     &writer_guid, name_.c_str(), cdefs.data(), cdefs.size());
+    }
+
+    // Continues an appendable file that an earlier writer left open, and
+    // covers a torn tail with sealed Padding blocks. All callbacks share one
+    // file position. Check status() for ErrEnded or ErrNotAppendable.
+    Writer(resume_t, ReadFn read, WriteFn write, SeekFn seek, size_t chunk = 64 * 1024) {
+        io_.read  = std::move(read);
+        io_.write = std::move(write);
+        io_.seek  = std::move(seek);
+        std::vector<uint8_t> scratch(chunk ? chunk : 1);
+        types_.resize(256);
+        size_t n = 0;
+        auto attempt = [&]() {
+            // The core reads the header from the current position.
+            if (io_.seek && !io_.seek(0)) return BINPAZER_ERR_IO;
+            n = 0;
+            return binpazer_writer_resume(&w_, detail::tramp_read, detail::tramp_write,
+                                          io_.seek ? detail::tramp_seek : nullptr, &io_,
+                                          types_.data(), types_.size(), &n,
+                                          scratch.data(), scratch.size());
+        };
+        binpazer_status s = attempt();
+        if (s == BINPAZER_ERR_CAPACITY && n > types_.size() && n <= detail::kMaxTypeEntries) {
+            types_.resize(n);
+            s = attempt();
+        }
+        if (s == BINPAZER_ERR_IO && w_.err == BINPAZER_OK) w_.err = s;
+        types_.resize(s == BINPAZER_OK ? n : 0);
+    }
+
     Writer(const Writer &) = delete;
     Writer &operator=(const Writer &) = delete;
     Writer(Writer &&) = delete; // w_.ctx points at io_; address must be stable
     Writer &operator=(Writer &&) = delete;
 
     Status block(uint16_t type_id, uint16_t flags, const void *payload, uint64_t len) {
-        idx_.push_back(binpazer_index_entry{type_id, w_.offset}); // record for the index
+        // An appender runs for a long time and carries no index, so it records nothing.
+        if (!w_.appendable) idx_.push_back(binpazer_index_entry{type_id, w_.offset});
         return static_cast<Status>(binpazer_writer_block(&w_, type_id, flags, payload, len));
     }
     Status block(uint16_t type_id, uint16_t flags, const std::vector<uint8_t> &payload) {
@@ -203,7 +261,7 @@ public:
     Status compressed_block(uint16_t type_id, uint16_t flags, uint16_t codec_id,
                             const void *stored, uint64_t stored_len, uint64_t uncompressed_len,
                             const Guid *codec_guid = nullptr) {
-        idx_.push_back(binpazer_index_entry{type_id, w_.offset}); // record for the index
+        if (!w_.appendable) idx_.push_back(binpazer_index_entry{type_id, w_.offset});
         return static_cast<Status>(binpazer_writer_block_compressed(
             &w_, type_id, flags, codec_id, codec_guid, stored, stored_len, uncompressed_len));
     }
@@ -241,12 +299,18 @@ public:
     uint64_t offset() const { return w_.offset; } // == the next block's offset
     bool     ok()     const { return w_.err == BINPAZER_OK; }
     Status   status() const { return static_cast<Status>(w_.err); }
+    bool     appendable() const { return w_.appendable != 0; }
+    // Stale bytes that a resumed writer covered with Padding blocks.
+    uint64_t sealed_tail() const { return w_.sealed_tail; }
+    // The file's Block Type Table, read by a resumed writer; empty otherwise.
+    const std::vector<TypeEntry> &types() const { return types_; }
 
 private:
     detail::IoCtx                     io_{};
     binpazer_writer                   w_{};
     std::string                       name_;
     std::vector<binpazer_index_entry> idx_;
+    std::vector<TypeEntry>            types_;
 };
 
 class Reader {
@@ -254,7 +318,7 @@ public:
     // Type ids are 16-bit, so no conformant Block Type Table can hold more
     // distinct entries than this. Larger declared counts are rejected as
     // Status::ErrCapacity instead of being allocated for.
-    static constexpr size_t kMaxTypeEntries = 65536;
+    static constexpr size_t kMaxTypeEntries = detail::kMaxTypeEntries;
 
     explicit Reader(ReadFn read, SeekFn seek = {}) {
         io_.read = std::move(read);
@@ -347,6 +411,18 @@ public:
 
     bool     has_index() const { return r_.has_index != 0; }
     uint64_t offset()    const { return r_.offset; }
+    bool     appendable() const { return (r_.header_flags & BINPAZER_HEADER_FLAG_APPENDABLE) != 0; }
+    bool     ended()      const { return r_.ended != 0; }
+
+    // Reads the next committed block of an appendable file into `out`. Ok:
+    // the reader sits at its payload. Pending or Torn: the reader has not
+    // moved, so poll again later. End: the writer ended the file. Needs a
+    // seek callback. The seal check reads the payload `chunk` bytes at a time.
+    Status next_committed(Block &out, size_t chunk = 64 * 1024) {
+        if (scratch_.size() != (chunk ? chunk : 1)) scratch_.resize(chunk ? chunk : 1);
+        return static_cast<Status>(binpazer_reader_next_committed(
+            &r_, entries_.data(), entries_.size(), &out, scratch_.data(), scratch_.size()));
+    }
 
     // Offsets of all blocks with this type id, using the Block Index when present
     // (seeking straight to them) and otherwise walking the file.
@@ -380,6 +456,7 @@ private:
     binpazer_reader                  r_{};
     std::vector<binpazer_type_entry> entries_;
     std::string                      writer_name_;
+    std::vector<uint8_t>             scratch_;
 };
 
 } // namespace binpazer

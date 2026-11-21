@@ -16,6 +16,9 @@ type Manifest struct {
 	Types      []ManifestType  `json:"types"`
 	Blocks     []ManifestBlock `json:"blocks"`
 	Index      bool            `json:"index,omitempty"`
+	// Appendable packs an appendable file. Open leaves it without the End block, so the append command can continue it.
+	Appendable bool `json:"appendable,omitempty"`
+	Open       bool `json:"open,omitempty"`
 }
 
 // ManifestType is one Block Type Table entry.
@@ -122,6 +125,8 @@ func predefinedName(id uint16) string {
 		return "Padding"
 	case binpazer.TypeGroup:
 		return "Group"
+	case binpazer.TypeEnd:
+		return "End"
 	}
 	return ""
 }

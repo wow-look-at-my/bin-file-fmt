@@ -40,6 +40,28 @@ body, _, _ := r.OpenAt(dir.Entries[name], typeFile)   // seek + type check + dec
 
 It composes the primitives and adds no format feature. These files are ordinary binpazer files that the C and C++ implementations read as-is.
 
+A file can also **grow while it is read**, the way a JSON Lines log does. An appendable file seals every block with a CRC. A reader takes a block only when all of it is there and the seal verifies. A block that a writer is still writing is never seen:
+
+```go
+w, _ := binpazer.NewAppendWriter(f, writerGUID, "logger", defs)
+w.Block(typeEvent, 0, payload)                // sealed and flushed: committed on return
+
+r, _ := binpazer.NewReader(g)                 // another process, same file
+for {
+	b, err := r.NextCommitted()
+	if errors.Is(err, binpazer.ErrPending) {  // nothing new yet; the reader has not moved
+		time.Sleep(interval)
+		continue
+	}
+	if err == io.EOF {                        // the writer called End
+		break
+	}
+	payload, _ := r.ReadPayload(b)
+}
+```
+
+`ResumeAppendWriter` continues a file after a restart, and seals the torn tail a crash left behind. See SPEC.md "Appendable files".
+
 The readers are hardened against hostile input. `ErrCapacityExceeded` in Go. `BINPAZER_ERR_*` codes in C/C++). The Go reader is fuzzed.
 
 ## The `binpazer` CLI
@@ -71,6 +93,8 @@ Any positional file argument accepts `-` for stdin (and `-o -`/`--out -` for std
 | `dump` | hex-dump block payloads |
 | `find` | list blocks of a given type (via the Block Index when present) |
 | `extract` (alias `cat`) | stream one block's payload to a file or stdout |
+| `follow` | print the blocks of an appendable file as a writer commits them |
+| `append` | add a block to an open appendable file, repair it, or end it |
 
 ### pack -- build a file from a JSON manifest
 
@@ -98,6 +122,7 @@ binpazer pack manifest.json -o demo.binpazer
 - `blocks` -- written in order. Each has a `type_id`, optional `flags`, and exactly one content source.
 - The manifest always holds the block's LOGICAL bytes, so `unpack` writes decoded payloads and records the codec that produced them. Re-packing reproduces the file exactly. There is no `compressed` flag name: compression is named by its codec or it does not happen.
 - `"index": true` -- append a footer of the Block Index + so readers can jump by type.
+- `"appendable": true` -- write an appendable file. Add `"open": true` to leave it without its End block, so `append` can continue it.
 
 `pack - -o -` reads the manifest from stdin and writes the archive to stdout (byte-identical to file output. The status line moves to stderr).
 
@@ -169,6 +194,22 @@ $ cat demo.binpazer | binpazer cat - --type 1
 hello, file!
 ```
 
+### follow / append -- a file that grows
+
+`append` adds one sealed block to an open appendable file. `follow` prints each block as a JSON line once it is committed, and waits for more until the writer ends the file:
+
+```sh
+$ binpazer follow log.binpazer &
+$ binpazer append log.binpazer --type 1 --data "disk at 91%"
+{"index":0,"type_id":1,"type_name":"Event","flags":["has_crc"],"offset":192,"payload_len":11,"payload_base64":"ZGlzayBhdCA5MSU="}
+$ binpazer append log.binpazer --end
+{"index":1,"type_id":65529,"type_name":"End","flags":["has_crc"],"offset":216,"payload_len":0,"payload_base64":""}
+```
+
+`follow --no-wait` prints what is committed now and exits. The other read commands also stop at the last committed block of an open file, and `info` and `validate` say where the unfinished bytes start.
+
+If a writer died in the middle of a block, `append` with no other flag seals that torn tail so the file reads cleanly again.
+
 ## In brief
 
 - Fixed file header: `magic` = `binpazer`, version, name of the writer GUID +, file length.
@@ -179,3 +220,4 @@ hello, file!
 - Strings are length-prefixed **and** null-terminated.
 - An optional **Block Index** plus a 16-byte footer let a reader seek straight to a block instead of walking it. Random access, which a `.tar.gz` has no way to offer.
 - Payloads may be **compressed per block** (1.1): a Compression Envelope names the codec, so one member decodes without touching the others. `length` still counts stored bytes, so older readers keep walking such files correctly, and a file that compresses nothing is byte-identical to a 1.0 file.
+- A file may be **appendable** (1.2): its length is unknown. A writer keeps adding blocks, and the CRC trailer of each block is its commit seal. A reader can follow the file while it grows and sees whole blocks only. An End block closes it.

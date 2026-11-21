@@ -191,12 +191,16 @@ jobs:
         run: |
           cc -std=c11 -Wall -Wextra -O1 -fsanitize=address,undefined -fno-sanitize-recover=all c/binpazer.c c/test.c -o /tmp/test_c_san
           /tmp/test_c_san
+          cc -std=c11 -Wall -Wextra -O1 -fsanitize=address,undefined -fno-sanitize-recover=all c/binpazer.c c/test_append.c -o /tmp/test_append_san
+          /tmp/test_append_san go/testdata
           cc -std=c11 -Wall -Wextra -O1 -fsanitize=address,undefined -fno-sanitize-recover=all c/binpazer.c c/binpazer_codec.c c/test_codec.c -o /tmp/test_codec_san -lz -lzstd -llz4
           /tmp/test_codec_san
       - name: C++ tests (ASan + UBSan)
         run: |
           c++ -std=c++17 -Wall -Wextra -O1 -fsanitize=address,undefined -fno-sanitize-recover=all -Ic cpp/test.cpp c/binpazer.c -o /tmp/test_cpp_san
           /tmp/test_cpp_san
+          c++ -std=c++17 -Wall -Wextra -O1 -fsanitize=address,undefined -fno-sanitize-recover=all -Ic cpp/test_append.cpp c/binpazer.c -o /tmp/test_cpp_append_san
+          /tmp/test_cpp_append_san
           c++ -std=c++17 -Wall -Wextra -O1 -fsanitize=address,undefined -fno-sanitize-recover=all -Ic cpp/test_codec.cpp c/binpazer.c c/binpazer_codec.c -o /tmp/test_cpp_codec_san -lz -lzstd -llz4
           /tmp/test_cpp_codec_san
       - name: Cross-impl fixtures are reproducible

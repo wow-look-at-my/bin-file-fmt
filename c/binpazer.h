@@ -30,6 +30,10 @@ extern "C" {
 #define BINPAZER_TYPE_WRITER_INFO      65532
 #define BINPAZER_TYPE_PADDING          65531
 #define BINPAZER_TYPE_GROUP            65530
+#define BINPAZER_TYPE_END              65529
+
+/* See SPEC.md "Appendable files". */
+#define BINPAZER_HEADER_FLAG_APPENDABLE 1u
 
 #define BINPAZER_LARGE_UNIT 4096
 
@@ -55,6 +59,9 @@ enum {
 /* Minor version a file must declare once it holds a compressed block. */
 #define BINPAZER_VERSION_MINOR_COMPRESSION 1
 
+/* Minor version an appendable file declares. */
+#define BINPAZER_VERSION_MINOR_APPENDABLE 2
+
 /* Codec ids from SPEC.md's registry. This library carries no codec code: it
  * reads and writes the envelope, and the caller supplies the codec bytes. That
  * is what keeps it dependency-free -- BINPAZER_CODEC_STORED needs no codec at
@@ -75,6 +82,7 @@ enum {
 typedef struct { uint8_t bytes[16]; } binpazer_guid;
 
 extern const binpazer_guid BINPAZER_GUID_BLOCK_TYPE_TABLE;
+extern const binpazer_guid BINPAZER_GUID_END;
 
 /*The opaque `ctx` is passed back to each callback. */
 typedef size_t (*binpazer_read_fn)(void *ctx, void *buf, size_t n);
@@ -84,6 +92,8 @@ typedef int    (*binpazer_seek_fn)(void *ctx, uint64_t offset);
 typedef enum {
     BINPAZER_OK        = 0,
     BINPAZER_END       = 1,   /* reader reached the last block */
+    BINPAZER_PENDING   = 2,   /* the next block of an appendable file is not committed. */
+    BINPAZER_TORN      = 3,   /* that block is all there, but its CRC seal is absent or wrong */
     BINPAZER_ERR_IO    = -1,  /* a callback failed */
     BINPAZER_ERR_MAGIC = -2,  /* bad magic or signature */
     BINPAZER_ERR_VERSION = -3,/* unsupported major version */
@@ -91,7 +101,9 @@ typedef enum {
     BINPAZER_ERR_RANGE  = -5, /* value out of range (e.g. large_mode misuse) */
     BINPAZER_ERR_CRC    = -6, /* CRC mismatch */
     BINPAZER_ERR_CAPACITY = -7, /* a caller-supplied buffer is too small */
-    BINPAZER_ERR_NOSEEK   = -8  /* operation requires a seek callback */
+    BINPAZER_ERR_NOSEEK   = -8, /* operation requires a seek callback */
+    BINPAZER_ERR_NOT_APPENDABLE = -9, /* the file does not set the appendable header flag */
+    BINPAZER_ERR_ENDED    = -10 /* the appendable file holds its End block */
 } binpazer_status;
 
 /* ---- Writing ---- */
@@ -106,6 +118,9 @@ typedef struct {
     int               wrote_index;
     int               used_compression; /* */
     uint16_t          version_minor;    /* as declared in the header at begin */
+    int               appendable;       /* every block is sealed; end writes the End block */
+    int               ended;            /* the End block is written */
+    uint64_t          sealed_tail;      /* stale bytes that binpazer_writer_resume covered with Padding */
 } binpazer_writer;
 
 /* One block-type-table entry supplied by the caller. */
@@ -134,6 +149,17 @@ binpazer_status binpazer_writer_begin_version(
     binpazer_write_fn write, binpazer_seek_fn seek, void *ctx,
     const binpazer_guid *writer_guid, const char *writer_name,
     const binpazer_type_def *defs, size_t ndefs, uint16_t version_minor);
+
+/* Starts an appendable file: one that grows block by block while readers
+ * follow it. Every block written after this gets BINPAZER_FLAG_HAS_CRC, the
+ * commit seal. binpazer_writer_end writes the End block, which closes the
+ * file for good. To stop and continue later, drop the writer and call
+ * binpazer_writer_resume. An appendable file carries no Block Index. */
+binpazer_status binpazer_writer_begin_append(
+    binpazer_writer *w,
+    binpazer_write_fn write, binpazer_seek_fn seek, void *ctx,
+    const binpazer_guid *writer_guid, const char *writer_name,
+    const binpazer_type_def *defs, size_t ndefs);
 
 /* Writes one block. */
 binpazer_status binpazer_writer_block(
@@ -190,8 +216,11 @@ typedef struct {
     binpazer_guid    writer_guid;
     uint64_t         file_length;        /* sentinel if unknown */
     uint64_t         first_block_offset;
+    uint32_t         header_flags;       /* BINPAZER_HEADER_FLAG_* */
+    int              ended;              /* the End block of an appendable file was read */
     int              has_index;          /* a Block Index was located via the footer */
     uint64_t         index_offset;       /* offset of the Block Index block */
+    uint64_t         table_end;          /* offset of the first block after the Block Type Table */
     uint64_t         blocks_end;         /* end of the block stream (excludes a trailing footer) */
 } binpazer_reader;
 
@@ -247,6 +276,34 @@ binpazer_status binpazer_reader_stream_payload(
     binpazer_reader *r, const binpazer_block *blk,
     void *scratch, size_t scratch_cap,
     binpazer_sink_fn sink, void *sink_ctx);
+
+/* ---- Appendable files: read while a writer appends, and resume ---- */
+
+/* Reads the next COMMITTED block header of an appendable file: a block whose
+ * bytes are all in the file and whose CRC seal verifies. On BINPAZER_OK the
+ * reader is positioned at the payload, as after binpazer_reader_next.
+ * BINPAZER_PENDING: no such block yet. BINPAZER_TORN: the bytes are all there
+ * but the seal is absent or wrong (an interrupted writer's tail, or damage).
+ * In both cases the reader has not moved: call again later. BINPAZER_END: the
+ * writer ended the file. None of these sets the sticky error. Needs a seek
+ * callback. The payload is read through `scratch` to check the seal,
+ * `scratch_cap` bytes at a time. */
+binpazer_status binpazer_reader_next_committed(
+    binpazer_reader *r,
+    const binpazer_type_entry *entries, size_t entries_count,
+    binpazer_block *blk, void *scratch, size_t scratch_cap);
+
+/* Continues an appendable file an earlier writer left open. Reads the header
+ * and the Block Type Table (into `entries`, as binpazer_reader_begin does),
+ * walks to the end of the committed blocks. It writes sealed Padding blocks
+ * over any torn tail. Afterwards `w` appends like a writer from
+ * binpazer_writer_begin_append. All callbacks are required and share `ctx`.
+ * BINPAZER_ERR_ENDED: the file holds its End block. */
+binpazer_status binpazer_writer_resume(
+    binpazer_writer *w,
+    binpazer_read_fn read, binpazer_write_fn write, binpazer_seek_fn seek, void *ctx,
+    binpazer_type_entry *entries, size_t entries_cap, size_t *entries_count,
+    void *scratch, size_t scratch_cap);
 
 /* ---- Group blocks (nesting, predefined a later type) ---- */
 

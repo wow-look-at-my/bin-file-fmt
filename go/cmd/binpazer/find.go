@@ -53,7 +53,7 @@ func runFind(br *binpazer.Reader, typeID uint16) (*findResult, error) {
 		return res, nil
 	}
 	for {
-		b, err := br.Next()
+		b, err := walkNext(br)
 		if err == io.EOF {
 			return res, nil
 		}

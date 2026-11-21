@@ -28,7 +28,14 @@ const (
 	TypeWriterInfo     = 65532
 	TypePadding        = 65531
 	TypeGroup          = 65530
+	TypeEnd            = 65529
 )
+
+// HeaderFlagAppendable is the header flag that marks an appendable file.
+const HeaderFlagAppendable uint32 = 1 << 0
+
+// VersionMinorAppendable is the minor version an appendable file declares.
+const VersionMinorAppendable = 2
 
 // Block flag bits.
 const (
@@ -55,6 +62,7 @@ var (
 	WriterInfoGUID     = GUID{0x62, 0x69, 0x6e, 0x70, 0x61, 0x7a, 0x65, 0x72, 0, 0, 0, 0, 0, 0, 0, 3}
 	PaddingGUID        = GUID{0x62, 0x69, 0x6e, 0x70, 0x61, 0x7a, 0x65, 0x72, 0, 0, 0, 0, 0, 0, 0, 4}
 	GroupGUID          = GUID{0x62, 0x69, 0x6e, 0x70, 0x61, 0x7a, 0x65, 0x72, 0, 0, 0, 0, 0, 0, 0, 5}
+	EndGUID            = GUID{0x62, 0x69, 0x6e, 0x70, 0x61, 0x7a, 0x65, 0x72, 0, 0, 0, 0, 0, 0, 0, 6}
 )
 
 var crcTable = crc32.MakeTable(crc32.Castagnoli)
