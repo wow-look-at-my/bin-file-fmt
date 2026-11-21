@@ -56,6 +56,9 @@ func (br *Reader) find(typeID uint16) ([]uint64, error) {
 	if err := br.seekTo(br.FirstBlockOffset); err != nil {
 		return nil, err
 	}
+	if br.Appendable() {
+		return br.findCommitted(typeID)
+	}
 	for br.blocksEnd == FileLengthUnknown || br.off < br.blocksEnd {
 		blkOff := br.off
 		bh := make([]byte, 8)
@@ -86,6 +89,29 @@ func (br *Reader) find(typeID uint16) ([]uint64, error) {
 		}
 	}
 	return offsets, nil
+}
+
+// findCommitted walks an appendable file from the current offset and stops where the committed blocks stop.
+func (br *Reader) findCommitted(typeID uint16) ([]uint64, error) {
+	ended := br.ended
+	defer func() { br.ended = ended }() // the walk must not change what the caller's position has seen
+	br.ended = false
+	var offsets []uint64
+	for {
+		b, err := br.NextCommitted()
+		if err == io.EOF || errors.Is(err, ErrPending) {
+			return offsets, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		if b.TypeID == typeID {
+			offsets = append(offsets, b.Offset())
+		}
+		if err := br.SkipPayload(b); err != nil {
+			return nil, err
+		}
+	}
 }
 
 // At seeks to a block (e.g. an offset from Find) and reads its header,

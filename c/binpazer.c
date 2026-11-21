@@ -835,12 +835,19 @@ binpazer_status binpazer_reader_find(
             /* No index -- walk the file. */
             if (r->seek(r->ctx, r->first_block_offset) != 0) { st = BINPAZER_ERR_IO; break; }
             r->offset = r->first_block_offset;
+            int appendable = (r->header_flags & BINPAZER_HEADER_FLAG_APPENDABLE) != 0;
             while (r->blocks_end == BINPAZER_FILE_LENGTH_UNKNOWN || r->offset < r->blocks_end) {
                 uint64_t blk_off = r->offset;
                 uint8_t bh[8];
-                size_t got = r->read(r->ctx, bh, 8);
-                if (got == 0) break;
-                if (got != 8) { st = BINPAZER_ERR_IO; break; }
+                if (appendable) {
+                    /* Only committed blocks of an appendable file are found; the walk stops where they stop. */
+                    uint8_t tmp[512];
+                    if (r_verify_committed(r, bh, tmp, sizeof tmp) != BINPAZER_OK) break;
+                } else {
+                    size_t got = r->read(r->ctx, bh, 8);
+                    if (got == 0) break;
+                    if (got != 8) { st = BINPAZER_ERR_IO; break; }
+                }
                 r->offset += 8;
                 uint16_t tid = get_u16(bh);
                 uint16_t flags = get_u16(bh + 2);
