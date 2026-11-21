@@ -56,12 +56,20 @@ func ResumeAppendWriter(rw io.ReadWriteSeeker) (*Writer, []TypeEntry, error) {
 	}
 	if size := uint64(br.InputSize()); size > end {
 		bw.sealedTail = size - end
+<<<<<<< HEAD
 		bw.padOver(bw.sealedTail)
+=======
+		bw.padOver(size - end)
+>>>>>>> 404b33e2236dc7d05cc5f276d4807fdec92d0cec
 	}
 	return bw, br.Types, bw.err
 }
 
+<<<<<<< HEAD
 // SealedTail reports how many stale bytes ResumeAppendWriter covered with Padding blocks.
+=======
+// SealedTail is how many stale bytes of a torn tail ResumeAppendWriter sealed inside Padding blocks.
+>>>>>>> 404b33e2236dc7d05cc5f276d4807fdec92d0cec
 func (bw *Writer) SealedTail() uint64 { return bw.sealedTail }
 
 // padOver writes sealed Padding blocks over the next n bytes of the destination.
