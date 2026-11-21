@@ -212,17 +212,17 @@ export class Reader {
 		const start = this.cursor;
 		this.size = this.io(() => sizeFn.call(this.src));
 		this.seekTo(start);
-		const b = this.verifyCommitted(start);
-		if (b === null) {
+		const h = this.verifyCommitted(start);
+		if (h === null) {
 			this.seekTo(start);
 			return "pending";
 		}
-		this.seekTo(b.payloadOffset);
-		return this.noteEnd(b);
+		this.seekTo(start + 8);
+		return this.noteEnd(this.parseHeader(h, start));
 	}
 
-	// verifyCommitted checks the seal of the block at start and returns null when it is not committed.
-	private verifyCommitted(start: number): Block | null {
+	// verifyCommitted checks the seal of the block at start and returns its header, or null when it is not committed.
+	private verifyCommitted(start: number): Uint8Array | null {
 		this.lastTorn = false;
 		if (this.size < start + 8) {
 			return null;
@@ -256,7 +256,7 @@ export class Reader {
 			this.lastTorn = true;
 			return null;
 		}
-		return this.parseHeader(h, start);
+		return h;
 	}
 
 	private noteEnd(b: Block): Block {

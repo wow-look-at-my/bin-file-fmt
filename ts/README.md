@@ -31,6 +31,25 @@ for (let b = r.next(); b !== null; b = r.next()) {
 
 Errors are `BinpazerError` instances. Switch on `err.code`.
 
+## Appendable files
+
+An appendable file (spec 1.2) grows block by block while readers follow it. `nextCommitted()` returns a block only once it is whole and its CRC seal verifies. It returns `"pending"` without moving the reader while a block is still on its way, and `null` after the End block.
+
+```ts
+import { MemoryFile, Reader, Writer, resumeAppendWriter } from "./src/index.ts";
+
+const file = new MemoryFile();
+const w = new Writer(file, writerGuid, "logger", types, { appendable: true });
+w.block(1, 0, record); // sealed and flushed before it returns
+
+const r = new Reader(file.view());
+const b = r.nextCommitted(); // a Block, "pending", or null
+if (b !== null && b !== "pending") console.log(r.readPayload(b));
+
+const { writer } = resumeAppendWriter(file); // a later process continues the file
+writer.end();
+```
+
 ## Build and test
 
 ```sh

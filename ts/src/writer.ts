@@ -411,6 +411,7 @@ export function resumeAppendWriter(file: Source & Sink, opts?: ReaderOptions): R
 	if (seek === undefined || size === undefined) {
 		throw new BinpazerError("noseek", "resume needs a file that can seek and report its size");
 	}
+	seek.call(file, 0);
 	const r = new Reader(file, opts);
 	for (;;) {
 		const b = r.nextCommitted();
