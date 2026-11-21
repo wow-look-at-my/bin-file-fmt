@@ -34,7 +34,8 @@ function main(argv: string[]): number {
 	if (!opts.keep) bench.removeMade();
 	removeEmptyWorkDir();
 
-	const builds = [...new Set(["make -C bench", ...opts.impls.map((i) => BUILD_COMMANDS[i])])];
+	const profBuild = opts.profile && (opts.impls.includes("c") || opts.impls.includes("cpp")) ? ["make -C bench prof"] : [];
+	const builds = [...new Set(["make -C bench", ...profBuild, ...opts.impls.map((i) => BUILD_COMMANDS[i])])];
 	const commands = [...builds, describeArgv(["node", "bench/run.ts", ...argv])];
 	writeFileAtomic(opts.jsonPath, JSON.stringify(results, null, "\t") + "\n");
 	writeFileAtomic(opts.reportPath, renderReport({ results, impls: opts.impls, reference: referenceImpl(opts.impls), commands }));

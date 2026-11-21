@@ -164,7 +164,7 @@ export class Bench {
 				const h = sha256File(fileOf(impl));
 				if (h !== baseHash) throw new Error(`[${w.name}] written files differ (codec ${w.codec} must be byte-identical): ${fileOf(base)} sha256 ${baseHash}, ${fileOf(impl)} sha256 ${h}`);
 			}
-			return;
+			return null;
 		}
 		let first: { writer: Impl; reader: Impl; line: string } | null = null;
 		for (const writer of impls) {
@@ -183,10 +183,11 @@ export class Bench {
 			}
 		}
 		process.stderr.write(`[${w.name}] cross-read: ${impls.length * impls.length} reader/writer pairs agree\n`);
+		return first!.line;
 	}
 
 	removeMade(): void {
-		for (const f of this.made) fs.rmSync(f, { force: true });
+		for (const f of this.made) fs.rmSync(f, { recursive: true, force: true });
 		this.made.clear();
 	}
 
@@ -194,6 +195,6 @@ export class Bench {
 		checkPrograms(this.opts);
 		const environment = collectEnvironment(this.opts.impls.includes("go") ? this.opts.bins.go : null);
 		const workloads = this.opts.workloads.map((w) => this.runWorkload(w));
-		return { mode: this.opts.quick ? "quick" : "full", repeats: this.opts.repeats, environment, workloads, profiles: [] };
+		return { mode: this.opts.quick ? "quick" : "full", repeats: this.opts.repeats, environment, workloads, profiles: [...this.profiles] };
 	}
 }
