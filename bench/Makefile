@@ -11,8 +11,12 @@ CODEC_LIBS ?= -lz -lzstd -llz4
 LIB_SRC = ../c/binpazer.c ../c/binpazer_codec.c
 LIB_HDR = ../c/binpazer.h ../c/binpazer_codec.h
 
-.PHONY: all clean
+.PHONY: all clean prof
 all: $(BUILD)/bench_c $(BUILD)/bench_cpp $(BUILD)/measure
+
+# gprof builds; a static link puts libc and the codec libraries in the sampled histogram.
+prof:
+	$(MAKE) BUILD=build-prof EXTRA_CFLAGS=-pg EXTRA_LDFLAGS="-pg -static" build-prof/bench_c build-prof/bench_cpp
 
 $(BUILD):
 	mkdir -p $@
