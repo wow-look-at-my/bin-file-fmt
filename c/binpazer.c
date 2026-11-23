@@ -312,51 +312,157 @@ static const uint32_t crc_table[8][256] = {
     },
 };
 
-/* The CPU's own CRC-32C instruction, where the compiler and the target have one.
- * crc_hw takes and returns the inverted CRC. crc_hw_ok asks the running CPU.
- * BINPAZER_NO_HW_CRC builds the table code alone, so a test can run it. */
-#if !defined(BINPAZER_NO_HW_CRC) && (defined(__GNUC__) || defined(__clang__)) && defined(__x86_64__)
-#include <nmmintrin.h>
+/* Hardware CRC-32C, in tiers. Each tier is faster than the one before it:
+ *   - a single stream through the CPU's CRC instruction (crc_one);
+ *   - several streams at once, joined with a carry-less multiply (crc_three);
+ *   - wide carry-less folding, on a CPU with AVX-512 and VPCLMULQDQ (crc_wide).
+ * binpazer_crc32c asks the running CPU and takes the highest tier it has.
+ * BINPAZER_CRC_TIER caps the tier at build time. Zero builds the tables alone. A test can so run each tier.
+ * Every function here takes and returns the inverted CRC.
+ * c/tools/crc32c_constants.mjs derives the multiply constants and checks them. */
+#ifndef BINPAZER_CRC_TIER
+#define BINPAZER_CRC_TIER 3
+#endif
+
+#if BINPAZER_CRC_TIER > 0 && (defined(__GNUC__) || defined(__clang__)) && defined(__x86_64__)
+#include <immintrin.h>
 #define BINPAZER_HW_CRC 1
-__attribute__((target("sse4.2")))
-static uint32_t crc_hw(uint32_t crc, const uint8_t *p, size_t n) {
-    uint64_t c = crc;
-    while (n >= 8) {
-        uint64_t v;
-        memcpy(&v, p, 8);
-        c = _mm_crc32_u64(c, v);
-        p += 8;
-        n -= 8;
-    }
-    while (n--) c = _mm_crc32_u8((uint32_t)c, *p++);
-    return (uint32_t)c;
+#define CRC_ONE   __attribute__((target("sse4.2")))
+#define CRC_THREE __attribute__((target("sse4.2,pclmul")))
+#define CRC_WIDE  __attribute__((target("sse4.2,pclmul,avx512f,avx512vl,vpclmulqdq")))
+#define CRC_U64(c, v) _mm_crc32_u64((c), (v))
+#define CRC_U8(c, b)  _mm_crc32_u8((uint32_t)(c), (b))
+/* The low half of the carry-less (a * ka) ^ (b * kb). */
+CRC_THREE static inline uint64_t crc_mul2(uint64_t a, uint32_t ka, uint64_t b, uint32_t kb) {
+    __m128i x = _mm_clmulepi64_si128(_mm_cvtsi64_si128((long long)a), _mm_cvtsi32_si128((int)ka), 0);
+    __m128i y = _mm_clmulepi64_si128(_mm_cvtsi64_si128((long long)b), _mm_cvtsi32_si128((int)kb), 0);
+    return (uint64_t)_mm_cvtsi128_si64(_mm_xor_si128(x, y));
 }
-static int crc_hw_ok(void) { return __builtin_cpu_supports("sse4.2"); }
-#elif !defined(BINPAZER_NO_HW_CRC) && (defined(__GNUC__) || defined(__clang__)) && defined(__aarch64__) && \
+static int crc_tier(void) {
+    if (!__builtin_cpu_supports("sse4.2")) return 0;
+    if (BINPAZER_CRC_TIER < 2 || !__builtin_cpu_supports("pclmul")) return 1;
+    if (BINPAZER_CRC_TIER >= 3 && __builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512vl") &&
+        __builtin_cpu_supports("vpclmulqdq"))
+        return 3;
+    return 2;
+}
+#elif BINPAZER_CRC_TIER > 0 && (defined(__GNUC__) || defined(__clang__)) && defined(__aarch64__) && \
     defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__ && (defined(__APPLE__) || defined(__linux__))
 #include <arm_acle.h>
+#include <arm_neon.h>
 #if defined(__linux__)
 #include <asm/hwcap.h>
 #include <sys/auxv.h>
 #endif
 #define BINPAZER_HW_CRC 1
-__attribute__((target("+crc")))
-static uint32_t crc_hw(uint32_t crc, const uint8_t *p, size_t n) {
+#if defined(__clang__)
+#define CRC_ONE   __attribute__((target("crc")))
+#define CRC_THREE __attribute__((target("crc,aes")))
+#else
+#define CRC_ONE   __attribute__((target("+crc")))
+#define CRC_THREE __attribute__((target("+crc+aes")))
+#endif
+#define CRC_U64(c, v) ((uint64_t)__crc32cd((uint32_t)(c), (v)))
+#define CRC_U8(c, b)  ((uint64_t)__crc32cb((uint32_t)(c), (b)))
+CRC_THREE static inline uint64_t crc_mul2(uint64_t a, uint32_t ka, uint64_t b, uint32_t kb) {
+    uint64_t x = vgetq_lane_u64(vreinterpretq_u64_p128(vmull_p64((poly64_t)a, (poly64_t)ka)), 0);
+    uint64_t y = vgetq_lane_u64(vreinterpretq_u64_p128(vmull_p64((poly64_t)b, (poly64_t)kb)), 0);
+    return x ^ y;
+}
+#if defined(__APPLE__)
+/* Every Apple arm64 CPU has the CRC and the polynomial multiply extensions. */
+static int crc_tier(void) { return BINPAZER_CRC_TIER < 2 ? 1 : 2; }
+#else
+static int crc_tier(void) {
+    unsigned long caps = getauxval(AT_HWCAP);
+    if (!(caps & HWCAP_CRC32)) return 0;
+    return (BINPAZER_CRC_TIER < 2 || !(caps & HWCAP_PMULL)) ? 1 : 2;
+}
+#endif
+#endif
+
+#ifdef BINPAZER_HW_CRC
+static inline uint64_t crc_load(const uint8_t *p) {
+    uint64_t v;
+    memcpy(&v, p, 8);
+    return v;
+}
+
+CRC_ONE static uint32_t crc_one(uint32_t crc, const uint8_t *p, size_t n) {
+    uint64_t c = crc;
     while (n >= 8) {
-        uint64_t v;
-        memcpy(&v, p, 8);
-        crc = __crc32cd(crc, v);
+        c = CRC_U64(c, crc_load(p));
         p += 8;
         n -= 8;
     }
-    while (n--) crc = __crc32cb(crc, *p++);
-    return crc;
+    while (n--) c = CRC_U8(c, *p++);
+    return (uint32_t)c;
 }
-#if defined(__APPLE__)
-/* Every Apple arm64 CPU has the CRC extension. */
-static int crc_hw_ok(void) { return 1; }
-#else
-static int crc_hw_ok(void) { return (getauxval(AT_HWCAP) & HWCAP_CRC32) != 0; }
+
+/* One CRC instruction waits for the one before it, so independent streams run in the time of one.
+ * Returns the CRC of the len-byte streams at p, read together. k2 moves the first stream to the end,
+ * and k1 moves the middle stream there. */
+CRC_THREE static inline uint32_t crc_three_block(uint32_t crc, const uint8_t *p, size_t len, uint32_t k2, uint32_t k1) {
+    uint64_t a = crc, b = 0, c = 0;
+    for (size_t i = 0; i + 8 < len; i += 8) {
+        a = CRC_U64(a, crc_load(p + i));
+        b = CRC_U64(b, crc_load(p + len + i));
+        c = CRC_U64(c, crc_load(p + 2 * len + i));
+    }
+    a = CRC_U64(a, crc_load(p + len - 8));
+    b = CRC_U64(b, crc_load(p + 2 * len - 8));
+    /* The moved a and b go into the last word of the third stream, and its CRC step finishes the multiply. */
+    return (uint32_t)CRC_U64(c, crc_load(p + 3 * len - 8) ^ crc_mul2(a, k2, b, k1));
+}
+
+#define CRC_LONG  2048
+#define CRC_SHORT 128
+
+CRC_THREE static uint32_t crc_three(uint32_t crc, const uint8_t *p, size_t n) {
+    while (n >= 3 * CRC_LONG) {
+        crc = crc_three_block(crc, p, CRC_LONG, 0x82f89c77u, 0xa51b6135u);
+        p += 3 * CRC_LONG;
+        n -= 3 * CRC_LONG;
+    }
+    while (n >= 3 * CRC_SHORT) {
+        crc = crc_three_block(crc, p, CRC_SHORT, 0xb9e02b86u, 0x0d3b6092u);
+        p += 3 * CRC_SHORT;
+        n -= 3 * CRC_SHORT;
+    }
+    return crc_one(crc, p, n);
+}
+
+#ifdef CRC_WIDE
+#define CRC_WIDE_STEP 256
+/* The accumulators hold a message of CRC_WIDE_STEP bytes that has the CRC of every byte read so far.
+ * A step multiplies each lane forward by CRC_WIDE_STEP bytes and adds the next input.
+ * n must be at least CRC_WIDE_STEP. */
+CRC_WIDE static uint32_t crc_wide(uint32_t crc, const uint8_t *p, size_t n) {
+    const __m512i k = _mm512_broadcast_i32x4(_mm_set_epi64x(0xb9e02b86, 0xdcb17aa4));
+    __m512i a0 = _mm512_xor_si512(_mm512_loadu_si512(p), _mm512_zextsi128_si512(_mm_cvtsi32_si128((int)crc)));
+    __m512i a1 = _mm512_loadu_si512(p + 64);
+    __m512i a2 = _mm512_loadu_si512(p + 128);
+    __m512i a3 = _mm512_loadu_si512(p + 192);
+    uint8_t rest[CRC_WIDE_STEP];
+    p += CRC_WIDE_STEP;
+    n -= CRC_WIDE_STEP;
+#define CRC_FOLD(a, at) \
+    _mm512_ternarylogic_epi64(_mm512_clmulepi64_epi128((a), k, 0x00), _mm512_clmulepi64_epi128((a), k, 0x11), _mm512_loadu_si512(at), 0x96)
+    while (n >= CRC_WIDE_STEP) {
+        a0 = CRC_FOLD(a0, p);
+        a1 = CRC_FOLD(a1, p + 64);
+        a2 = CRC_FOLD(a2, p + 128);
+        a3 = CRC_FOLD(a3, p + 192);
+        p += CRC_WIDE_STEP;
+        n -= CRC_WIDE_STEP;
+    }
+#undef CRC_FOLD
+    _mm512_storeu_si512(rest, a0);
+    _mm512_storeu_si512(rest + 64, a1);
+    _mm512_storeu_si512(rest + 128, a2);
+    _mm512_storeu_si512(rest + 192, a3);
+    return crc_three(crc_three(0, rest, sizeof rest), p, n);
+}
 #endif
 #endif
 
@@ -364,7 +470,14 @@ uint32_t binpazer_crc32c(uint32_t crc, const void *data, size_t n) {
     const uint8_t *p = (const uint8_t *)data;
     crc = ~crc;
 #ifdef BINPAZER_HW_CRC
-    if (crc_hw_ok()) return ~crc_hw(crc, p, n);
+    {
+        int tier = crc_tier();
+#ifdef CRC_WIDE
+        if (tier >= 3 && n >= 2 * CRC_WIDE_STEP) return ~crc_wide(crc, p, n);
+#endif
+        if (tier >= 2 && n >= 3 * CRC_SHORT) return ~crc_three(crc, p, n);
+        if (tier >= 1) return ~crc_one(crc, p, n);
+    }
 #endif
     /* Bytes are combined by value, not by a word load, so the result does not depend on host byte order. */
     while (n >= 8) {

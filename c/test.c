@@ -293,6 +293,25 @@ static void test_crc32c(void) {
         if (binpazer_crc32c(c, buf + cut, sizeof buf - cut) != whole) chained = 0;
     }
     CHECK(chained, "crc: chained calls match one call at every split");
+
+    /* Lengths around every boundary where the hardware paths change how they split the input. */
+    static uint8_t big[40000];
+    for (size_t i = 0; i < sizeof big; i++) {
+        x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+        big[i] = (uint8_t)x;
+    }
+    static const size_t edges[] = { 384, 512, 768, 1024, 4096, 6144, 6528, 8192, 12288, 18432, 32768 };
+    int long_same = 1;
+    for (size_t e = 0; e < sizeof edges / sizeof edges[0]; e++)
+        for (size_t len = edges[e] - 20; len <= edges[e] + 20; len++)
+            for (size_t start = 0; start < 3; start++) {
+                uint32_t seed = (uint32_t)(len * 2654435761u + start);
+                if (binpazer_crc32c(seed, big + start, len) != crc32c_bitwise(seed, big + start, len)) long_same = 0;
+            }
+    for (size_t len = 0; len <= 2200; len++)
+        if (binpazer_crc32c(0, big + 5, len) != crc32c_bitwise(0, big + 5, len)) long_same = 0;
+    CHECK(long_same, "crc: long inputs match the bitwise definition around every split boundary");
+    CHECK(binpazer_crc32c(7, big + 1, sizeof big - 1) == crc32c_bitwise(7, big + 1, sizeof big - 1), "crc: a 40 KB input");
 }
 
 static void test_group_parse(void) {
