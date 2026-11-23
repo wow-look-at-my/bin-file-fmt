@@ -2,7 +2,7 @@
 
 A Python implementation of the binpazer block-container format (see [SPEC.md](../SPEC.md)). It writes files byte-identical to the C reference for uncompressed and `stored` blocks, and it decodes every codec in the registry.
 
-It needs Python 3.10 or newer and no package from PyPI. License: MIT, like the rest of the repository.
+It needs Python 3.10 or newer, a C compiler for the first import, and no package from PyPI. License: MIT, like the rest of the repository.
 
 ## Modules
 
@@ -54,7 +54,15 @@ writer.end()
 
 ## Speed
 
-CRC-32C is pure Python, because the standard library has no CRC-32C. It is the cost of every block with `has_crc`, and of every block of an appendable file. [`bench/RESULTS.md`](../bench/RESULTS.md) has the numbers next to the other implementations.
+CRC-32C is native code. The standard library has no CRC-32C. The package calls the C reference's `binpazer_crc32c` through `ctypes`. It comes from a small shared library that is built from `c/binpazer.c`:
+
+```sh
+make -C py native
+```
+
+An import builds the library too when it is absent or older than its source. A C compiler (`cc`, or the one `CC` names) must be there the first time. Without one, the import fails and names the command to run. There is no slow fallback.
+
+[`bench/RESULTS.md`](../bench/RESULTS.md) has the numbers next to the other implementations.
 
 ## Test
 

@@ -188,6 +188,45 @@ class Roundtrip(unittest.TestCase):
 			self.assertEqual(s.code_of(self, lambda: bp.parse_guid(bad)), "format")
 		self.assertEqual(s.code_of(self, lambda: bp.format_guid(b"abc")), "range")
 
+	def test_an_import_builds_the_native_library_when_it_is_absent(self):
+		import os
+		import subprocess
+		import sys
+
+		from binpazer import _native
+
+		py_root = str(s.REPO_ROOT / "py")
+		probe = "import binpazer; print(binpazer.crc32c(0, b'123456789'))"
+		_native.LIBRARY.unlink()
+		try:
+			out = subprocess.run([sys.executable, "-c", probe], cwd=py_root, capture_output=True, text=True, check=True)
+			self.assertEqual(out.stdout.strip(), str(0xE3069283))
+			self.assertTrue(_native.LIBRARY.exists())
+
+			_native.LIBRARY.unlink()
+			env = {**os.environ, "CC": "/nonexistent/cc"}
+			failed = subprocess.run([sys.executable, "-c", probe], cwd=py_root, capture_output=True, text=True, env=env)
+			self.assertNotEqual(failed.returncode, 0)
+			self.assertIn("cannot build", failed.stderr)
+			self.assertIn("/nonexistent/cc -std=c11 -O2 -shared -fPIC", failed.stderr, "the error names the command to run")
+		finally:
+			if not _native.LIBRARY.exists():
+				_native._build()
+
+	def test_crc32c_takes_every_buffer_kind(self):
+		data = s.pattern(1000, 3)
+		want = bp.crc32c(0, data)
+		buf = bytearray(data)
+		for form in (buf, memoryview(buf), memoryview(data), memoryview(buf)[10:], bytearray()):
+			if len(form) == 990:
+				self.assertEqual(bp.crc32c(bp.crc32c(0, data[:10]), form), want)
+			elif len(form):
+				self.assertEqual(bp.crc32c(0, form), want)
+			else:
+				self.assertEqual(bp.crc32c(7, form), 7)
+		self.assertEqual(buf, data, "the buffer is free again after the call")
+		buf.append(1)
+
 	def test_crc32c_matches_the_standard_check_values(self):
 		self.assertEqual(bp.crc32c(0, b"123456789"), 0xE3069283)
 		self.assertEqual(bp.crc32c(0, b""), 0)
