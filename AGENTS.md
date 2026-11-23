@@ -84,7 +84,19 @@ Its deflate and zstd go through `node:zlib`, which allocates the codec output be
 
 ## CRC-32C in the C core
 
-`binpazer_crc32c` uses the CPU's CRC instruction on x86-64 (SSE4.2) and on little-endian arm64 (Linux and Apple), with GCC or Clang. It asks the running CPU first, and every other target runs the slicing tables. `-DBINPAZER_NO_HW_CRC` builds the tables alone. `make -C c test` runs the core tests both ways (`test_c` and `test_c_table`), so neither path goes untested. C++ and Python get the same function.
+`binpazer_crc32c` asks the running CPU and takes the fastest path it has, with GCC or Clang:
+
+| Tier | Path | Needs |
+|---|---|---|
+| 0 | slicing tables | nothing: every other target and compiler |
+| 1 | one stream through the CRC instruction | x86-64 SSE4.2, or arm64 CRC |
+| 2 | three streams, joined with a carry-less multiply | x86-64 PCLMULQDQ, or arm64 PMULL |
+| 3 | carry-less folding, 256 bytes per step | x86-64 AVX-512F, AVX-512VL and VPCLMULQDQ |
+
+- `-DBINPAZER_CRC_TIER=<n>` caps the tier at build time. `make -C c test` runs the core tests at every tier, so no path goes untested on a CPU that has a better one.
+- `c/tools/crc32c_constants.mjs` derives the multiply constants and checks each one. `c/tools/crc_speed.c` prints the throughput per buffer size.
+- The wide path must clear the upper vector state before it calls the SSE-encoded code. Without `_mm256_zeroupper()` a 4 KiB input ran a few times slower.
+- C++ and Python call the same function, so they get every tier.
 
 ## IO-injection seam (deliberate -- do not add mmap)
 
