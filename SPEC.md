@@ -341,7 +341,9 @@ An optional fixed 16-byte footer at the very end points to the [Block Index](#bl
 | -16 | 8 | `index_block_offset` | u64 |
 | -8 | 8 | `footer_magic` | char[8] = `rezapnib` |
 
-A streaming writer writes the footer too. A file can carry one while `file_length` is the streaming sentinel. A reader then finds the footer by its place at the end of the input. A seekable reader checks the last several bytes of the input. A reader that cannot seek checks at each block boundary. When several bytes remain before the end of the input, it reads them as a footer and ends the walk. The check:
+A streaming writer writes the footer too. A file can carry one while `file_length` is the streaming sentinel. A reader then finds the footer by its place at the end of the input. A seekable reader checks the last several bytes of the input. A reader that cannot seek checks at each block boundary. When several bytes remain before the end of the input, it reads them as a footer and ends the walk.
+
+The check:
 
 ```
 at  = offset of the 16 bytes (input_size - 16, or the block boundary with exactly 16 bytes left)
