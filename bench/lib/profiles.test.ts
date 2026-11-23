@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { cleanName, parseCpuProfile, parseGprofFlat, parseSelfTimesJson, profileOps, shortGoName, summarizeProfile } from "./profiles.ts";
+import { cleanName, parseCpuProfile, parseGprofFlat, parseSelfTimesJson, profileOps, profileWorkload, shortGoName, summarizeProfile } from "./profiles.ts";
 import { addSelfTimes } from "./profrun.ts";
 import { WORKLOADS } from "./workloads.ts";
 
@@ -94,6 +94,9 @@ test("profiled pairs per workload", () => {
 	assert.deepEqual(profileOps(byName("lz4")), ["write", "read"]);
 	assert.deepEqual(profileOps(byName("zstd")), []);
 	for (const w of WORKLOADS) for (const op of profileOps(w)) assert.ok(w.ops.includes(op), `${w.name} times ${op}`);
+	assert.equal(profileWorkload(byName("lz4")).blocks, byName("lz4").blocks * 8, "a fast workload runs longer under the sampler");
+	assert.equal(profileWorkload(byName("medium")).blocks, byName("medium").blocks);
+	assert.deepEqual(profileWorkload(byName("lz4")).ops, byName("lz4").ops);
 });
 
 test("self times of repeated runs sum per function", () => {
