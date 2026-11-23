@@ -98,6 +98,20 @@ Its deflate and zstd go through `node:zlib`, which allocates the codec output be
 - The wide path must clear the upper vector state before it calls the SSE-encoded code. Without `_mm256_zeroupper()` a 4 KiB input ran a few times slower.
 - C++ and Python call the same function, so they get every tier.
 
+Measured with `c/tools/crc_speed.c` on a Xeon with AVX-512 and VPCLMULQDQ, in GiB/s. The XXH3 column is xxHash 0.8.2 built with `-O3 -march=native`, for scale: a different hash is not a faster one here.
+
+| Buffer | Tier 0 | Tier 1 | Tier 2 | Tier 3 | XXH3 |
+|---|---:|---:|---:|---:|---:|
+| 1 KiB | 1.92 | 7.03 | 13.12 | 23.91 | 26.44 |
+| 4 KiB | 1.95 | 7.15 | 16.42 | 62.19 | 39.51 |
+| 64 KiB | 1.93 | 7.34 | 21.75 | 63.29 | 51.28 |
+| 1 MiB | 1.94 | 7.30 | 21.77 | 64.11 | 50.47 |
+| 8 MiB | 1.92 | 7.04 | 19.09 | 25.17 | 24.91 |
+
+- The 8 MiB row is the memory, not the hash: XXH3 stops at the same rate.
+- Tier keeps multiple accumulators. Eight measured no faster on this CPU, so the multiplier is the limit.
+- The arm64 paths pass the tests under QEMU. Nobody timed them on real hardware yet.
+
 ## IO-injection seam (deliberate -- do not add mmap)
 
 The libraries do **no file IO and no mmap**. The caller injects IO. C/C++ take `read`/`write` (+ optional `seek`) callbacks. Go takes `io.Reader`/`io.Writer` and *sniffs* `io.Seeker` on both sides. The Reader uses it for the input-size probe, seek-based skipping, and footer/Block Index jumps. The Writer uses it to back-patch `file_length` (non-seekable output keeps the streaming sentinel).

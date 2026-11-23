@@ -439,22 +439,11 @@ CRC_THREE static uint32_t crc_three(uint32_t crc, const uint8_t *p, size_t n) {
 }
 
 #ifdef CRC_WIDE
-/* CRC_WIDE_ACC is the count of accumulators. More of them hide the latency of the multiply, up to the count the CPU runs at once. */
-#ifndef CRC_WIDE_ACC
-#define CRC_WIDE_ACC 4
-#endif
-#define CRC_WIDE_STEP (64 * CRC_WIDE_ACC)
-#if CRC_WIDE_ACC == 4
+/* The loop keeps one accumulator per lane of CRC_LANES. A loop with twice as many measured no faster: the multiplier is already busy every cycle. */
+#define CRC_LANES(X) X(0) X(1) X(2) X(3)
+#define CRC_WIDE_STEP 256
 #define CRC_WIDE_K_LO 0xdcb17aa4
 #define CRC_WIDE_K_HI 0xb9e02b86
-#define CRC_LANES(X) X(0) X(1) X(2) X(3)
-#elif CRC_WIDE_ACC == 8
-#define CRC_WIDE_K_LO 0xbd6f81f8
-#define CRC_WIDE_K_HI 0xdd7e3b0c
-#define CRC_LANES(X) X(0) X(1) X(2) X(3) X(4) X(5) X(6) X(7)
-#else
-#error "CRC_WIDE_ACC must be 4 or 8"
-#endif
 /* The accumulators hold a message of CRC_WIDE_STEP bytes that has the CRC of every byte read so far.
  * A step multiplies each lane forward by CRC_WIDE_STEP bytes and adds the next input.
  * n must be at least CRC_WIDE_STEP. */
