@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { cleanName, parseCpuProfile, parseGprofFlat, profileOps, shortGoName, summarizeProfile } from "./profiles.ts";
+import { cleanName, parseCpuProfile, parseGprofFlat, parseSelfTimesJson, profileOps, shortGoName, summarizeProfile } from "./profiles.ts";
 import { addSelfTimes } from "./profrun.ts";
 import { WORKLOADS } from "./workloads.ts";
 
@@ -76,6 +76,15 @@ test("cpuprofile self time per function name, dropping idle and root", () => {
 	assert.throws(() => parseCpuProfile("{", "p"), /not valid JSON/);
 	assert.throws(() => parseCpuProfile(JSON.stringify({ ...prof, timeDeltas: [1] }), "p"), /7 samples but 1 timeDeltas/);
 	assert.throws(() => parseCpuProfile(JSON.stringify({ ...prof, samples: [9, 2, 2, 2, 2, 2, 2] }), "p"), /unknown node 9/);
+});
+
+test("the Python self-time JSON becomes one row per function", () => {
+	const m = parseSelfTimesJson('{"format.py:crc32c": 812.5, "method \'read\' of \'_io.BufferedReader\' objects": 40}', "c.json");
+	assert.deepEqual(m, new Map([["format.py:crc32c", 812.5], ["method 'read' of '_io.BufferedReader' objects", 40]]));
+	assert.throws(() => parseSelfTimesJson("[", "c.json"), /c\.json: not valid JSON/);
+	assert.throws(() => parseSelfTimesJson("[1]", "c.json"), /not a JSON object/);
+	assert.throws(() => parseSelfTimesJson('{"f": "1"}', "c.json"), /self time of f is not a number/);
+	assert.throws(() => parseSelfTimesJson("{}", "c.json"), /no rows/);
 });
 
 test("profiled pairs per workload", () => {

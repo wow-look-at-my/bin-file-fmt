@@ -83,6 +83,24 @@ export function parseGprofFlat(text: string, source: string): Map<string, number
 	return out;
 }
 
+// Parses the JSON object that the Python bench program writes: self milliseconds per function name.
+export function parseSelfTimesJson(text: string, source: string): Map<string, number> {
+	let v: unknown;
+	try {
+		v = JSON.parse(text);
+	} catch {
+		throw new Error(`${source}: not valid JSON`);
+	}
+	if (typeof v !== "object" || v === null || Array.isArray(v)) throw new Error(`${source}: not a JSON object`);
+	const out = new Map<string, number>();
+	for (const [name, ms] of Object.entries(v)) {
+		if (typeof ms !== "number") throw new Error(`${source}: self time of ${name} is not a number`);
+		out.set(name, ms);
+	}
+	if (out.size === 0) throw new Error(`${source}: the profile has no rows`);
+	return out;
+}
+
 interface CpuProfileNode {
 	id: number;
 	callFrame: { functionName: string; url: string; lineNumber: number };
