@@ -322,11 +322,9 @@ static const uint32_t crc_table[8][256] = {
  * c/tools/crc32c_constants.mjs derives the multiply constants and checks them. */
 #ifndef BINPAZER_CRC_TIER
 #define BINPAZER_CRC_TIER 3
-#if defined(__aarch64__) && !defined(__APPLE__)
-/* Which of crc_three and crc_wide is faster differs between arm64 CPUs: the server core that CI measures and Apple silicon are opposites.
+/* Which of crc_three and crc_wide is faster differs between CPUs: the arm64 server core that CI measures and Apple silicon are opposites.
  * With no tier named by the build, the first long input times both on the running CPU and the winner stays. */
 #define BINPAZER_CRC_AUTO 1
-#endif
 #endif
 
 #if BINPAZER_CRC_TIER > 0 && (defined(__GNUC__) || defined(__clang__)) && defined(__x86_64__)
