@@ -312,9 +312,60 @@ static const uint32_t crc_table[8][256] = {
     },
 };
 
+/* The CPU's own CRC-32C instruction, where the compiler and the target have one.
+ * crc_hw takes and returns the inverted CRC. crc_hw_ok asks the running CPU.
+ * BINPAZER_NO_HW_CRC builds the table code alone, so a test can run it. */
+#if !defined(BINPAZER_NO_HW_CRC) && (defined(__GNUC__) || defined(__clang__)) && defined(__x86_64__)
+#include <nmmintrin.h>
+#define BINPAZER_HW_CRC 1
+__attribute__((target("sse4.2")))
+static uint32_t crc_hw(uint32_t crc, const uint8_t *p, size_t n) {
+    uint64_t c = crc;
+    while (n >= 8) {
+        uint64_t v;
+        memcpy(&v, p, 8);
+        c = _mm_crc32_u64(c, v);
+        p += 8;
+        n -= 8;
+    }
+    while (n--) c = _mm_crc32_u8((uint32_t)c, *p++);
+    return (uint32_t)c;
+}
+static int crc_hw_ok(void) { return __builtin_cpu_supports("sse4.2"); }
+#elif !defined(BINPAZER_NO_HW_CRC) && (defined(__GNUC__) || defined(__clang__)) && defined(__aarch64__) && \
+    defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__ && (defined(__APPLE__) || defined(__linux__))
+#include <arm_acle.h>
+#if defined(__linux__)
+#include <asm/hwcap.h>
+#include <sys/auxv.h>
+#endif
+#define BINPAZER_HW_CRC 1
+__attribute__((target("+crc")))
+static uint32_t crc_hw(uint32_t crc, const uint8_t *p, size_t n) {
+    while (n >= 8) {
+        uint64_t v;
+        memcpy(&v, p, 8);
+        crc = __crc32cd(crc, v);
+        p += 8;
+        n -= 8;
+    }
+    while (n--) crc = __crc32cb(crc, *p++);
+    return crc;
+}
+#if defined(__APPLE__)
+/* Every Apple arm64 CPU has the CRC extension. */
+static int crc_hw_ok(void) { return 1; }
+#else
+static int crc_hw_ok(void) { return (getauxval(AT_HWCAP) & HWCAP_CRC32) != 0; }
+#endif
+#endif
+
 uint32_t binpazer_crc32c(uint32_t crc, const void *data, size_t n) {
     const uint8_t *p = (const uint8_t *)data;
     crc = ~crc;
+#ifdef BINPAZER_HW_CRC
+    if (crc_hw_ok()) return ~crc_hw(crc, p, n);
+#endif
     /* Bytes are combined by value, not by a word load, so the result does not depend on host byte order. */
     while (n >= 8) {
         uint32_t lo = crc ^ get_u32(p);

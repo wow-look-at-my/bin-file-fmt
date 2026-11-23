@@ -82,6 +82,10 @@ This is because that is how it learns that the file grew. TypeScript holds every
 
 Its deflate and zstd go through `node:zlib`, which allocates the codec output before the copy into the caller's buffer.
 
+## CRC-32C in the C core
+
+`binpazer_crc32c` uses the CPU's CRC instruction on x86-64 (SSE4.2) and on little-endian arm64 (Linux and Apple), with GCC or Clang. It asks the running CPU first, and every other target runs the slicing tables. `-DBINPAZER_NO_HW_CRC` builds the tables alone. `make -C c test` runs the core tests both ways (`test_c` and `test_c_table`), so neither path goes untested. C++ and Python get the same function.
+
 ## IO-injection seam (deliberate -- do not add mmap)
 
 The libraries do **no file IO and no mmap**. The caller injects IO. C/C++ take `read`/`write` (+ optional `seek`) callbacks. Go takes `io.Reader`/`io.Writer` and *sniffs* `io.Seeker` on both sides. The Reader uses it for the input-size probe, seek-based skipping, and footer/Block Index jumps. The Writer uses it to back-patch `file_length` (non-seekable output keeps the streaming sentinel).

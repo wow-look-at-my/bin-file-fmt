@@ -1,4 +1,5 @@
 test_c
+test_c_table
 test_san
 test_cpp
 *.o
