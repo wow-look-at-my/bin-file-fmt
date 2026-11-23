@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from struct import iter_unpack
+
+from ._native import crc32c
 
 MAGIC = b"binpazer"
 SIGNATURE = b"\r\n\x1a\n"
@@ -106,69 +107,6 @@ def parse_guid(text: str) -> bytes:
 	return bytes.fromhex(clean)
 
 
-def _byte_tables() -> list[list[int]]:
-	t0 = []
-	for i in range(256):
-		c = i
-		for _ in range(8):
-			c = (c >> 1) ^ 0x82F63B78 if c & 1 else c >> 1
-		t0.append(c)
-	tables = [t0]
-	for _ in range(7):
-		prev = tables[-1]
-		tables.append([(p >> 8) ^ t0[p & 255] for p in prev])
-	return tables
-
-
-_T = _byte_tables()
-_T0 = _T[0]
-# Tables indexed by a little-endian u16; crc32c builds them at the first long input.
-_W: list[list[int]] = []
-_WORD_TABLE_MIN = 2048
-
-
-def _word_tables() -> None:
-	for hi, lo in ((7, 6), (5, 4), (3, 2), (1, 0)):
-		a = _T[hi]
-		b = _T[lo]
-		_W.append([x ^ y for y in b for x in a])
-
-
-def crc32c(crc: int, data) -> int:
-	"""CRC-32C (Castagnoli) of data, continued from crc. Start with 0."""
-	n = len(data)
-	c = crc ^ 0xFFFFFFFF
-	t0 = _T0
-	tail = n & 7
-	if n >= 8:
-		view = memoryview(data)
-		if n < _WORD_TABLE_MIN and not _W:
-			t7, t6, t5, t4, t3, t2, t1 = _T[7], _T[6], _T[5], _T[4], _T[3], _T[2], _T[1]
-			for b0, b1, b2, b3, b4, b5, b6, b7 in iter_unpack("8B", view[: n - tail]):
-				c = (
-					t7[b0 ^ (c & 255)]
-					^ t6[b1 ^ ((c >> 8) & 255)]
-					^ t5[b2 ^ ((c >> 16) & 255)]
-					^ t4[b3 ^ (c >> 24)]
-					^ t3[b4]
-					^ t2[b5]
-					^ t1[b6]
-					^ t0[b7]
-				)
-		else:
-			if not _W:
-				_word_tables()
-			w3, w2, w1, w0 = _W
-			for a, b, d, e in iter_unpack("<4H", view[: n - tail]):
-				c = w3[a ^ (c & 0xFFFF)] ^ w2[b ^ (c >> 16)] ^ w1[d] ^ w0[e]
-		if tail:
-			data = view[n - tail :]
-	if tail:
-		for b in bytes(data):
-			c = t0[(c ^ b) & 255] ^ (c >> 8)
-	return c ^ 0xFFFFFFFF
-
-
 def align8(x: int) -> int:
 	return (x + 7) & ~7
 
@@ -193,4 +131,4 @@ def check_guid(g, what: str) -> None:
 		raise BinpazerError("range", f"{what} must be 16 bytes, got {len(g)}")
 
 
-__all__ = [n for n in dir() if n[0] != "_" and n not in ("annotations", "dataclass", "iter_unpack")]
+__all__ = [n for n in dir() if n[0] != "_" and n not in ("annotations", "dataclass")]

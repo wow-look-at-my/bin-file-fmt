@@ -21,7 +21,7 @@ make -C c test               # C11 round-trip tests (core, then codecs)
 make -C cpp test             # C++17 round-trip tests (core, then codecs)
 cd go && go-toolchain        # tidy + vet + tests + coverage gate + go/build/binpazer
 cd ts && ts0 test            # type-check + TypeScript tests (ts0 build emits ts/dist)
-make -C py test              # Python tests (unittest, standard library only)
+make -C py test              # builds the native CRC library, then the Python tests (unittest)
 ```
 
 The codec targets need `zlib1g-dev libzstd-dev liblz4-dev`. The TypeScript suite needs them too, plus the `lz4` tool: it compiles `c/interop.c` and checks its LZ4 encoder against the reference decoder. `ts0` comes from `https://apt.pazer.build/ts0` and needs Node 22.18 or newer. The TypeScript package has no npm dependency and no `node_modules`.
@@ -106,7 +106,7 @@ Everything degrades gracefully without a seeker: sequential walk, read-through s
 - IO is a binary file object: `read` for the reader, `write` for the writer. Both sniff `seekable()`, as Go sniffs `io.Seeker`. The reader keeps no buffer of its own. Wrap a raw input in `io.BufferedReader`.
 - `Reader._claim()` is the allocation gate, as in Go and TypeScript. New parsing code goes through it. `tests/test_hardening.py` ports the Go hardening cases.
 - Every `u64` is a Python int. So no offset read from a file gives a `range` error, and a footer offset past the input is `truncated`.
-- CRC-32C is pure Python (`format.py`), because the standard library has none. It is the hot spot of every sealed block. Keep its inner loop free of function calls.
+- CRC-32C is the C reference's `binpazer_crc32c`, called through `ctypes` (`_native.py`). `make -C py native` builds its shared library from `c/binpazer.c`, and an import builds it when it is absent or stale. Never add a pure-Python CRC, not even as a fallback. A missing compiler fails the import and names the build command.
 - `codec.py` binds the system libzstd and liblz4 with `ctypes`, at the first use of the codec. A missing library is `codec_unavailable`, not a silent `stored`.
 - `tests/test_append.py` holds "at every prefix a follower sees exactly the whole blocks", the safety proof for this reader.
 
