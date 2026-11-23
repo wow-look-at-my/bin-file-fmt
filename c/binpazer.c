@@ -362,6 +362,7 @@ static int crc_tier(void) {
 #define CRC_ONE   __attribute__((target("+crc")))
 #define CRC_THREE __attribute__((target("+crc+aes")))
 #endif
+#define CRC_WIDE CRC_THREE
 #define CRC_U64(c, v) ((uint64_t)__crc32cd((uint32_t)(c), (v)))
 #define CRC_U8(c, b)  ((uint64_t)__crc32cb((uint32_t)(c), (b)))
 CRC_THREE static inline uint64_t crc_mul2(uint64_t a, uint32_t ka, uint64_t b, uint32_t kb) {
@@ -371,12 +372,13 @@ CRC_THREE static inline uint64_t crc_mul2(uint64_t a, uint32_t ka, uint64_t b, u
 }
 #if defined(__APPLE__)
 /* Every Apple arm64 CPU has the CRC and the polynomial multiply extensions. */
-static int crc_tier(void) { return BINPAZER_CRC_TIER < 2 ? 1 : 2; }
+static int crc_tier(void) { return BINPAZER_CRC_TIER < 3 ? BINPAZER_CRC_TIER : 3; }
 #else
 static int crc_tier(void) {
     unsigned long caps = getauxval(AT_HWCAP);
     if (!(caps & HWCAP_CRC32)) return 0;
-    return (BINPAZER_CRC_TIER < 2 || !(caps & HWCAP_PMULL)) ? 1 : 2;
+    if (BINPAZER_CRC_TIER < 2 || !(caps & HWCAP_PMULL)) return 1;
+    return BINPAZER_CRC_TIER < 3 ? 2 : 3;
 }
 #endif
 #endif
@@ -439,6 +441,7 @@ CRC_THREE static uint32_t crc_three(uint32_t crc, const uint8_t *p, size_t n) {
 }
 
 #ifdef CRC_WIDE
+#if defined(__x86_64__)
 /* The loop keeps one accumulator per lane of CRC_LANES. A loop with twice as many measured no faster: the multiplier is already busy every cycle. */
 #define CRC_LANES(X) X(0) X(1) X(2) X(3)
 #define CRC_WIDE_STEP 256
@@ -473,6 +476,53 @@ CRC_WIDE static uint32_t crc_wide(uint32_t crc, const uint8_t *p, size_t n) {
     _mm256_zeroupper();
     return crc_three(crc_three(0, rest, sizeof rest), p, n);
 }
+#else
+/* The arm64 form of the same loop: each accumulator is one NEON register, and PMULL is the multiply.
+ * CRC_NEON_LANES picks the count of accumulators, so a build can time each count. */
+#ifndef CRC_NEON_LANES
+#define CRC_NEON_LANES 8
+#endif
+#if CRC_NEON_LANES == 8
+#define CRC_LANES(X) X(0) X(1) X(2) X(3) X(4) X(5) X(6) X(7)
+#define CRC_WIDE_K_LO 0x6992cea2
+#define CRC_WIDE_K_HI 0x0d3b6092
+#elif CRC_NEON_LANES == 12
+#define CRC_LANES(X) X(0) X(1) X(2) X(3) X(4) X(5) X(6) X(7) X(8) X(9) X(10) X(11)
+#define CRC_WIDE_K_LO 0xa87ab8a8
+#define CRC_WIDE_K_HI 0xab7aff2a
+#elif CRC_NEON_LANES == 16
+#define CRC_LANES(X) X(0) X(1) X(2) X(3) X(4) X(5) X(6) X(7) X(8) X(9) X(10) X(11) X(12) X(13) X(14) X(15)
+#define CRC_WIDE_K_LO 0xdcb17aa4
+#define CRC_WIDE_K_HI 0xb9e02b86
+#else
+#error "CRC_NEON_LANES must be 8, 12 or 16"
+#endif
+#define CRC_WIDE_STEP (16 * CRC_NEON_LANES)
+CRC_WIDE static uint32_t crc_wide(uint32_t crc, const uint8_t *p, size_t n) {
+    const poly64x2_t k = vreinterpretq_p64_u64(vcombine_u64(vcreate_u64(CRC_WIDE_K_LO), vcreate_u64(CRC_WIDE_K_HI)));
+    uint8_t rest[CRC_WIDE_STEP];
+#define CRC_LOAD(i) uint64x2_t a##i = vreinterpretq_u64_u8(vld1q_u8(p + 16 * i));
+#define CRC_FOLD(i) \
+    a##i = veorq_u64(veorq_u64(vreinterpretq_u64_p128(vmull_p64((poly64_t)vgetq_lane_u64(a##i, 0), (poly64_t)CRC_WIDE_K_LO)), \
+                               vreinterpretq_u64_p128(vmull_high_p64(vreinterpretq_p64_u64(a##i), k))), \
+                     vreinterpretq_u64_u8(vld1q_u8(p + 16 * i)));
+#define CRC_STORE(i) vst1q_u8(rest + 16 * i, vreinterpretq_u8_u64(a##i));
+    CRC_LANES(CRC_LOAD)
+    a0 = veorq_u64(a0, vcombine_u64(vcreate_u64(crc), vcreate_u64(0)));
+    p += CRC_WIDE_STEP;
+    n -= CRC_WIDE_STEP;
+    while (n >= CRC_WIDE_STEP) {
+        CRC_LANES(CRC_FOLD)
+        p += CRC_WIDE_STEP;
+        n -= CRC_WIDE_STEP;
+    }
+    CRC_LANES(CRC_STORE)
+#undef CRC_LOAD
+#undef CRC_FOLD
+#undef CRC_STORE
+    return crc_three(crc_three(0, rest, sizeof rest), p, n);
+}
+#endif
 #endif
 #endif
 

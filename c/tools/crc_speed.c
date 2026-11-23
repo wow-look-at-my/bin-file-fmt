@@ -24,7 +24,7 @@ int main(void) {
     uint32_t sink = 0;
     for (size_t s = 0; s < sizeof sizes / sizeof sizes[0]; s++) {
         size_t n = sizes[s];
-        size_t reps = ((size_t)1 << 30) / n;
+        size_t reps = ((size_t)1 << 28) / n;
         double best = 0;
         for (int round = 0; round < 3; round++) {
             double t0 = now();

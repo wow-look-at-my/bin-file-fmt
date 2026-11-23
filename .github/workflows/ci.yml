@@ -98,7 +98,7 @@ jobs:
   # Publish the CLI matrix binaries to https://pazer.build. buildhost scopes a repo's OIDC token to the repo's own namespace, and the binary name (binpazer) differs from the repo name. The action publishes it as the nested project "bin-file-fmt/binpazer" (auto-provisioned on first publish, git branch recorded on the release): https://dl.pazer.build/bin-file-fmt/binpazer?branch=<branch>&os=<os>&arch=<arch>
   publish:
     runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
-    needs: [go, c-cpp, ts, py, bench]
+    needs: [go, c-cpp, c-arm64, ts, py, bench]
     permissions:
       id-token: write # mint the OIDC token buildhost trusts
       contents: read
@@ -129,6 +129,22 @@ jobs:
       - uses: wow-look-at-my/ts0@lkgb
         with:
           working-directory: ts
+
+  # The arm64 CRC-32C paths on real arm64 CPUs: a Linux server core and Apple silicon. The emulator in a developer's session proves the result, not the speed, so the job also prints the throughput of every tier to its summary.
+  c-arm64:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04-arm, macos-latest]
+    if: github.event.repository.visibility == 'public'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: C core tests at every CRC tier
+        run: make -C c test-core
+      - name: CRC-32C throughput per tier
+        shell: bash
+        run: make -C c speed | tee -a "$GITHUB_STEP_SUMMARY"
 
   # The Python implementation: the standard-library test runner. The suite compiles c/interop.c, and the codec layer loads libzstd and liblz4, so the codec libraries go in first.
   py:

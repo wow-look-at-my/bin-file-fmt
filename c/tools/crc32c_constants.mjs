@@ -96,7 +96,7 @@ function foldConstants(distance) {
 for (const n of [32, 128, 2048]) {
 	console.log(`3-way, ${n} bytes per stream: past 2 streams ${hex32(shiftConstant(2 * n))}, past 1 stream ${hex32(shiftConstant(n))}`);
 }
-for (const d of [1024, 512, 256, 64]) {
+for (const d of [256, 192, 128, 64]) {
 	const [kLo, kHi] = foldConstants(d);
 	console.log(`fold by ${d} bytes: low half ${hex32(kLo)}, high half ${hex32(kHi)}`);
 }

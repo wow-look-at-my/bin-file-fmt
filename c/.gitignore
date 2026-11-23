@@ -1,5 +1,7 @@
 test_c
 test_c_tier*
+test_c_lanes*
+crc_speed_*
 test_san
 test_cpp
 *.o
