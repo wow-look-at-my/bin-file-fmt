@@ -485,7 +485,7 @@ CRC_WIDE static uint32_t crc_wide(uint32_t crc, const uint8_t *p, size_t n) {
 /* The arm64 form of the same loop: each accumulator is one NEON register, and PMULL is the multiply.
  * CRC_NEON_LANES picks the count of accumulators, so a build can time each count. */
 #ifndef CRC_NEON_LANES
-#define CRC_NEON_LANES 12
+#define CRC_NEON_LANES 16
 #endif
 #if CRC_NEON_LANES == 8
 #define CRC_LANES(X) X(0) X(1) X(2) X(3) X(4) X(5) X(6) X(7)

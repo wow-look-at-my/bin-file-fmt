@@ -113,14 +113,16 @@ Measured with `c/tools/crc_speed.c` on a Xeon with AVX-512 and VPCLMULQDQ, in Gi
 - The 8 MiB row is the memory, not the hash: XXH3 stops at the same rate.
 - Tier keeps multiple accumulators. Eight measured no faster on this CPU, so the multiplier is the limit.
 
-The `c-arm64` CI job runs `make -C c test-core` and `make -C c speed` on real arm64 CPUs and prints the throughput to its summary. From one run, 1 MiB buffer, in GiB/s:
+The `c-arm64` CI job runs `make -C c test-core` and `make -C c speed` on real arm64 CPUs and prints the throughput to its summary. From its first runs, 1 MiB buffer, in GiB/s:
 
 | CPU | Tier 0 | Tier 1 | Tier 2 | Fold, 8 lanes | Fold, 12 lanes | Fold, 16 lanes |
 |---|---:|---:|---:|---:|---:|---:|
-| arm64 Linux runner | 2.28 | 13.88 | 23.49 | 18.04 | 17.72 | 19.42 |
-| Apple silicon runner | 1.19 | 5.74 | 16.31 | 42.01 | 54.84 | 56.14 |
+| arm64 Linux runner, first run | 2.28 | 13.88 | 23.49 | 18.04 | 17.72 | 19.42 |
+| arm64 Linux runner, second run | 2.28 | 13.82 | 23.10 | 18.07 | 17.68 | 19.19 |
+| Apple silicon runner, first run | 1.19 | 5.74 | 16.31 | 42.01 | 54.84 | 56.14 |
+| Apple silicon runner, second run | 1.34 | 4.95 | 16.79 | 40.49 | 53.35 | 61.02 |
 
-- On the Linux core the streams of tier 2 beat every fold. So the streams are the default there. On Apple silicon the fold wins, with `CRC_NEON_LANES` at 12.
+- On the Linux core the streams of tier 2 beat every fold. So the streams are the default there. On Apple silicon the fold wins, and it gains with every lane count the job times. So `CRC_NEON_LANES` is at the highest of them.
 - Both runners are shared virtual machines, and the Apple numbers moved by a third between buffer sizes. Read them as an order.
 - Change a default only with a new run of that job as the evidence.
 
