@@ -121,8 +121,9 @@ The `c-arm64` CI job runs `make -C c test-core` and `make -C c speed` on real ar
 | arm64 Linux runner, second run | 2.28 | 13.82 | 23.10 | 18.07 | 17.68 | 19.19 |
 | Apple silicon runner, first run | 1.19 | 5.74 | 16.31 | 42.01 | 54.84 | 56.14 |
 | Apple silicon runner, second run | 1.34 | 4.95 | 16.79 | 40.49 | 53.35 | 61.02 |
+| Apple silicon runner, third run | 1.20 | 5.99 | 16.97 | 28.28 | 53.58 | 33.58 |
 
-- On the Linux core the streams of tier 2 beat every fold. So the streams are the default there. On Apple silicon the fold wins, and it gains with every lane count the job times. So `CRC_NEON_LANES` is at the highest of them.
+- On the Linux core the streams of tier 2 beat every fold. So the streams are the default there. On Apple silicon every fold beats the streams. The runs do not separate the highest lane counts, and `CRC_NEON_LANES` is at the higher one.
 - Both runners are shared virtual machines, and the Apple numbers moved by a third between buffer sizes. Read them as an order.
 - Change a default only with a new run of that job as the evidence.
 
