@@ -145,6 +145,19 @@ jobs:
       - name: CRC-32C throughput per tier
         shell: bash
         run: make -C c speed | tee -a "$GITHUB_STEP_SUMMARY"
+      # XXH3 on the same CPU shows whether a hash other than CRC-32C would be faster there.
+      - name: XXH3 throughput (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends libxxhash-dev
+          make -C c speed-xxh3 | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: XXH3 throughput (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew install xxhash
+          make -C c speed-xxh3 XXH_INC="-I$(brew --prefix)/include" | tee -a "$GITHUB_STEP_SUMMARY"
 
   # The Python implementation: the standard-library test runner. The suite compiles c/interop.c, and the codec layer loads libzstd and liblz4, so the codec libraries go in first.
   py:
