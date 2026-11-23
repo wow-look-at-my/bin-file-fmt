@@ -14,10 +14,11 @@ Minimal-dependency libraries that do **no file IO and no mmap** -- the caller in
 | [`cpp/`](./cpp) | C++17, header-only convenience wrapper over the C core | `std::function` callbacks | `make -C cpp test` |
 | [`go/`](./go) | pure Go library (the CLI uses cobra) | `io.Reader` / `io.Writer` (`io.Seeker` optional) | `go-toolchain` (in `go/`) |
 | [`ts/`](./ts) | TypeScript, no npm dependency; the core also runs in a browser | `Source` / `Sink` objects (`seek` optional) | `ts0 test` (in `ts/`) |
+| [`py/`](./py) | Python 3.10+, no PyPI dependency | binary file objects (`seek` optional) | `make -C py test` |
 
-Each one implements **every codec the format defines**, so no implementation can write a file another cannot read. In C and C++ the codecs are a second file you link (`c/binpazer_codec.c`, over zlib/libzstd/liblz4). The core links nothing but libc, and keeps a test binary that proves it. TypeScript makes the same split: `ts/src/core.ts` imports nothing, and `ts/src/index.ts` adds the codecs.
+Each one implements **every codec the format defines**, so no implementation can write a file another cannot read. In C and C++ the codecs are a second file you link (`c/binpazer_codec.c`, over zlib/libzstd/liblz4). The core links nothing but libc, and keeps a test binary that proves it. TypeScript makes the same split: `ts/src/core.ts` imports nothing, and `ts/src/index.ts` adds the codecs. Python keeps its codecs in `py/binpazer/codec.py`, which loads the system libzstd and liblz4.
 
-All write byte-identical files. The Go and TypeScript tests verify this against a C-generated fixture ([`go/testdata/sample.binpazer`](./go/testdata)). CI regenerates the fixture from C and `cmp`s it on every push. Compressed blocks are the deliberate exception. A codec id names a decodable format, not one encoder. Implementations agree on what a file *means* rather than on the bytes their compressors emit.
+All write byte-identical files. The Go, TypeScript and Python tests verify this against a C-generated fixture ([`go/testdata/sample.binpazer`](./go/testdata)). CI regenerates the fixture from C and `cmp`s it on every push. Compressed blocks are the deliberate exception. A codec id names a decodable format, not one encoder. Implementations agree on what a file *means* rather than on the bytes their compressors emit.
 
 CI checks that directly, by having each implementation decode files the other wrote with every codec.
 

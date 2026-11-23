@@ -98,7 +98,7 @@ jobs:
   # Publish the CLI matrix binaries to https://pazer.build. buildhost scopes a repo's OIDC token to the repo's own namespace, and the binary name (binpazer) differs from the repo name. The action publishes it as the nested project "bin-file-fmt/binpazer" (auto-provisioned on first publish, git branch recorded on the release): https://dl.pazer.build/bin-file-fmt/binpazer?branch=<branch>&os=<os>&arch=<arch>
   publish:
     runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
-    needs: [go, c-cpp, ts, bench]
+    needs: [go, c-cpp, ts, py, bench]
     permissions:
       id-token: write # mint the OIDC token buildhost trusts
       contents: read
@@ -130,6 +130,19 @@ jobs:
         with:
           working-directory: ts
 
+  # The Python implementation: the standard-library test runner. The suite compiles c/interop.c, and the codec layer loads libzstd and liblz4, so the codec libraries go in first.
+  py:
+    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Codec libraries
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential zlib1g-dev libzstd-dev liblz4-dev
+      - name: Python tests
+        run: make -C py test
+
   # Runs every implementation through the same workloads in quick mode, with the CPU profiles. The driver fails when implementations disagree on a file or a checksum, so this is also the live interop check across all of them. The numbers of a shared runner are noisy: the committed bench/RESULTS.md comes from a full run on one machine.
   bench:
     runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
@@ -139,6 +152,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
       # The gprof builds link statically, and a static liblz4 can need libxxhash. pkg-config names what the static link needs.
       - name: Codec libraries
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential pkg-config zlib1g-dev libzstd-dev liblz4-dev libxxhash-dev
