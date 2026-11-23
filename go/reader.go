@@ -276,7 +276,49 @@ func NewReaderLimited(r io.Reader, maxAlloc int64) (*Reader, error) {
 	if br.hasIndex {
 		br.blocksEnd = br.FileLength - 16 // exclude the trailing footer
 	}
+	// A streamed file has no file_length, but the real input size shows where a footer must be.
+	if br.seeker != nil && br.FileLength == FileLengthUnknown && !br.Appendable() && br.inputSize >= 16 {
+		end := uint64(br.inputSize)
+		saved := br.off
+		if err := br.seekTo(end - 16); err == nil {
+			ft := make([]byte, 16)
+			if _, err := io.ReadFull(br.r, ft); err == nil && isFooter(ft, end-16) {
+				br.indexOffset = binary.LittleEndian.Uint64(ft[0:])
+				br.hasIndex = true
+				br.blocksEnd = end - 16
+			}
+		}
+		if err := br.seekTo(saved); err != nil {
+			return br, err
+		}
+	}
 	return br, nil
+}
+
+// isFooter reports whether ft, which starts at offset at, is a footer of a
+// file with no file_length. The magic alone can be the payload of a last
+// block.
+func isFooter(ft []byte, at uint64) bool {
+	if string(ft[8:16]) != footerMagic {
+		return false
+	}
+	idx := binary.LittleEndian.Uint64(ft[0:8])
+	return idx%8 == 0 && idx < at
+}
+
+// streamFooter checks for the footer of a streamed file when the walk is at a block boundary.
+// It needs the bytes to be the last bytes of the input, so it peeks one byte past them.
+func (br *Reader) streamFooter() bool {
+	if br.hasIndex || br.FileLength != FileLengthUnknown || br.Appendable() {
+		return false
+	}
+	ft, err := br.r.Peek(17)
+	if len(ft) != 16 || err != io.EOF || !isFooter(ft, br.off) {
+		return false
+	}
+	br.indexOffset = binary.LittleEndian.Uint64(ft[0:8])
+	br.hasIndex = true
+	return true
 }
 
 // readBTT parses the Block Type Table (the required first block) into
@@ -358,10 +400,10 @@ func (br *Reader) readBTT() error {
 // It returns io.EOF after the last block. The payload is not read.
 //
 // On a non-seekable input the footer cannot be excluded from the walk up
-// front. When file_length is known and several bytes of it remain, Next
-// peeks for the footer magic. It ends the walk there (recording the index
-// location) instead of misparsing the footer as a block header. This mirrors
-// the position-based footer detection the seekable probe already performs.
+// front. When file_length is known and bytes of it remain, Next peeks for
+// the footer magic. When file_length is unknown, Next looks for a footer in
+// the last bytes of the input. In both cases it records the index location
+// and ends the walk, so it never parses the footer as a block header.
 func (br *Reader) Next() (*Block, error) {
 	if br.ended || (br.blocksEnd != FileLengthUnknown && br.off >= br.blocksEnd) {
 		return nil, io.EOF
@@ -377,6 +419,14 @@ func (br *Reader) Next() (*Block, error) {
 			br.off += 16
 			return nil, io.EOF
 		}
+	}
+	if br.streamFooter() {
+		if _, err := br.r.Discard(16); err != nil {
+			return nil, err
+		}
+		br.off += 16
+		br.blocksEnd = br.off - 16
+		return nil, io.EOF
 	}
 	bh := make([]byte, 8)
 	n, err := io.ReadFull(br.r, bh)
