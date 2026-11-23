@@ -45,7 +45,8 @@ function main(argv: string[]): number {
 	removeEmptyWorkDir();
 
 	const profBuild = opts.profile && (opts.impls.includes("c") || opts.impls.includes("cpp")) ? ["make -C bench prof"] : [];
-	const builds = [...new Set(["make -C bench", ...profBuild, ...opts.impls.map((i) => BUILD_COMMANDS[i])])];
+	const implBuilds = opts.impls.map((i) => BUILD_COMMANDS[i]).filter((c): c is string => c !== null);
+	const builds = [...new Set(["make -C bench", ...profBuild, ...implBuilds])];
 	// A subshell keeps each `cd` from leaking into the next command.
 	const commands = [...builds.map((c) => (c.startsWith("cd ") ? `(${c})` : c)),describeArgv(["node", "bench/run.ts", ...argv])];
 	const stored: StoredResults = { ...results, impls: opts.impls, reference: referenceImpl(opts.impls), commands };

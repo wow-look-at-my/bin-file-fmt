@@ -17,6 +17,8 @@ export interface Options {
 	jsonPath: string;
 	reportPath: string;
 	bins: Record<Impl, string>;
+	// The interpreter that runs the Python bench program: a command name, or a path.
+	python: string;
 	measureBin: string;
 }
 
@@ -31,12 +33,14 @@ export const USAGE = `usage: node bench/run.ts [options]
 	--report <path>      markdown report (default bench/RESULTS.md)
 	--c-bin, --cpp-bin, --go-bin <path>   bench program paths
 	--ts-bin <path>      the TypeScript bench .js file (run with node)
+	--py-bin <path>      the Python bench .py file (default py/bench/bench.py)
+	--python <command>   the interpreter that runs it (default python3)
 	--profile            one extra profiled run per implementation for the hot-spot tables
 	--c-prof-bin, --cpp-prof-bin <path>   gprof builds (default bench/build-prof/bench_c, bench_cpp)
 	--render             run nothing: rebuild the report (--report) from an existing results file (--json)
 	--help               print this text`;
 
-const VALUE_OPTIONS = ["--repeats", "--impls", "--only", "--work-dir", "--json", "--report", "--c-bin", "--cpp-bin", "--go-bin", "--ts-bin", "--c-prof-bin", "--cpp-prof-bin"];
+const VALUE_OPTIONS = ["--repeats", "--impls", "--only", "--work-dir", "--json", "--report", "--c-bin", "--cpp-bin", "--go-bin", "--ts-bin", "--py-bin", "--python", "--c-prof-bin", "--cpp-prof-bin"];
 const FLAG_OPTIONS = ["--quick", "--keep", "--profile", "--render", "--help"];
 
 function splitList(opt: string, v: string): string[] {
@@ -113,22 +117,39 @@ export function parseArgs(argv: string[], repoRoot: string, cwd: string, env: Re
 			cpp: opt("--cpp-bin", path.join(repoRoot, "bench", "build", "bench_cpp")),
 			go: opt("--go-bin", path.join(repoRoot, "go", "build", "binpazer")),
 			ts: opt("--ts-bin", path.join(repoRoot, "ts", "bench", "dist", "bench.js")),
+			py: opt("--py-bin", path.join(repoRoot, "py", "bench", "bench.py")),
 		},
+		python: pythonCommand(values.get("--python"), cwd),
 		measureBin: path.join(repoRoot, "bench", "build", "measure"),
 	};
 }
 
-// The command that builds each implementation's bench program.
-export const BUILD_COMMANDS: Record<Impl, string> = {
+// A bare command name goes through PATH; anything with a slash resolves against cwd.
+function pythonCommand(v: string | undefined, cwd: string): string {
+	if (v === undefined) return "python3";
+	if (v === "") throw new Error("--python needs a command name or a path");
+	return v.includes("/") ? path.resolve(cwd, v) : v;
+}
+
+// The command that builds each implementation's bench program. The Python program runs from its source, so it has none.
+export const BUILD_COMMANDS: Record<Impl, string | null> = {
 	c: "make -C bench",
 	cpp: "make -C bench",
 	go: "cd go && go-toolchain",
 	ts: "cd ts && ts0 build",
+	py: null,
 };
 
+// The interpreters that run the bench programs that are not native executables.
+export interface Runtimes {
+	node: string;
+	python: string;
+}
+
 // The argv prefix of an implementation's bench program; the operation and its arguments follow.
-export function benchArgv(impl: Impl, bin: string, nodePath: string): string[] {
+export function benchArgv(impl: Impl, bin: string, rt: Runtimes): string[] {
 	if (impl === "go") return [bin, "bench"];
-	if (impl === "ts") return [nodePath, bin];
+	if (impl === "ts") return [rt.node, bin];
+	if (impl === "py") return [rt.python, bin];
 	return [bin];
 }
