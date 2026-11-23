@@ -30,19 +30,19 @@ CPU seconds per operation from that run (user + sys, median of the timed runs, l
 
 | Workload / operation | C | C++ | Go | TypeScript | Python |
 |---|---:|---:|---:|---:|---:|
-| small (256 B blocks) / write | 0.048 | 0.049 | 0.080 | 0.283 | 0.597 |
-| small / read | 0.037 | 0.055 | 0.119 | 0.694 | 0.933 |
-| small / find | 0.224 | 0.228 | 0.466 | 0.869 | 3.767 |
-| medium (64 KiB blocks) / write | 0.052 | 0.051 | 0.068 | 0.293 | 0.120 |
-| medium / read | 0.031 | 0.031 | 0.111 | 0.297 | 0.107 |
-| large (8 MiB blocks) / write | 0.093 | 0.083 | 0.097 | 0.357 | 0.142 |
-| large / read | 0.048 | 0.062 | 0.123 | 0.388 | 0.130 |
-| deflate / write | 0.940 | 0.982 | 0.891 | 0.953 | 1.048 |
-| deflate / read | 0.166 | 0.163 | 0.660 | 0.272 | 0.301 |
-| zstd / write | 0.291 | 0.246 | 0.747 | 0.374 | 0.330 |
-| zstd / read | 0.022 | 0.024 | 0.343 | 0.183 | 0.093 |
-| lz4 / write | 0.067 | 0.072 | 0.308 | 0.669 | 0.215 |
-| lz4 / read | 0.014 | 0.017 | 0.328 | 0.203 | 0.089 |
+| small (256 B blocks) / write | 0.044 | 0.049 | 0.075 | 0.296 | 0.523 |
+| small / read | 0.033 | 0.043 | 0.101 | 0.723 | 0.862 |
+| small / find | 0.200 | 0.194 | 0.416 | 0.865 | 2.858 |
+| medium (64 KiB blocks) / write | 0.068 | 0.062 | 0.078 | 0.303 | 0.113 |
+| medium / read | 0.028 | 0.030 | 0.112 | 0.294 | 0.107 |
+| large (8 MiB blocks) / write | 0.089 | 0.082 | 0.097 | 0.357 | 0.141 |
+| large / read | 0.047 | 0.053 | 0.110 | 0.395 | 0.124 |
+| deflate / write | 0.916 | 0.883 | 0.878 | 0.937 | 0.998 |
+| deflate / read | 0.147 | 0.155 | 0.590 | 0.263 | 0.305 |
+| zstd / write | 0.257 | 0.241 | 0.711 | 0.379 | 0.401 |
+| zstd / read | 0.020 | 0.025 | 0.366 | 0.172 | 0.089 |
+| lz4 / write | 0.063 | 0.069 | 0.316 | 0.662 | 0.185 |
+| lz4 / read | 0.013 | 0.017 | 0.331 | 0.201 | 0.092 |
 
 Every block in these workloads carries a CRC. The C core computes CRC-32C with the fastest instructions the CPU has: AVX-512 carry-less folding on this machine. Python calls the C implementation's CRC-32C and the system codec libraries, so its cost is per block, not per byte. The full report also has peak memory, wall time, throughput and file sizes.
 
