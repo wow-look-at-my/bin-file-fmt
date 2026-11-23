@@ -93,7 +93,7 @@ Its deflate and zstd go through `node:zlib`, which allocates the codec output be
 | 2 | three streams, joined with a carry-less multiply | x86-64 PCLMULQDQ, or arm64 PMULL |
 | 3 | carry-less folding across several vector accumulators | x86-64 AVX-512F, AVX-512VL and VPCLMULQDQ, or arm64 PMULL |
 
-On x86-64 and on Apple silicon the highest tier the CPU has is the fastest. On arm64 Linux the highest tiers trade places between CPUs. `crc_wide_wins` times both on the first long input and keeps the winner for the process. A build that names `BINPAZER_CRC_TIER` gets that tier and no timing.
+The folding tier and the streams tier trade places between CPUs: the fold wins on the x86-64 and Apple silicon machines measured below. Apple loses on the arm64 Linux one. So the choice is never fixed. `crc_wide_wins` times both on the first long input, on every platform, and keeps the winner for the process. A build that names `BINPAZER_CRC_TIER` gets that tier and no timing.
 
 - `-DBINPAZER_CRC_TIER=<n>` caps the tier at build time. `make -C c test` runs the core tests at every tier, so no path goes untested on a CPU that has a better one.
 - `c/tools/crc32c_constants.mjs` derives the multiply constants and checks each one. `c/tools/crc_speed.c` prints the throughput per buffer size.
@@ -123,7 +123,7 @@ The `c-arm64` CI job runs `make -C c test-core` and `make -C c speed` on real ar
 | Apple silicon runner, second run | 1.34 | 4.95 | 16.79 | 40.49 | 53.35 | 61.02 |
 | Apple silicon runner, third run | 1.20 | 5.99 | 16.97 | 28.28 | 53.58 | 33.58 |
 
-- On the Linux core the streams of tier 2 beat every fold. An arm64 Linux CPU of another kind can reverse that, which is why the choice there is timed at run time. On Apple silicon every fold beats the streams. The runs do not separate the highest lane counts, and `CRC_NEON_LANES` is at the higher one.
+- On the Linux core the streams of tier 2 beat every fold. A CPU of another kind can reverse either result, which is why the choice is timed at run time. On Apple silicon every fold beats the streams. The runs do not separate the highest lane counts, and `CRC_NEON_LANES` is at the higher one.
 - Both runners are shared virtual machines, and the Apple numbers moved by a third between buffer sizes. Read them as an order.
 - Change a default only with a new run of that job as the evidence.
 

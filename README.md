@@ -52,7 +52,7 @@ CRC-32C throughput of the C core by CPU, with XXH3 built for the same CPU as a y
 | arm64 Linux (GitHub runner) | 2.28 | three CRC streams | 22.91 | 13.41 |
 | Apple silicon (GitHub runner) | 1.19 | PMULL folding | 57.21 | 26.23 |
 
-The arm64 rows come from the `c-arm64` CI job, which prints them again on every run. An arm64 Linux CPU of another kind can rank the paths differently, so on arm64 Linux the library times its fastest paths. This happens once and keeps the winner. `make -C c speed` prints every path on any machine.
+The arm64 rows come from the `c-arm64` CI job, which prints them again on every run. Another CPU can rank the paths differently. The library does not fix the choice. On every platform it times its fastest paths once, on the CPU it runs on, and keeps the winner. `make -C c speed` prints every path on any machine.
 
 Every block in these workloads carries a CRC. The C core computes CRC-32C with the fastest instructions the CPU has: AVX-512 carry-less folding on this machine. Python calls the C implementation's CRC-32C and the system codec libraries, so its cost is per block, not per byte. The full report also has peak memory, wall time, throughput and file sizes.
 
