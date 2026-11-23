@@ -1,7 +1,7 @@
 // Writer and reader round trips: flags, large_mode, index, find, streaming, and the seek rules.
 
 import { compressBlock, readPayloadDecompressed } from "./codec.ts";
-import { CODEC_STORED, CODEC_ZSTD, FLAG_CRITICAL, FLAG_HAS_CRC, FLAG_LARGE_MODE, FLAG_SAFE_TO_COPY, LARGE_UNIT, TYPE_BLOCK_INDEX, VERSION_MINOR_COMPRESSION, crc32c, getU16 } from "./format.ts";
+import { CODEC_STORED, CODEC_ZSTD, FLAG_CRITICAL, FLAG_HAS_CRC, FLAG_LARGE_MODE, FLAG_SAFE_TO_COPY, LARGE_UNIT, TYPE_BLOCK_INDEX, VERSION_MINOR_COMPRESSION, crc32c, getU16, getU32 } from "./format.ts";
 import type { TypeDef } from "./format.ts";
 import * as mem from "./memory.ts";
 import { Reader as R } from "./reader.ts";
@@ -176,6 +176,56 @@ test("a non-seekable source reads a file with an index and stops at the footer",
 	}
 	assert.deepEqual(types, [1, 2, TYPE_BLOCK_INDEX]);
 	assert.ok(rd.hasIndex);
+});
+
+function walkData(rd: R): Uint8Array[] {
+	const got: Uint8Array[] = [];
+	for (let b = rd.next(); b !== null; b = rd.next()) {
+		const p = readPayloadDecompressed(rd, b);
+		if (b.typeId === 1) {
+			got.push(p);
+		}
+	}
+	return got;
+}
+
+test("a file streamed to a non-seekable sink with a Block Index reads back, seekable or not", () => {
+	const pipe = new StreamSink();
+	const w = new Writer(pipe, SAMPLE_WRITER, "x", DEFS, { versionMinor: VERSION_MINOR_COMPRESSION });
+	const payloads = [pattern(5000), enc("raw tail")];
+	compressBlock(w, 1, FLAG_HAS_CRC, CODEC_ZSTD, null, payloads[0]);
+	w.block(1, FLAG_HAS_CRC, payloads[1]);
+	w.writeIndex();
+	w.end();
+	const bytes = pipe.mem.bytes();
+	assert.equal(open(bytes).fileLength, null);
+	const idx = getU32(bytes, bytes.length - 16);
+	assert.equal(getU16(bytes, idx), TYPE_BLOCK_INDEX);
+
+	const piped = new R(streamSource(new mem.MemorySource(bytes)));
+	assert.deepEqual(walkData(piped), payloads);
+	assert.ok(piped.hasIndex);
+	assert.equal(piped.indexOffset, idx);
+	assert.equal(piped.offset, bytes.length, "a streamed walk reads the footer");
+
+	const seekable = open(bytes);
+	assert.ok(seekable.hasIndex, "the seekable reader finds the footer before the walk");
+	assert.equal(seekable.indexOffset, idx);
+	assert.equal(seekable.find(1).length, 2);
+	assert.deepEqual(walkData(seekable), payloads);
+	assert.equal(seekable.offset, bytes.length - 16, "a seekable walk stops before the footer");
+});
+
+test("a streamed file that ends in a 16-byte block holding the footer magic keeps the block", () => {
+	const pipe = new StreamSink();
+	const w = new Writer(pipe, SAMPLE_WRITER, "x", DEFS);
+	w.block(1, 0, enc("rezapnib"));
+	w.end();
+	const bytes = pipe.mem.bytes();
+	for (const rd of [new R(streamSource(new mem.MemorySource(bytes))), open(bytes)]) {
+		assert.deepEqual(walkData(rd), [enc("rezapnib")]);
+		assert.ok(!rd.hasIndex);
+	}
 });
 
 test("a non-seekable sink keeps the streaming sentinel and buffers small writes", () => {

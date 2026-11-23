@@ -222,6 +222,8 @@ typedef struct {
     uint64_t         index_offset;       /* offset of the Block Index block */
     uint64_t         table_end;          /* offset of the first block after the Block Type Table */
     uint64_t         blocks_end;         /* end of the block stream (excludes a trailing footer) */
+    uint8_t          ahead[16];          /* bytes a footer check read and the next read gets first */
+    uint8_t          ahead_len, ahead_pos;
 } binpazer_reader;
 
 typedef struct {

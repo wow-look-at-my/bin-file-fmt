@@ -341,6 +341,16 @@ An optional fixed 16-byte footer at the very end points to the [Block Index](#bl
 | -16 | 8 | `index_block_offset` | u64 |
 | -8 | 8 | `footer_magic` | char[8] = `rezapnib` |
 
+A streaming writer writes the footer too. A file can carry one while `file_length` is the streaming sentinel. A reader then finds the footer by its place at the end of the input. A seekable reader checks the last several bytes of the input. A reader that cannot seek checks at each block boundary. When several bytes remain before the end of the input, it reads them as a footer and ends the walk. The check:
+
+```
+at  = offset of the 16 bytes (input_size - 16, or the block boundary with exactly 16 bytes left)
+idx = u64 at at+0
+footer if bytes at+8..at+16 == "rezapnib" and idx % 8 == 0 and idx < at
+```
+
+In this case the reader accepts the footer only when `index_block_offset` is a multiple of 8 and is less than the footer's own offset. A last block of several bytes whose payload is `rezapnib` fails that test, because its length field puts a value of at least 2^35 in `index_block_offset`.
+
 ## Reader algorithm
 
 1. Verify `magic` (`binpazer`) and `signature` (`0D 0A 1A 0A`). Reject on mismatch.
