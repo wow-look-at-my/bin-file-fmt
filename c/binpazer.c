@@ -417,6 +417,7 @@ CRC_THREE static inline uint32_t crc_three_block(uint32_t crc, const uint8_t *p,
 
 #define CRC_LONG  2048
 #define CRC_SHORT 128
+#define CRC_TINY  32
 
 CRC_THREE static uint32_t crc_three(uint32_t crc, const uint8_t *p, size_t n) {
     while (n >= 3 * CRC_LONG) {
@@ -428,6 +429,11 @@ CRC_THREE static uint32_t crc_three(uint32_t crc, const uint8_t *p, size_t n) {
         crc = crc_three_block(crc, p, CRC_SHORT, 0xb9e02b86u, 0x0d3b6092u);
         p += 3 * CRC_SHORT;
         n -= 3 * CRC_SHORT;
+    }
+    while (n >= 3 * CRC_TINY) {
+        crc = crc_three_block(crc, p, CRC_TINY, 0x9e4addf8u, 0xba4fc28eu);
+        p += 3 * CRC_TINY;
+        n -= 3 * CRC_TINY;
     }
     return crc_one(crc, p, n);
 }
@@ -475,7 +481,7 @@ uint32_t binpazer_crc32c(uint32_t crc, const void *data, size_t n) {
 #ifdef CRC_WIDE
         if (tier >= 3 && n >= 2 * CRC_WIDE_STEP) return ~crc_wide(crc, p, n);
 #endif
-        if (tier >= 2 && n >= 3 * CRC_SHORT) return ~crc_three(crc, p, n);
+        if (tier >= 2 && n >= 3 * CRC_TINY) return ~crc_three(crc, p, n);
         if (tier >= 1) return ~crc_one(crc, p, n);
     }
 #endif
