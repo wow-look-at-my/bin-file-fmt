@@ -26,6 +26,26 @@ CI checks that directly, by having each implementation decode files the other wr
 
 [`bench/`](./bench) runs the same workloads through every implementation and compares CPU time and peak memory. [`bench/RESULTS.md`](./bench/RESULTS.md) holds the measured comparison and the hot functions of each implementation. [`bench/README.md`](./bench/README.md) says how to run it.
 
+CPU seconds per operation from that run (user + sys, median of the timed runs, lower is better):
+
+| Workload / operation | C | C++ | Go | TypeScript | Python |
+|---|---:|---:|---:|---:|---:|
+| small (256 B blocks) / write | 0.073 | 0.085 | 0.086 | 0.379 | 4.080 |
+| small / read | 0.050 | 0.076 | 0.124 | 0.785 | 4.388 |
+| small / find | 0.270 | 0.241 | 0.512 | 0.940 | 7.562 |
+| medium (64 KiB blocks) / write | 0.118 | 0.112 | 0.073 | 0.302 | 6.735 |
+| medium / read | 0.100 | 0.094 | 0.126 | 0.318 | 6.917 |
+| large (8 MiB blocks) / write | 0.190 | 0.182 | 0.101 | 0.388 | 12.109 |
+| large / read | 0.146 | 0.158 | 0.120 | 0.451 | 12.063 |
+| deflate / write | 1.028 | 1.116 | 0.958 | 0.983 | 3.486 |
+| deflate / read | 0.201 | 0.179 | 0.749 | 0.276 | 2.100 |
+| zstd / write | 0.254 | 0.287 | 0.770 | 0.420 | 2.118 |
+| zstd / read | 0.034 | 0.038 | 0.388 | 0.195 | 1.798 |
+| lz4 / write | 0.085 | 0.093 | 0.336 | 0.729 | 1.944 |
+| lz4 / read | 0.029 | 0.033 | 0.383 | 0.221 | 2.093 |
+
+Every block in these workloads carries a CRC. Python computes CRC-32C in pure Python. That is most of its time. The full report also has peak memory, wall time, throughput and file sizes.
+
 The Go library also ships a convenience layer for the shape most binpazer files take. Content blocks, a directory naming where they landed, then the index -- so building one is not twenty lines of bookkeeping:
 
 ```go
