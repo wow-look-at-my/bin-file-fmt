@@ -30,21 +30,21 @@ CPU seconds per operation from that run (user + sys, median of the timed runs, l
 
 | Workload / operation | C | C++ | Go | TypeScript | Python |
 |---|---:|---:|---:|---:|---:|
-| small (256 B blocks) / write | 0.078 | 0.066 | 0.077 | 0.281 | 0.628 |
-| small / read | 0.050 | 0.066 | 0.113 | 0.710 | 1.033 |
-| small / find | 0.223 | 0.219 | 0.436 | 0.816 | 3.241 |
-| medium (64 KiB blocks) / write | 0.116 | 0.112 | 0.066 | 0.287 | 0.196 |
-| medium / read | 0.090 | 0.094 | 0.104 | 0.326 | 0.174 |
-| large (8 MiB blocks) / write | 0.180 | 0.178 | 0.100 | 0.360 | 0.230 |
-| large / read | 0.139 | 0.153 | 0.108 | 0.385 | 0.223 |
-| deflate / write | 1.008 | 0.988 | 0.880 | 0.955 | 1.059 |
-| deflate / read | 0.185 | 0.178 | 0.654 | 0.267 | 0.300 |
-| zstd / write | 0.262 | 0.258 | 0.687 | 0.356 | 0.341 |
-| zstd / read | 0.042 | 0.035 | 0.358 | 0.173 | 0.106 |
-| lz4 / write | 0.083 | 0.086 | 0.331 | 0.690 | 0.177 |
-| lz4 / read | 0.029 | 0.032 | 0.368 | 0.202 | 0.102 |
+| small (256 B blocks) / write | 0.048 | 0.049 | 0.080 | 0.283 | 0.597 |
+| small / read | 0.037 | 0.055 | 0.119 | 0.694 | 0.933 |
+| small / find | 0.224 | 0.228 | 0.466 | 0.869 | 3.767 |
+| medium (64 KiB blocks) / write | 0.052 | 0.051 | 0.068 | 0.293 | 0.120 |
+| medium / read | 0.031 | 0.031 | 0.111 | 0.297 | 0.107 |
+| large (8 MiB blocks) / write | 0.093 | 0.083 | 0.097 | 0.357 | 0.142 |
+| large / read | 0.048 | 0.062 | 0.123 | 0.388 | 0.130 |
+| deflate / write | 0.940 | 0.982 | 0.891 | 0.953 | 1.048 |
+| deflate / read | 0.166 | 0.163 | 0.660 | 0.272 | 0.301 |
+| zstd / write | 0.291 | 0.246 | 0.747 | 0.374 | 0.330 |
+| zstd / read | 0.022 | 0.024 | 0.343 | 0.183 | 0.093 |
+| lz4 / write | 0.067 | 0.072 | 0.308 | 0.669 | 0.215 |
+| lz4 / read | 0.014 | 0.017 | 0.328 | 0.203 | 0.089 |
 
-Every block in these workloads carries a CRC. Python calls the C implementation's CRC-32C and the system codec libraries, so its cost is per block, not per byte. The full report also has peak memory, wall time, throughput and file sizes.
+Every block in these workloads carries a CRC. The C core computes CRC-32C with the fastest instructions the CPU has: AVX-512 carry-less folding on this machine. Python calls the C implementation's CRC-32C and the system codec libraries, so its cost is per block, not per byte. The full report also has peak memory, wall time, throughput and file sizes.
 
 The Go library also ships a convenience layer for the shape most binpazer files take. Content blocks, a directory naming where they landed, then the index -- so building one is not twenty lines of bookkeeping:
 
