@@ -447,34 +447,39 @@ CRC_THREE static uint32_t crc_three(uint32_t crc, const uint8_t *p, size_t n) {
 #if CRC_WIDE_ACC == 4
 #define CRC_WIDE_K_LO 0xdcb17aa4
 #define CRC_WIDE_K_HI 0xb9e02b86
+#define CRC_LANES(X) X(0) X(1) X(2) X(3)
 #elif CRC_WIDE_ACC == 8
 #define CRC_WIDE_K_LO 0xbd6f81f8
 #define CRC_WIDE_K_HI 0xdd7e3b0c
-#elif CRC_WIDE_ACC == 16
-#define CRC_WIDE_K_LO 0xfe314258
-#define CRC_WIDE_K_HI 0x170076fa
+#define CRC_LANES(X) X(0) X(1) X(2) X(3) X(4) X(5) X(6) X(7)
 #else
-#error "CRC_WIDE_ACC must be 4, 8 or 16"
+#error "CRC_WIDE_ACC must be 4 or 8"
 #endif
 /* The accumulators hold a message of CRC_WIDE_STEP bytes that has the CRC of every byte read so far.
  * A step multiplies each lane forward by CRC_WIDE_STEP bytes and adds the next input.
  * n must be at least CRC_WIDE_STEP. */
 CRC_WIDE static uint32_t crc_wide(uint32_t crc, const uint8_t *p, size_t n) {
     const __m512i k = _mm512_broadcast_i32x4(_mm_set_epi64x(CRC_WIDE_K_HI, CRC_WIDE_K_LO));
-    __m512i a[CRC_WIDE_ACC];
     uint8_t rest[CRC_WIDE_STEP];
-    for (int i = 0; i < CRC_WIDE_ACC; i++) a[i] = _mm512_loadu_si512(p + 64 * i);
-    a[0] = _mm512_xor_si512(a[0], _mm512_zextsi128_si512(_mm_cvtsi32_si128((int)crc)));
+    /* Each accumulator is its own variable: as an array, the compiler kept them in memory and the loop lost a third of its speed. */
+#define CRC_LOAD(i) __m512i a##i = _mm512_loadu_si512(p + 64 * i);
+#define CRC_FOLD(i) \
+    a##i = _mm512_ternarylogic_epi64(_mm512_clmulepi64_epi128(a##i, k, 0x00), _mm512_clmulepi64_epi128(a##i, k, 0x11), \
+                                     _mm512_loadu_si512(p + 64 * i), 0x96);
+#define CRC_STORE(i) _mm512_storeu_si512(rest + 64 * i, a##i);
+    CRC_LANES(CRC_LOAD)
+    a0 = _mm512_xor_si512(a0, _mm512_zextsi128_si512(_mm_cvtsi32_si128((int)crc)));
     p += CRC_WIDE_STEP;
     n -= CRC_WIDE_STEP;
     while (n >= CRC_WIDE_STEP) {
-        for (int i = 0; i < CRC_WIDE_ACC; i++)
-            a[i] = _mm512_ternarylogic_epi64(_mm512_clmulepi64_epi128(a[i], k, 0x00), _mm512_clmulepi64_epi128(a[i], k, 0x11),
-                                             _mm512_loadu_si512(p + 64 * i), 0x96);
+        CRC_LANES(CRC_FOLD)
         p += CRC_WIDE_STEP;
         n -= CRC_WIDE_STEP;
     }
-    for (int i = 0; i < CRC_WIDE_ACC; i++) _mm512_storeu_si512(rest + 64 * i, a[i]);
+    CRC_LANES(CRC_STORE)
+#undef CRC_LOAD
+#undef CRC_FOLD
+#undef CRC_STORE
     /* crc_three runs SSE-encoded multiplies, which are slow while the upper vector halves hold data. */
     _mm256_zeroupper();
     return crc_three(crc_three(0, rest, sizeof rest), p, n);
