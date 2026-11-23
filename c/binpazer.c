@@ -321,7 +321,12 @@ static const uint32_t crc_table[8][256] = {
  * Every function here takes and returns the inverted CRC.
  * c/tools/crc32c_constants.mjs derives the multiply constants and checks them. */
 #ifndef BINPAZER_CRC_TIER
+#if defined(__aarch64__) && !defined(__APPLE__)
+/* On the arm64 server core that CI measures, the streams of crc_three are faster than the folding of crc_wide. Apple silicon is the reverse. */
+#define BINPAZER_CRC_TIER 2
+#else
 #define BINPAZER_CRC_TIER 3
+#endif
 #endif
 
 #if BINPAZER_CRC_TIER > 0 && (defined(__GNUC__) || defined(__clang__)) && defined(__x86_64__)
@@ -480,7 +485,7 @@ CRC_WIDE static uint32_t crc_wide(uint32_t crc, const uint8_t *p, size_t n) {
 /* The arm64 form of the same loop: each accumulator is one NEON register, and PMULL is the multiply.
  * CRC_NEON_LANES picks the count of accumulators, so a build can time each count. */
 #ifndef CRC_NEON_LANES
-#define CRC_NEON_LANES 8
+#define CRC_NEON_LANES 12
 #endif
 #if CRC_NEON_LANES == 8
 #define CRC_LANES(X) X(0) X(1) X(2) X(3) X(4) X(5) X(6) X(7)

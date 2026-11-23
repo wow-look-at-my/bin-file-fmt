@@ -91,7 +91,9 @@ Its deflate and zstd go through `node:zlib`, which allocates the codec output be
 | 0 | slicing tables | nothing: every other target and compiler |
 | 1 | one stream through the CRC instruction | x86-64 SSE4.2, or arm64 CRC |
 | 2 | three streams, joined with a carry-less multiply | x86-64 PCLMULQDQ, or arm64 PMULL |
-| 3 | carry-less folding, 256 bytes per step | x86-64 AVX-512F, AVX-512VL and VPCLMULQDQ |
+| 3 | carry-less folding across several vector accumulators | x86-64 AVX-512F, AVX-512VL and VPCLMULQDQ, or arm64 PMULL |
+
+The default stops at tier 2 on arm64 Linux and goes to tier 3 everywhere else, because the measurements below differ by CPU.
 
 - `-DBINPAZER_CRC_TIER=<n>` caps the tier at build time. `make -C c test` runs the core tests at every tier, so no path goes untested on a CPU that has a better one.
 - `c/tools/crc32c_constants.mjs` derives the multiply constants and checks each one. `c/tools/crc_speed.c` prints the throughput per buffer size.
@@ -110,7 +112,17 @@ Measured with `c/tools/crc_speed.c` on a Xeon with AVX-512 and VPCLMULQDQ, in Gi
 
 - The 8 MiB row is the memory, not the hash: XXH3 stops at the same rate.
 - Tier keeps multiple accumulators. Eight measured no faster on this CPU, so the multiplier is the limit.
-- The arm64 paths pass the tests under QEMU. Nobody timed them on real hardware yet.
+
+The `c-arm64` CI job runs `make -C c test-core` and `make -C c speed` on real arm64 CPUs and prints the throughput to its summary. From one run, 1 MiB buffer, in GiB/s:
+
+| CPU | Tier 0 | Tier 1 | Tier 2 | Fold, 8 lanes | Fold, 12 lanes | Fold, 16 lanes |
+|---|---:|---:|---:|---:|---:|---:|
+| arm64 Linux runner | 2.28 | 13.88 | 23.49 | 18.04 | 17.72 | 19.42 |
+| Apple silicon runner | 1.19 | 5.74 | 16.31 | 42.01 | 54.84 | 56.14 |
+
+- On the Linux core the streams of tier 2 beat every fold. So the streams are the default there. On Apple silicon the fold wins, with `CRC_NEON_LANES` at 12.
+- Both runners are shared virtual machines, and the Apple numbers moved by a third between buffer sizes. Read them as an order.
+- Change a default only with a new run of that job as the evidence.
 
 ## IO-injection seam (deliberate -- do not add mmap)
 
