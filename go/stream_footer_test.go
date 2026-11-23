@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"github.com/stretchr/testify/require"
 	"io"
 	"testing"
 )
@@ -13,22 +14,17 @@ func streamedIndexed(t *testing.T) ([]byte, [][]byte) {
 	t.Helper()
 	var buf bytes.Buffer
 	w, err := NewWriterVersion(&buf, GUID{1}, "x", compressDefs, VersionMinorCompression)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	payloads := [][]byte{bytes.Repeat([]byte("streamed payload "), 64), []byte("raw tail")}
-	if err := w.CompressedBlock(1, FlagHasCRC, CodecZstd, payloads[0]); err != nil {
-		t.Fatal(err)
-	}
-	if err := w.Block(1, FlagHasCRC, payloads[1]); err != nil {
-		t.Fatal(err)
-	}
-	if err := w.WriteIndex(); err != nil {
-		t.Fatal(err)
-	}
-	if err := w.End(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, w.CompressedBlock(1, FlagHasCRC, CodecZstd, payloads[0]))
+
+	require.NoError(t, w.Block(1, FlagHasCRC, payloads[1]))
+
+	require.NoError(t, w.WriteIndex())
+
+	require.NoError(t, w.End())
+
 	return buf.Bytes(), payloads
 }
 
@@ -41,13 +37,11 @@ func walkAll(t *testing.T, br *Reader) [][]byte {
 		if errors.Is(err, io.EOF) {
 			return got
 		}
-		if err != nil {
-			t.Fatalf("Next: %v", err)
-		}
+		require.NoError(t, err)
+
 		p, err := br.ReadDecompressedPayload(b)
-		if err != nil {
-			t.Fatalf("payload of block %d: %v", b.TypeID, err)
-		}
+		require.NoError(t, err)
+
 		if b.TypeID == 1 {
 			got = append(got, p)
 		}
@@ -56,78 +50,63 @@ func walkAll(t *testing.T, br *Reader) [][]byte {
 
 func TestStreamedIndexReadsBack(t *testing.T) {
 	file, payloads := streamedIndexed(t)
-	if binary.LittleEndian.Uint64(file[32:]) != FileLengthUnknown {
-		t.Fatal("file_length is not the streaming sentinel")
-	}
+	require.Equal(t, FileLengthUnknown, binary.LittleEndian.Uint64(file[32:]))
+
 	wantIdx := binary.LittleEndian.Uint64(file[len(file)-16:])
-	if binary.LittleEndian.Uint16(file[wantIdx:]) != TypeBlockIndex {
-		t.Fatal("the footer does not point at the Block Index")
-	}
+	require.Equal(t, uint16(TypeBlockIndex), binary.LittleEndian.Uint16(file[wantIdx:]))
 
 	for _, tc := range []struct {
 		name string
 		src  io.Reader
+		end  int // a seekable walk stops before the footer, a streamed walk reads it
 	}{
-		{"non-seekable", bytes.NewBuffer(file)},
-		{"seekable", bytes.NewReader(file)},
+		{"non-seekable", bytes.NewBuffer(file), len(file)},
+		{"seekable", bytes.NewReader(file), len(file) - 16},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			br, err := NewReader(tc.src)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
+
 			got := walkAll(t, br)
-			if len(got) != 2 || !bytes.Equal(got[0], payloads[0]) || !bytes.Equal(got[1], payloads[1]) {
-				t.Fatalf("payloads do not round-trip: got %d blocks", len(got))
-			}
+			require.False(t, len(got) != 2 || !bytes.Equal(got[0], payloads[0]) || !bytes.Equal(got[1], payloads[1]))
+
 			idx, ok := br.IndexOffset()
-			if !ok || idx != wantIdx {
-				t.Fatalf("IndexOffset = %d, %v; want %d, true", idx, ok, wantIdx)
-			}
-			if br.Offset() != uint64(len(file)) {
-				t.Fatalf("walk ended at %d, want %d (after the footer)", br.Offset(), len(file))
-			}
+			require.False(t, !ok || idx != wantIdx)
+
+			require.Equal(t, uint64(tc.end), br.Offset())
+
 		})
 	}
 
 	br, err := NewReader(bytes.NewReader(file))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !br.HasIndex() {
-		t.Fatal("the seekable reader did not find the footer before the walk")
-	}
+	require.NoError(t, err)
+
+	require.True(t, br.HasIndex())
+
 	offs, err := br.Find(1)
-	if err != nil || len(offs) != 2 {
-		t.Fatalf("Find(1) = %v, %v; want two offsets from the index", offs, err)
-	}
+	require.False(t, err != nil || len(offs) != 2)
+
 }
 
 // A streamed file can end in a 16-byte block whose payload is the footer magic. It must stay a block.
 func TestStreamedMagicPayloadIsNotAFooter(t *testing.T) {
 	var buf bytes.Buffer
 	w, err := NewWriter(&buf, GUID{1}, "x", compressDefs)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := w.Block(1, 0, []byte(footerMagic)); err != nil {
-		t.Fatal(err)
-	}
-	if err := w.End(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, w.Block(1, 0, []byte(footerMagic)))
+
+	require.NoError(t, w.End())
+
 	file := buf.Bytes()
 	for _, src := range []io.Reader{bytes.NewBuffer(file), bytes.NewReader(file)} {
 		br, err := NewReader(src)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+
 		got := walkAll(t, br)
-		if len(got) != 1 || string(got[0]) != footerMagic {
-			t.Fatalf("the magic payload block did not read back: %q", got)
-		}
-		if br.HasIndex() {
-			t.Fatal("a block payload was taken for a footer")
-		}
+		require.False(t, len(got) != 1 || string(got[0]) != footerMagic)
+
+		require.False(t, br.HasIndex())
+
 	}
 }
