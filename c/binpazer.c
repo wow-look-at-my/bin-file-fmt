@@ -778,9 +778,46 @@ binpazer_status binpazer_writer_end(binpazer_writer *w) {
 
 /* ---- reader ---- */
 
+/* Every reader read goes through r_in, so the bytes a footer check looked at come first. */
+static size_t r_in(binpazer_reader *r, void *buf, size_t n) {
+    size_t have = (size_t)(r->ahead_len - r->ahead_pos);
+    size_t take = n < have ? n : have;
+    memcpy(buf, r->ahead + r->ahead_pos, take);
+    r->ahead_pos = (uint8_t)(r->ahead_pos + take);
+    if (take == n) return n;
+    return take + r->read(r->ctx, (uint8_t *)buf + take, n - take);
+}
+static int r_seek(binpazer_reader *r, uint64_t offset) {
+    r->ahead_len = r->ahead_pos = 0;
+    return r->seek(r->ctx, offset);
+}
+
+/* Reports whether the bytes bh at offset `at` start the footer, and consumes the footer if so.
+ * With a known file_length the footer is at file_length-16. With no file_length the footer is the
+ * last several bytes of the input, so the check reads one byte past them. The magic alone can be
+ * the payload of a last 16-byte block. */
+static int r_footer(binpazer_reader *r, const uint8_t bh[8], uint64_t at) {
+    if (r->has_index || (r->header_flags & BINPAZER_HEADER_FLAG_APPENDABLE)) return 0;
+    int known = r->file_length != BINPAZER_FILE_LENGTH_UNKNOWN;
+    if (known && (r->file_length < 16 || at != r->file_length - 16)) return 0;
+    size_t want = known ? 8 : 9;
+    size_t have = (size_t)(r->ahead_len - r->ahead_pos);
+    memmove(r->ahead, r->ahead + r->ahead_pos, have);
+    r->ahead_pos = 0;
+    if (have < want) have += r->read(r->ctx, r->ahead + have, want - have);
+    r->ahead_len = (uint8_t)have;
+    if (have < 8 || (!known && have != 8) || memcmp(r->ahead, "rezapnib", 8) != 0) return 0;
+    uint64_t idx = get_u64(bh);
+    if (!known && (idx % 8 != 0 || idx >= at)) return 0;
+    r->index_offset = idx;
+    r->has_index = 1;
+    r->ahead_pos = 8;
+    return 1;
+}
+
 static binpazer_status r_raw(binpazer_reader *r, void *buf, size_t n) {
     if (r->err) return (binpazer_status)r->err;
-    if (r->read(r->ctx, buf, n) != n) { r->err = BINPAZER_ERR_IO; }
+    if (r_in(r,buf, n) != n) { r->err = BINPAZER_ERR_IO; }
     else r->offset += n;
     return (binpazer_status)r->err;
 }
@@ -871,13 +908,13 @@ binpazer_status binpazer_reader_begin(
     if (r->seek && r->file_length != BINPAZER_FILE_LENGTH_UNKNOWN && r->file_length >= 16) {
         uint64_t saved = r->offset;
         uint8_t ft[16];
-        if (r->seek(r->ctx, r->file_length - 16) == 0 &&
-            r->read(r->ctx, ft, 16) == 16 &&
+        if (r_seek(r,r->file_length - 16) == 0 &&
+            r_in(r,ft, 16) == 16 &&
             memcmp(ft + 8, "rezapnib", 8) == 0) {
             r->index_offset = get_u64(ft);
             r->has_index = 1;
         }
-        if (r->seek(r->ctx, saved) != 0) return (binpazer_status)(r->err = BINPAZER_ERR_IO);
+        if (r_seek(r,saved) != 0) return (binpazer_status)(r->err = BINPAZER_ERR_IO);
         r->offset = saved;
     }
     r->blocks_end = r->file_length;
@@ -919,10 +956,15 @@ binpazer_status binpazer_reader_next(
         return BINPAZER_END;
 
     uint8_t bh[8];
-    size_t got = r->read(r->ctx, bh, 8);
+    size_t got = r_in(r,bh, 8);
     if (got == 0) return BINPAZER_END;            /* clean EOF at a boundary */
     if (got != 8) return (binpazer_status)(r->err = BINPAZER_ERR_IO);
     r->offset += 8;
+    if (r_footer(r, bh, r->offset - 8)) {
+        r->blocks_end = r->offset - 8;
+        r->offset += 8;
+        return BINPAZER_END;
+    }
 
     r_block_from_header(r, bh, r->offset, entries, entries_count, blk);
     return BINPAZER_OK;
@@ -934,7 +976,7 @@ binpazer_status binpazer_reader_next(
 static binpazer_status r_verify_committed(
     binpazer_reader *r, uint8_t bh[8], void *scratch, size_t scratch_cap)
 {
-    if (r->read(r->ctx, bh, 8) != 8) return BINPAZER_PENDING;
+    if (r_in(r,bh, 8) != 8) return BINPAZER_PENDING;
     uint16_t type_id = get_u16(bh);
     uint16_t flags   = get_u16(bh + 2);
     uint32_t lf      = get_u32(bh + 4);
@@ -947,13 +989,13 @@ static binpazer_status r_verify_committed(
     uint32_t crc = binpazer_crc32c(0, bh, 8);
     while (left) {
         size_t n = left < (uint64_t)scratch_cap ? (size_t)left : scratch_cap;
-        if (r->read(r->ctx, scratch, n) != n) return BINPAZER_PENDING;
+        if (r_in(r,scratch, n) != n) return BINPAZER_PENDING;
         crc = binpazer_crc32c(crc, scratch, n);
         left -= n;
     }
     uint8_t tail[12]; /* the CRC trailer, then the alignment padding */
     size_t tail_len = 4 + (size_t)(align8(body_end) - body_end);
-    if (r->read(r->ctx, tail, tail_len) != tail_len) return BINPAZER_PENDING;
+    if (r_in(r,tail, tail_len) != tail_len) return BINPAZER_PENDING;
     return crc == get_u32(tail) ? BINPAZER_OK : BINPAZER_TORN;
 }
 
@@ -972,11 +1014,11 @@ binpazer_status binpazer_reader_next_committed(
 
     /* Seek first: a FILE* that hit the end of the file reads nothing until it is repositioned. */
     uint64_t start = r->offset;
-    if (r->seek(r->ctx, start) != 0) return (binpazer_status)(r->err = BINPAZER_ERR_IO);
+    if (r_seek(r,start) != 0) return (binpazer_status)(r->err = BINPAZER_ERR_IO);
     uint8_t bh[8];
     binpazer_status st = r_verify_committed(r, bh, scratch, scratch_cap);
     uint64_t at = (st == BINPAZER_OK) ? start + 8 : start;
-    if (r->seek(r->ctx, at) != 0) return (binpazer_status)(r->err = BINPAZER_ERR_IO);
+    if (r_seek(r,at) != 0) return (binpazer_status)(r->err = BINPAZER_ERR_IO);
     r->offset = at;
     if (st == BINPAZER_OK) r_block_from_header(r, bh, at, entries, entries_count, blk);
     return st;
@@ -1102,7 +1144,7 @@ binpazer_status binpazer_reader_find(
     do {
         if (r->has_index) {
             /* Scan only the compact index -- no file walk. */
-            if (r->seek(r->ctx, r->index_offset) != 0) { st = BINPAZER_ERR_IO; break; }
+            if (r_seek(r,r->index_offset) != 0) { st = BINPAZER_ERR_IO; break; }
             r->offset = r->index_offset;
             uint8_t bh[8], cc[8];
             if (r_raw(r, bh, 8) || r_raw(r, cc, 8)) { st = (binpazer_status)r->err; break; }
@@ -1117,7 +1159,7 @@ binpazer_status binpazer_reader_find(
             }
         } else {
             /* No index -- walk the file. */
-            if (r->seek(r->ctx, r->first_block_offset) != 0) { st = BINPAZER_ERR_IO; break; }
+            if (r_seek(r,r->first_block_offset) != 0) { st = BINPAZER_ERR_IO; break; }
             r->offset = r->first_block_offset;
             int appendable = (r->header_flags & BINPAZER_HEADER_FLAG_APPENDABLE) != 0;
             if (appendable) {
@@ -1126,7 +1168,7 @@ binpazer_status binpazer_reader_find(
                     if (total < cap) { out[total].type_id = type_id; out[total].offset = r->first_block_offset; }
                     total++;
                 }
-                if (r->seek(r->ctx, r->table_end) != 0) { st = BINPAZER_ERR_IO; break; }
+                if (r_seek(r,r->table_end) != 0) { st = BINPAZER_ERR_IO; break; }
                 r->offset = r->table_end;
             }
             while (r->blocks_end == BINPAZER_FILE_LENGTH_UNKNOWN || r->offset < r->blocks_end) {
@@ -1137,9 +1179,10 @@ binpazer_status binpazer_reader_find(
                     uint8_t tmp[512];
                     if (r_verify_committed(r, bh, tmp, sizeof tmp) != BINPAZER_OK) break;
                 } else {
-                    size_t got = r->read(r->ctx, bh, 8);
+                    size_t got = r_in(r,bh, 8);
                     if (got == 0) break;
                     if (got != 8) { st = BINPAZER_ERR_IO; break; }
+                    if (r_footer(r, bh, blk_off)) break;
                 }
                 r->offset += 8;
                 uint16_t tid = get_u16(bh);
@@ -1152,7 +1195,7 @@ binpazer_status binpazer_reader_find(
                 }
                 uint64_t crc = (flags & BINPAZER_FLAG_HAS_CRC) ? 4 : 0;
                 uint64_t next = align8(blk_off + 8 + plen + crc);
-                if (r->seek(r->ctx, next) != 0) { st = BINPAZER_ERR_IO; break; }
+                if (r_seek(r,next) != 0) { st = BINPAZER_ERR_IO; break; }
                 r->offset = next;
             }
         }
@@ -1160,7 +1203,7 @@ binpazer_status binpazer_reader_find(
 
     if (count) *count = total;
     if (st == BINPAZER_OK && total > cap) st = BINPAZER_ERR_CAPACITY;
-    if (r->seek(r->ctx, saved) == 0) r->offset = saved; /* restore position */
+    if (r_seek(r,saved) == 0) r->offset = saved; /* restore position */
     if (st != BINPAZER_OK && st != BINPAZER_ERR_CAPACITY) r->err = st;
     return st;
 }
@@ -1171,7 +1214,7 @@ binpazer_status binpazer_reader_at(
 {
     if (r->err) return (binpazer_status)r->err;
     if (!r->seek) return (binpazer_status)(r->err = BINPAZER_ERR_NOSEEK);
-    if (r->seek(r->ctx, offset) != 0) return (binpazer_status)(r->err = BINPAZER_ERR_IO);
+    if (r_seek(r,offset) != 0) return (binpazer_status)(r->err = BINPAZER_ERR_IO);
     r->offset = offset;
 
     uint8_t bh[8];

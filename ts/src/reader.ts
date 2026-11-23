@@ -33,7 +33,19 @@ function matchesAscii(b: Uint8Array, at: number, text: string): boolean {
 	return true;
 }
 
-// looseU64 reads file_length without the safe-integer check: it is only compared, never used as a position.
+// isStreamFooter reports whether the bytes at b[at] are the footer of a file
+// with no file_length; pos is their file offset.
+function isStreamFooter(b: Uint8Array, at: number, pos: number): boolean {
+	if (!matchesAscii(b, at + 8, FOOTER_MAGIC)) {
+		return false;
+	}
+	const lo = getU32(b, at);
+	const idx = getU32(b, at + 4) * 0x100000000 + lo;
+	return lo % 8 === 0 && idx < pos;
+}
+
+// looseU64 reads file_length without the safe-integer check: it is only
+// compared, never used as a position.
 function looseU64(b: Uint8Array, at: number): number | null {
 	const lo = getU32(b, at);
 	const hi = getU32(b, at + 4);
@@ -135,6 +147,18 @@ export class Reader {
 		if (fl !== null && this.indexFound) {
 			this.blocksEnd = fl - 16;
 		}
+		// A streamed file has no file_length, but the real input size shows where a footer must be.
+		if (source.seek !== undefined && fl === null && !this.appendable && this.size >= 16) {
+			const saved = this.cursor;
+			const at = this.size - 16;
+			this.seekTo(at);
+			const foot = new Uint8Array(16);
+			if (this.readUpTo(foot) === 16 && isStreamFooter(foot, 0, at)) {
+				this.recordIndex(foot, 0);
+				this.blocksEnd = at;
+			}
+			this.seekTo(saved);
+		}
 	}
 
 	// hasIndex reports whether a Block Index was located through the footer.
@@ -183,6 +207,15 @@ export class Reader {
 				this.cursor += 16;
 				return null;
 			}
+		}
+		// With no file_length the footer is the last several bytes, so the check needs one byte past them.
+		if (!this.indexFound && fl === null && !this.appendable && this.ensureAtLeast(17) === 16 &&
+			isStreamFooter(this.win, this.winPos, this.cursor)) {
+			this.recordIndex(this.win, this.winPos);
+			this.winPos += 16;
+			this.cursor += 16;
+			this.blocksEnd = this.cursor - 16;
+			return null;
 		}
 		const hdr8 = new Uint8Array(8);
 		const got = this.readUpTo(hdr8);
@@ -614,6 +647,14 @@ export class Reader {
 	private ensure(n: number): number {
 		if (this.winEnd - this.winPos < n && !this.srcEof) {
 			this.fill();
+		}
+		return this.winEnd - this.winPos;
+	}
+
+	// ensureAtLeast buffers n bytes, or every byte left before the end of the input, and returns how many are available.
+	private ensureAtLeast(n: number): number {
+		while (this.winEnd - this.winPos < n && this.fill() > 0) {
+			// fill until n bytes or the end of the input
 		}
 		return this.winEnd - this.winPos;
 	}

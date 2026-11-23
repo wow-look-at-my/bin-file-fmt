@@ -103,6 +103,92 @@ static void test_index(void) {
 }
 
 /* Exercises large_mode with 4096-byte (page) units. */
+/* Walks every block of `m` and checks the payloads against `want`. A NULL seek reads it as a stream. */
+static int walk_payloads(membuf *m, binpazer_seek_fn seek, const char *const *want, int nwant,
+                         binpazer_reader *r) {
+    char nm[16]; binpazer_type_entry te[8]; size_t nte = 0;
+    m->pos = 0;
+    if (binpazer_reader_begin(r, mem_read, seek, m, nm, sizeof nm, te, 8, &nte) != BINPAZER_OK) return -1;
+    int n = 0; binpazer_block b; char pb[64];
+    while (binpazer_reader_next(r, te, nte, &b) == BINPAZER_OK) {
+        if (b.type_id == BINPAZER_TYPE_BLOCK_INDEX) {
+            if (binpazer_reader_skip_payload(r, &b) != BINPAZER_OK) return -1;
+            n++;
+            continue;
+        }
+        if (binpazer_reader_read_payload(r, &b, pb, sizeof pb) != BINPAZER_OK) return -1;
+        if (n >= nwant || b.payload_len != strlen(want[n]) || memcmp(pb, want[n], b.payload_len) != 0) return -1;
+        n++;
+    }
+    return r->err == BINPAZER_OK ? n : -1;
+}
+
+/* A streamed file has no file_length, but its footer still locates the index. The walk must stop at it. */
+static void test_streamed_index(void) {
+    static uint8_t buf[4096], buf2[4096];
+    membuf S = { buf, sizeof buf, 0, 0 };
+    binpazer_guid wg = {{0x01}};
+    binpazer_type_def defs[2] = { {1, {{0x11}}, "A"}, {2, {{0x22}}, "B"} };
+    static const char *const want[] = { "aaaa", "", "b", "cccccccc" };
+
+    binpazer_writer w;
+    binpazer_writer_begin(&w, mem_write, NULL, &S, &wg, "s", defs, 2);
+    binpazer_index_entry idx[4];
+    for (int i = 0; i < 4; i++) {
+        idx[i].type_id = (uint16_t)(i == 2 ? 2 : 1); idx[i].offset = w.offset;
+        binpazer_writer_block(&w, idx[i].type_id, BINPAZER_FLAG_HAS_CRC, want[i], strlen(want[i]));
+    }
+    uint64_t idx_off = w.offset;
+    CHECK(binpazer_writer_index(&w, idx, 4) == BINPAZER_OK, "stream-index: write index");
+    CHECK(binpazer_writer_end(&w) == BINPAZER_OK, "stream-index: end ok");
+    uint64_t fl; memcpy(&fl, buf + 32, 8);
+    CHECK(fl == BINPAZER_FILE_LENGTH_UNKNOWN, "stream-index: file_length is the sentinel");
+
+    binpazer_reader r;
+    CHECK(walk_payloads(&S, NULL, want, 4, &r) == 5, "stream-index: non-seekable walk reads 4 blocks and the index");
+    CHECK(r.has_index && r.index_offset == idx_off, "stream-index: non-seekable walk records the footer");
+    CHECK(walk_payloads(&S, mem_seek, want, 4, &r) == 5, "stream-index: seekable walk reads 4 blocks and the index");
+    CHECK(r.has_index && r.index_offset == idx_off, "stream-index: seekable walk records the footer");
+
+    /* Find walks the file first: the footer must not show up as a block of a matching type. */
+    char nm[16]; binpazer_type_entry te[8]; size_t nte = 0;
+    S.pos = 0;
+    binpazer_reader_begin(&r, mem_read, mem_seek, &S, nm, sizeof nm, te, 8, &nte);
+    binpazer_index_entry found[8]; size_t nf = 0;
+    uint16_t fake_type = (uint16_t)idx_off;
+    CHECK(binpazer_reader_find(&r, fake_type, found, 8, &nf) == BINPAZER_OK, "stream-index: find walk ok");
+    CHECK(nf == (fake_type == 1 ? 3u : 0u), "stream-index: find walk skips the footer");
+    CHECK(binpazer_reader_find(&r, 1, found, 8, &nf) == BINPAZER_OK && nf == 3, "stream-index: find type 1 -> 3");
+
+    /* A streamed file can end in a 16-byte block whose payload is the magic. It stays a block. */
+    membuf M = { buf2, sizeof buf2, 0, 0 };
+    binpazer_writer_begin(&w, mem_write, NULL, &M, &wg, "s", defs, 2);
+    binpazer_writer_block(&w, 1, 0, "rezapnib", 8);
+    binpazer_writer_end(&w);
+    static const char *const magic[] = { "rezapnib" };
+    CHECK(walk_payloads(&M, NULL, magic, 1, &r) == 1 && !r.has_index, "stream-index: magic payload is a block");
+}
+
+/* A known file_length read without a seek: the walk finds the footer at file_length-16. */
+static void test_known_length_stream(void) {
+    static uint8_t buf[4096];
+    membuf F = { buf, sizeof buf, 0, 0 };
+    binpazer_guid wg = {{0x01}};
+    binpazer_type_def defs[1] = { {1, {{0x11}}, "A"} };
+    static const char *const want[] = { "aaaa", "bb" };
+    binpazer_writer w;
+    binpazer_writer_begin(&w, mem_write, mem_seek, &F, &wg, "k", defs, 1);
+    binpazer_index_entry idx[2];
+    for (int i = 0; i < 2; i++) {
+        idx[i].type_id = 1; idx[i].offset = w.offset;
+        binpazer_writer_block(&w, 1, 0, want[i], strlen(want[i]));
+    }
+    binpazer_writer_index(&w, idx, 2);
+    CHECK(binpazer_writer_end(&w) == BINPAZER_OK, "known-stream: end ok");
+    binpazer_reader r;
+    CHECK(walk_payloads(&F, NULL, want, 2, &r) == 3 && r.has_index, "known-stream: walk stops at the footer");
+}
+
 static void test_large(void) {
     static uint8_t buf[8192];
     membuf m = { buf, sizeof buf, 0, 0 };
@@ -563,6 +649,8 @@ int main(void) {
 
     test_crc32c();
     test_index();
+    test_streamed_index();
+    test_known_length_stream();
     test_large();
     test_btt_capacity();
     test_compression();
