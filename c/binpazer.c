@@ -467,6 +467,8 @@ CRC_WIDE static uint32_t crc_wide(uint32_t crc, const uint8_t *p, size_t n) {
     _mm512_storeu_si512(rest + 64, a1);
     _mm512_storeu_si512(rest + 128, a2);
     _mm512_storeu_si512(rest + 192, a3);
+    /* crc_three runs SSE-encoded multiplies, which are slow while the upper vector halves hold data. */
+    _mm256_zeroupper();
     return crc_three(crc_three(0, rest, sizeof rest), p, n);
 }
 #endif
