@@ -21,15 +21,17 @@ export function checkPrograms(opts: Options): void {
 	if (!fs.existsSync(opts.measureBin)) throw new Error(`measure helper not found: ${opts.measureBin}; build it with: make -C bench`);
 	for (const impl of opts.impls) {
 		const bin = opts.bins[impl];
-		if (!fs.existsSync(bin)) throw new Error(`${IMPL_LABELS[impl]} bench program not found: ${bin}; build it with: ${BUILD_COMMANDS[impl]}`);
+		const build = BUILD_COMMANDS[impl];
+		if (!fs.existsSync(bin)) throw new Error(`${IMPL_LABELS[impl]} bench program not found: ${bin}${build === null ? "" : `; build it with: ${build}`}`);
 	}
+	if (opts.impls.includes("py")) requireTool(opts.python, "the Python bench program");
 	if (!opts.profile) return;
 	const gprofImpls = opts.impls.filter((i): i is "c" | "cpp" => i === "c" || i === "cpp");
 	for (const impl of gprofImpls) {
 		const bin = opts.profBins[impl];
 		if (!fs.existsSync(bin)) throw new Error(`${IMPL_LABELS[impl]} gprof build not found: ${bin}; build it with: make -C bench prof`);
 	}
-	if (gprofImpls.length > 0) requireTool("gprof");
+	if (gprofImpls.length > 0) requireTool("gprof", "--profile");
 }
 
 export class Bench {
@@ -44,7 +46,7 @@ export class Bench {
 	}
 
 	argv(impl: Impl, op: Op, args: string[]): string[] {
-		return [...benchArgv(impl, this.opts.bins[impl], process.execPath), op, ...args];
+		return [...benchArgv(impl, this.opts.bins[impl], { node: process.execPath, python: this.opts.python }), op, ...args];
 	}
 
 	opArgs(w: Workload, op: Op, file: string, payload: string): string[] {
@@ -212,7 +214,8 @@ export class Bench {
 
 	run(): Results {
 		checkPrograms(this.opts);
-		const environment = collectEnvironment(this.opts.impls.includes("go") ? this.opts.bins.go : null, this.opts.workDir);
+		const { impls, bins, python, workDir } = this.opts;
+		const environment = collectEnvironment(impls.includes("go") ? bins.go : null, impls.includes("py") ? python : null, workDir);
 		const workloads = this.opts.workloads.map((w) => this.runWorkload(w));
 		return { mode: this.opts.quick ? "quick" : "full", repeats: this.opts.repeats, environment, workloads, profiles: [...this.profiles] };
 	}

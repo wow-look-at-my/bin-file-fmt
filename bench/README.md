@@ -1,6 +1,6 @@
 # binpazer benchmark
 
-The benchmark runs the same workloads through the C, C++, Go and TypeScript implementations. It measures CPU time and peak memory of each run, checks that the implementations agree, and writes a comparison report.
+The benchmark runs the same workloads through the C, C++, Go, TypeScript and Python implementations. It measures CPU time and peak memory of each run, checks that the implementations agree, and writes a comparison report.
 
 ## What it measures
 
@@ -31,6 +31,8 @@ make -C bench
 node bench/run.ts
 ```
 
+The Python bench program is `py/bench/bench.py` and needs no build. The driver runs it with `python3`. Pass `--python <command>` for another interpreter.
+
 A quick run divides the block counts by 8, does one repeat and writes its outputs into `bench/work/`, so it never overwrites the committed results:
 
 ```sh
@@ -45,7 +47,9 @@ make -C bench prof
 node bench/run.ts --profile
 ```
 
-`make -C bench prof` builds `bench_c` and `bench_cpp` into `bench/build-prof/` with `-pg` and a static link, so gprof also samples libc and the codec libraries. After the timed runs of a workload, `--profile` runs each implementation. This happens once more for small/read, medium/write and medium/read. This also happens lz4/write and lz4/read: C and C++ under gprof, Go with `--cpuprofile` (pprof), TypeScript with `node --cpu-prof`. These profiled runs always use the full block counts, also with `--quick`, because the samplers only take samples a second. Each profiled run must print the same result line as the reference.
+`make -C bench prof` builds `bench_c` and `bench_cpp` into `bench/build-prof/` with `-pg` and a static link, so gprof also samples libc and the codec libraries. After the timed runs of a workload, `--profile` runs each implementation. This happens once more for small/read, medium/write and medium/read. This also happens lz4/write and lz4/read: C and C++ under gprof, Go with `--cpuprofile` (pprof), TypeScript with `node --cpu-prof`, Python with `--cpuprofile` (cProfile). cProfile is a tracer and not a sampler. It adds time to every Python function call.
+
+Read its shares as an order, not as exact weights. These profiled runs always use the full block counts, also with `--quick`, because the samplers only take samples a second. Each profiled run must print the same result line as the reference.
 
 Every write and read goes through the filesystem of the work directory. The report names it. A disk there can add kernel time that has nothing to do with the libraries. Point the work directory at a RAM-backed filesystem with `--work-dir`, or with the `BINPAZER_BENCH_WORK_DIR` environment variable. To keep the block device out of the numbers.
 

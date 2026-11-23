@@ -1,13 +1,13 @@
 // Implementation and workload tables, and the selection and --quick scaling over them.
 
-export type Impl = "c" | "cpp" | "go" | "ts";
+export type Impl = "c" | "cpp" | "go" | "ts" | "py";
 export type Op = "write" | "read" | "stream" | "find";
 export type Codec = "none" | "stored" | "deflate" | "zstd" | "lz4";
 
 // Report column order.
-export const IMPLS: readonly Impl[] = ["c", "cpp", "go", "ts"];
+export const IMPLS: readonly Impl[] = ["c", "cpp", "go", "ts", "py"];
 
-export const IMPL_LABELS: Record<Impl, string> = { c: "C", cpp: "C++", go: "Go", ts: "TypeScript" };
+export const IMPL_LABELS: Record<Impl, string> = { c: "C", cpp: "C++", go: "Go", ts: "TypeScript", py: "Python" };
 
 export interface Workload {
 	name: string;

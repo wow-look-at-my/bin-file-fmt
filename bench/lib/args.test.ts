@@ -24,7 +24,7 @@ test("defaults select everything in full mode", () => {
 	const o = parse([]);
 	assert.equal(o.quick, false);
 	assert.equal(o.repeats, 5);
-	assert.deepEqual(o.impls, ["c", "cpp", "go", "ts"]);
+	assert.deepEqual(o.impls, ["c", "cpp", "go", "ts", "py"]);
 	assert.deepEqual(o.workloads.map((w) => w.name), ["small", "medium", "large", "stored", "deflate", "zstd", "lz4"]);
 	assert.equal(o.workloads[0]!.blocks, 200000);
 	assert.equal(o.workDir, "/repo/bench/work");
@@ -33,6 +33,8 @@ test("defaults select everything in full mode", () => {
 	assert.equal(o.bins.c, "/repo/bench/build/bench_c");
 	assert.equal(o.bins.go, "/repo/go/build/binpazer");
 	assert.equal(o.bins.ts, "/repo/ts/bench/dist/bench.js");
+	assert.equal(o.bins.py, "/repo/py/bench/bench.py");
+	assert.equal(o.python, "python3");
 	assert.equal(o.measureBin, "/repo/bench/build/measure");
 });
 
@@ -69,7 +71,8 @@ test("--help returns null", () => {
 
 test("bad input fails with the valid names", () => {
 	assert.throws(() => parse(["--bogus"]), /unknown option "--bogus"; valid options: .*--quick/);
-	assert.throws(() => parse(["--impls", "c,rust"]), /unknown implementation "rust"; valid implementations: c, cpp, go, ts/);
+	assert.throws(() => parse(["--impls", "c,rust"]), /unknown implementation "rust"; valid implementations: c, cpp, go, ts, py/);
+	assert.throws(() => parse(["--python", ""]), /command name or a path/);
 	assert.throws(() => parse(["--only", "huge"]), /unknown workload "huge"; valid workloads: small, medium/);
 	assert.throws(() => parse(["--repeats", "0"]), /positive integer/);
 	assert.throws(() => parse(["--repeats"]), /needs a value/);
@@ -94,7 +97,15 @@ test("implementations come back in column order and the reference prefers c", ()
 });
 
 test("bench argv prefixes", () => {
-	assert.deepEqual(benchArgv("c", "/b/c", "/node"), ["/b/c"]);
-	assert.deepEqual(benchArgv("go", "/b/binpazer", "/node"), ["/b/binpazer", "bench"]);
-	assert.deepEqual(benchArgv("ts", "/b/bench.js", "/node"), ["/node", "/b/bench.js"]);
+	const rt = { node: "/node", python: "python3" };
+	assert.deepEqual(benchArgv("c", "/b/c", rt), ["/b/c"]);
+	assert.deepEqual(benchArgv("go", "/b/binpazer", rt), ["/b/binpazer", "bench"]);
+	assert.deepEqual(benchArgv("ts", "/b/bench.js", rt), ["/node", "/b/bench.js"]);
+	assert.deepEqual(benchArgv("py", "/b/bench.py", rt), ["python3", "/b/bench.py"]);
+});
+
+test("the interpreter is a command name, or a path that resolves against cwd", () => {
+	assert.equal(parse(["--python", "pypy3"]).python, "pypy3");
+	assert.equal(parse(["--python=venv/bin/python3", "--py-bin", "b.py"]).python, "/cwd/venv/bin/python3");
+	assert.equal(parse(["--py-bin", "b.py"]).bins.py, "/cwd/b.py");
 });

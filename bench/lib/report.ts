@@ -30,6 +30,7 @@ export interface Environment {
 	cc: string;
 	cxx: string;
 	go?: string;
+	python?: string;
 }
 
 export interface ProfileSummary {
@@ -146,6 +147,7 @@ function renderEnvironment(input: ReportInput): string {
 		["c++", e.cxx],
 	];
 	if (e.go !== undefined) rows.push(["go cli", e.go]);
+	if (e.python !== undefined) rows.push(["python", e.python]);
 	const width = Math.max(...rows.map(([k]) => k.length));
 	return "```text\n" + rows.map(([k, v]) => `${k.padEnd(width)}  ${v}`).join("\n") + "\n```";
 }

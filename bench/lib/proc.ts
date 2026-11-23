@@ -47,10 +47,10 @@ export function runDirect(argv: string[], cwd?: string): RunOutput {
 	return { stdout: check(argv, r), stats: null };
 }
 
-// Throws naming the tool when `<tool> --version` cannot run.
-export function requireTool(tool: string): void {
+// Throws naming the tool and what needs it when `<tool> --version` cannot run.
+export function requireTool(tool: string, neededBy: string): void {
 	const r = spawnSync(tool, ["--version"], { stdio: "ignore" });
-	if (r.error !== undefined || r.status !== 0) throw new Error(`${tool} is required by --profile but \`${tool} --version\` failed: ${r.error?.message ?? `status ${r.status}`}`);
+	if (r.error !== undefined || r.status !== 0) throw new Error(`${tool} is required by ${neededBy} but \`${tool} --version\` failed: ${r.error?.message ?? `status ${r.status}`}`);
 }
 
 // Streams the file through sha256 in reads.
@@ -97,7 +97,7 @@ function osName(): string | null {
 	return m[1]!.trim().replace(/^"(.*)"$/, "$1");
 }
 
-export function collectEnvironment(goBin: string | null, workDir: string): Environment {
+export function collectEnvironment(goBin: string | null, python: string | null, workDir: string): Environment {
 	const env: Environment = {
 		// Every write and read goes through this filesystem, so the report names it.
 		workDirFilesystem: firstLine(["stat", "-f", "-c", "%T", workDir]),
@@ -111,6 +111,7 @@ export function collectEnvironment(goBin: string | null, workDir: string): Envir
 		cxx: firstLine(["c++", "--version"]),
 	};
 	if (goBin !== null) env.go = firstLine([goBin, "--version"]);
+	if (python !== null) env.python = firstLine([python, "--version"]);
 	return env;
 }
 

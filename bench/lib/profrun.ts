@@ -4,13 +4,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { pprofSelfTimes } from "./pprof.ts";
 import { describeArgv, runDirect } from "./proc.ts";
-import { parseCpuProfile, parseGprofFlat, shortGoName, summarizeProfile } from "./profiles.ts";
+import { parseCpuProfile, parseGprofFlat, parseSelfTimesJson, shortGoName, summarizeProfile } from "./profiles.ts";
 import type { ProfileSummary } from "./report.ts";
 import type { Impl, Op } from "./workloads.ts";
 
 export interface ProfilePrograms {
 	bins: Record<Impl, string>;
 	profBins: { c: string; cpp: string };
+	python: string;
 }
 
 export interface ProfiledRun {
@@ -90,6 +91,13 @@ function runOnce(progs: ProfilePrograms, impl: Impl, op: Op, args: string[], dir
 			ms.set(n, (ms.get(n) ?? 0) + ns / 1e6);
 		}
 		return { stdout, argv, selfMs: ms, tool: "pprof", source: file };
+	}
+	if (impl === "py") {
+		const file = path.join(dir, "cprofile.json");
+		const argv = [progs.python, progs.bins.py, "--cpuprofile", file, op, ...args];
+		const { stdout } = runDirect(argv, dir);
+		if (!fs.existsSync(file)) throw new Error(`${describeArgv(argv)} wrote no ${file}`);
+		return { stdout, argv, selfMs: parseSelfTimesJson(fs.readFileSync(file, "utf8"), file), tool: "cProfile", source: file };
 	}
 	const argv = [process.execPath, "--cpu-prof", `--cpu-prof-dir=${dir}`, progs.bins.ts, op, ...args];
 	const { stdout } = runDirect(argv, dir);
