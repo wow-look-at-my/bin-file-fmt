@@ -44,6 +44,16 @@ CPU seconds per operation from that run (user + sys, median of the timed runs, l
 | lz4 / write | 0.063 | 0.069 | 0.316 | 0.662 | 0.185 |
 | lz4 / read | 0.013 | 0.017 | 0.331 | 0.201 | 0.092 |
 
+CRC-32C throughput of the C core by CPU, with XXH3 built for the same CPU as a yardstick (GiB/s, 1 MiB buffer, from `make -C c speed` and `make -C c speed-xxh3`):
+
+| CPU | Table CRC | CRC-32C path in use | Its throughput | XXH3 |
+|---|---:|---|---:|---:|
+| x86-64 with AVX-512 and VPCLMULQDQ | 1.94 | carry-less folding | 64.11 | 53.40 |
+| arm64 Linux (GitHub runner) | 2.28 | three CRC streams | 22.91 | 13.41 |
+| Apple silicon (GitHub runner) | 1.19 | PMULL folding | 57.21 | 26.23 |
+
+The arm64 rows come from the `c-arm64` CI job, which prints them again on every run. An arm64 Linux CPU of another kind can rank the paths differently: run `make -C c speed` there.
+
 Every block in these workloads carries a CRC. The C core computes CRC-32C with the fastest instructions the CPU has: AVX-512 carry-less folding on this machine. Python calls the C implementation's CRC-32C and the system codec libraries, so its cost is per block, not per byte. The full report also has peak memory, wall time, throughput and file sizes.
 
 The Go library also ships a convenience layer for the shape most binpazer files take. Content blocks, a directory naming where they landed, then the index -- so building one is not twenty lines of bookkeeping:
