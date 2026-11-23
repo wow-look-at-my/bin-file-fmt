@@ -11,7 +11,8 @@
 		"node": "v22.23.5",
 		"cc": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
 		"cxx": "c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
-		"go": "binpazer version dev (345200ed)"
+		"go": "binpazer version dev (b5b25eff)",
+		"python": "Python 3.13.18"
 	},
 	"workloads": [
 		{
@@ -23,54 +24,55 @@
 				"c": 57600192,
 				"cpp": 57600192,
 				"go": 57600192,
-				"ts": 57600192
+				"ts": 57600192,
+				"py": 57600192
 			},
 			"results": [
 				{
 					"op": "write",
 					"impl": "c",
-					"cpuS": 0.06431100000000001,
-					"userS": 0.038636,
-					"sysS": 0.024997,
-					"wallS": 0.06556,
-					"cpuMinS": 0.058267,
-					"cpuMaxS": 0.07059,
+					"cpuS": 0.072686,
+					"userS": 0.052468,
+					"sysS": 0.020218,
+					"wallS": 0.078992,
+					"cpuMinS": 0.066049,
+					"cpuMaxS": 0.090942,
 					"maxRssKb": 5016,
-					"throughputMiBs": 744.7853111653448,
+					"throughputMiBs": 618.1401281142394,
 					"runs": [
 						{
-							"wall_s": 0.059052,
-							"user_s": 0.043216,
-							"sys_s": 0.015721,
+							"wall_s": 0.085995,
+							"user_s": 0.050002,
+							"sys_s": 0.028614,
+							"max_rss_kb": 4828,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.075912,
+							"user_s": 0.054652,
+							"sys_s": 0.0158,
 							"max_rss_kb": 5016,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.087415,
-							"user_s": 0.038636,
-							"sys_s": 0.030673,
+							"wall_s": 0.09926,
+							"user_s": 0.055292,
+							"sys_s": 0.03565,
 							"max_rss_kb": 5016,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.070825,
-							"user_s": 0.051054,
-							"sys_s": 0.019536,
+							"wall_s": 0.0672,
+							"user_s": 0.046628,
+							"sys_s": 0.019421,
 							"max_rss_kb": 5016,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.06556,
-							"user_s": 0.036206,
-							"sys_s": 0.028105,
-							"max_rss_kb": 5012,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.058557,
-							"user_s": 0.03327,
-							"sys_s": 0.024997,
-							"max_rss_kb": 5016,
+							"wall_s": 0.078992,
+							"user_s": 0.052468,
+							"sys_s": 0.020218,
+							"max_rss_kb": 4956,
 							"exit": 0
 						}
 					]
@@ -78,48 +80,48 @@
 				{
 					"op": "write",
 					"impl": "cpp",
-					"cpuS": 0.062398,
-					"userS": 0.039065,
-					"sysS": 0.023333,
-					"wallS": 0.063392,
-					"cpuMinS": 0.060572,
-					"cpuMaxS": 0.070019,
-					"maxRssKb": 7940,
-					"throughputMiBs": 770.2568936143361,
+					"cpuS": 0.085311,
+					"userS": 0.058572,
+					"sysS": 0.024376,
+					"wallS": 0.085686,
+					"cpuMinS": 0.068538,
+					"cpuMaxS": 0.088352,
+					"maxRssKb": 7928,
+					"throughputMiBs": 569.8495086711948,
 					"runs": [
 						{
-							"wall_s": 0.060699,
-							"user_s": 0.040391,
-							"sys_s": 0.020181,
-							"max_rss_kb": 7940,
+							"wall_s": 0.085686,
+							"user_s": 0.060935,
+							"sys_s": 0.024376,
+							"max_rss_kb": 7916,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.064006,
-							"user_s": 0.047136,
-							"sys_s": 0.014618,
-							"max_rss_kb": 7972,
+							"wall_s": 0.071435,
+							"user_s": 0.053569,
+							"sys_s": 0.015739,
+							"max_rss_kb": 7928,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.062648,
-							"user_s": 0.039065,
-							"sys_s": 0.023333,
-							"max_rss_kb": 7844,
+							"wall_s": 0.06951,
+							"user_s": 0.052247,
+							"sys_s": 0.016291,
+							"max_rss_kb": 7928,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.063392,
-							"user_s": 0.029404,
-							"sys_s": 0.033476,
-							"max_rss_kb": 7848,
+							"wall_s": 0.093025,
+							"user_s": 0.06026,
+							"sys_s": 0.028092,
+							"max_rss_kb": 7928,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.07022,
-							"user_s": 0.038876,
-							"sys_s": 0.031143,
-							"max_rss_kb": 7944,
+							"wall_s": 0.086689,
+							"user_s": 0.058572,
+							"sys_s": 0.027322,
+							"max_rss_kb": 7916,
 							"exit": 0
 						}
 					]
@@ -127,48 +129,48 @@
 				{
 					"op": "write",
 					"impl": "go",
-					"cpuS": 0.067907,
-					"userS": 0.030016,
-					"sysS": 0.037891,
-					"wallS": 0.059623,
-					"cpuMinS": 0.066399,
-					"cpuMaxS": 0.07072,
-					"maxRssKb": 17980,
-					"throughputMiBs": 818.9478053771195,
+					"cpuS": 0.085836,
+					"userS": 0.039581,
+					"sysS": 0.044208,
+					"wallS": 0.080122,
+					"cpuMinS": 0.07794599999999999,
+					"cpuMaxS": 0.096609,
+					"maxRssKb": 17340,
+					"throughputMiBs": 609.4221936546767,
 					"runs": [
 						{
-							"wall_s": 0.059291,
-							"user_s": 0.043818,
-							"sys_s": 0.026902,
-							"max_rss_kb": 17980,
+							"wall_s": 0.082693,
+							"user_s": 0.033738,
+							"sys_s": 0.044208,
+							"max_rss_kb": 16828,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.059623,
-							"user_s": 0.02864,
-							"sys_s": 0.038632,
-							"max_rss_kb": 17980,
+							"wall_s": 0.086586,
+							"user_s": 0.057791,
+							"sys_s": 0.038818,
+							"max_rss_kb": 16432,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.061649,
-							"user_s": 0.030016,
-							"sys_s": 0.037891,
-							"max_rss_kb": 19324,
+							"wall_s": 0.080122,
+							"user_s": 0.029322,
+							"sys_s": 0.055975,
+							"max_rss_kb": 19568,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.059229,
-							"user_s": 0.015971,
-							"sys_s": 0.050428,
-							"max_rss_kb": 19580,
+							"wall_s": 0.076016,
+							"user_s": 0.057567,
+							"sys_s": 0.028269,
+							"max_rss_kb": 17340,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.062807,
-							"user_s": 0.041288,
-							"sys_s": 0.029336,
-							"max_rss_kb": 17468,
+							"wall_s": 0.077913,
+							"user_s": 0.039581,
+							"sys_s": 0.051493,
+							"max_rss_kb": 20028,
 							"exit": 0
 						}
 					]
@@ -176,48 +178,97 @@
 				{
 					"op": "write",
 					"impl": "ts",
-					"cpuS": 0.278835,
-					"userS": 0.206316,
-					"sysS": 0.06669,
-					"wallS": 0.247599,
-					"cpuMinS": 0.25402,
-					"cpuMaxS": 0.338603,
-					"maxRssKb": 91816,
-					"throughputMiBs": 197.20647094697475,
+					"cpuS": 0.378821,
+					"userS": 0.299486,
+					"sysS": 0.090959,
+					"wallS": 0.345103,
+					"cpuMinS": 0.311556,
+					"cpuMaxS": 0.40673000000000004,
+					"maxRssKb": 90928,
+					"throughputMiBs": 141.48855559064975,
 					"runs": [
 						{
-							"wall_s": 0.225748,
-							"user_s": 0.200574,
-							"sys_s": 0.059021,
-							"max_rss_kb": 91840,
+							"wall_s": 0.345103,
+							"user_s": 0.287862,
+							"sys_s": 0.090959,
+							"max_rss_kb": 90928,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.260229,
-							"user_s": 0.208794,
-							"sys_s": 0.085044,
-							"max_rss_kb": 91816,
+							"wall_s": 0.348861,
+							"user_s": 0.299486,
+							"sys_s": 0.096053,
+							"max_rss_kb": 91228,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.247599,
-							"user_s": 0.206316,
-							"sys_s": 0.072519,
-							"max_rss_kb": 94056,
+							"wall_s": 0.277132,
+							"user_s": 0.215596,
+							"sys_s": 0.09596,
+							"max_rss_kb": 90432,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.247205,
-							"user_s": 0.18733,
-							"sys_s": 0.06669,
-							"max_rss_kb": 89592,
+							"wall_s": 0.333993,
+							"user_s": 0.311398,
+							"sys_s": 0.057949,
+							"max_rss_kb": 90416,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.31357,
-							"user_s": 0.275849,
-							"sys_s": 0.062754,
-							"max_rss_kb": 91088,
+							"wall_s": 0.362256,
+							"user_s": 0.328367,
+							"sys_s": 0.078363,
+							"max_rss_kb": 91896,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "write",
+					"impl": "py",
+					"cpuS": 4.079568,
+					"userS": 4.008441,
+					"sysS": 0.075954,
+					"wallS": 4.104485,
+					"cpuMinS": 4.025899,
+					"cpuMaxS": 4.257531,
+					"maxRssKb": 71612,
+					"throughputMiBs": 11.896285404868088,
+					"runs": [
+						{
+							"wall_s": 4.335538,
+							"user_s": 4.201632,
+							"sys_s": 0.055899,
+							"max_rss_kb": 71632,
+							"exit": 0
+						},
+						{
+							"wall_s": 4.104485,
+							"user_s": 3.995678,
+							"sys_s": 0.08389,
+							"max_rss_kb": 71628,
+							"exit": 0
+						},
+						{
+							"wall_s": 4.237121,
+							"user_s": 4.143352,
+							"sys_s": 0.075954,
+							"max_rss_kb": 71608,
+							"exit": 0
+						},
+						{
+							"wall_s": 4.048365,
+							"user_s": 3.937172,
+							"sys_s": 0.088727,
+							"max_rss_kb": 71612,
+							"exit": 0
+						},
+						{
+							"wall_s": 4.102207,
+							"user_s": 4.008441,
+							"sys_s": 0.054067,
+							"max_rss_kb": 71604,
 							"exit": 0
 						}
 					]
@@ -225,48 +276,48 @@
 				{
 					"op": "read",
 					"impl": "c",
-					"cpuS": 0.048301,
-					"userS": 0.040918,
-					"sysS": 0.011749,
-					"wallS": 0.050478,
-					"cpuMinS": 0.046998000000000005,
-					"cpuMaxS": 0.062213000000000004,
-					"maxRssKb": 2156,
-					"throughputMiBs": 967.3149688973414,
+					"cpuS": 0.049829,
+					"userS": 0.039791,
+					"sysS": 0.012271,
+					"wallS": 0.051007,
+					"cpuMinS": 0.049657,
+					"cpuMaxS": 0.069537,
+					"maxRssKb": 1972,
+					"throughputMiBs": 957.2828239261279,
 					"runs": [
 						{
-							"wall_s": 0.062359,
-							"user_s": 0.045613,
-							"sys_s": 0.0166,
-							"max_rss_kb": 2180,
+							"wall_s": 0.054257,
+							"user_s": 0.039791,
+							"sys_s": 0.010859,
+							"max_rss_kb": 1952,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.048456,
-							"user_s": 0.024123,
-							"sys_s": 0.024178,
-							"max_rss_kb": 2176,
+							"wall_s": 0.069651,
+							"user_s": 0.057266,
+							"sys_s": 0.012271,
+							"max_rss_kb": 2112,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.050478,
-							"user_s": 0.049784,
-							"sys_s": 0,
-							"max_rss_kb": 2148,
+							"wall_s": 0.051007,
+							"user_s": 0.029,
+							"sys_s": 0.020714,
+							"max_rss_kb": 2116,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.047099,
-							"user_s": 0.035249,
-							"sys_s": 0.011749,
-							"max_rss_kb": 2156,
+							"wall_s": 0.050086,
+							"user_s": 0.037372,
+							"sys_s": 0.012457,
+							"max_rss_kb": 1972,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.053797,
-							"user_s": 0.040918,
-							"sys_s": 0.006898,
-							"max_rss_kb": 2148,
+							"wall_s": 0.049869,
+							"user_s": 0.041381,
+							"sys_s": 0.008276,
+							"max_rss_kb": 1968,
 							"exit": 0
 						}
 					]
@@ -274,48 +325,48 @@
 				{
 					"op": "read",
 					"impl": "cpp",
-					"cpuS": 0.057588,
-					"userS": 0.049883,
-					"sysS": 0.007705,
-					"wallS": 0.057913,
-					"cpuMinS": 0.055334999999999995,
-					"cpuMaxS": 0.05802,
-					"maxRssKb": 4120,
-					"throughputMiBs": 843.1289175142024,
+					"cpuS": 0.076323,
+					"userS": 0.059363,
+					"sysS": 0.012491,
+					"wallS": 0.079254,
+					"cpuMinS": 0.061148,
+					"cpuMaxS": 0.079737,
+					"maxRssKb": 4156,
+					"throughputMiBs": 616.0966638907815,
 					"runs": [
 						{
-							"wall_s": 0.058102,
-							"user_s": 0.050062,
-							"sys_s": 0.007645,
-							"max_rss_kb": 4084,
+							"wall_s": 0.063671,
+							"user_s": 0.055624,
+							"sys_s": 0.007937,
+							"max_rss_kb": 4176,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.055436,
-							"user_s": 0.047429,
-							"sys_s": 0.007906,
-							"max_rss_kb": 4120,
+							"wall_s": 0.079288,
+							"user_s": 0.059363,
+							"sys_s": 0.01696,
+							"max_rss_kb": 4260,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.056205,
-							"user_s": 0.040032,
-							"sys_s": 0.01588,
-							"max_rss_kb": 4084,
+							"wall_s": 0.06837,
+							"user_s": 0.048633,
+							"sys_s": 0.012515,
+							"max_rss_kb": 4124,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.057913,
-							"user_s": 0.049883,
-							"sys_s": 0.007705,
-							"max_rss_kb": 4136,
+							"wall_s": 0.079868,
+							"user_s": 0.07575,
+							"sys_s": 0.003987,
+							"max_rss_kb": 4156,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.058228,
-							"user_s": 0.053868,
-							"sys_s": 0.004152,
-							"max_rss_kb": 4180,
+							"wall_s": 0.079254,
+							"user_s": 0.066623,
+							"sys_s": 0.012491,
+							"max_rss_kb": 4100,
 							"exit": 0
 						}
 					]
@@ -323,244 +374,293 @@
 				{
 					"op": "read",
 					"impl": "go",
-					"cpuS": 0.102784,
-					"userS": 0.073468,
-					"sysS": 0.028417,
-					"wallS": 0.072137,
-					"cpuMinS": 0.093554,
-					"cpuMaxS": 0.10970300000000001,
-					"maxRssKb": 10032,
-					"throughputMiBs": 676.8804496998765,
+					"cpuS": 0.123662,
+					"userS": 0.07932,
+					"sysS": 0.044342,
+					"wallS": 0.091067,
+					"cpuMinS": 0.11079800000000001,
+					"cpuMaxS": 0.12782,
+					"maxRssKb": 11256,
+					"throughputMiBs": 536.178033755367,
 					"runs": [
 						{
-							"wall_s": 0.072137,
-							"user_s": 0.077941,
-							"sys_s": 0.024843,
-							"max_rss_kb": 11068,
+							"wall_s": 0.091067,
+							"user_s": 0.068826,
+							"sys_s": 0.05217,
+							"max_rss_kb": 9584,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.071418,
-							"user_s": 0.046965,
-							"sys_s": 0.049888,
-							"max_rss_kb": 10492,
+							"wall_s": 0.090049,
+							"user_s": 0.07932,
+							"sys_s": 0.044342,
+							"max_rss_kb": 11120,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.081716,
-							"user_s": 0.073468,
-							"sys_s": 0.036235,
-							"max_rss_kb": 9592,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.075107,
-							"user_s": 0.076795,
-							"sys_s": 0.028417,
-							"max_rss_kb": 9532,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.069671,
-							"user_s": 0.068401,
-							"sys_s": 0.025153,
-							"max_rss_kb": 10032,
-							"exit": 0
-						}
-					]
-				},
-				{
-					"op": "read",
-					"impl": "ts",
-					"cpuS": 0.670737,
-					"userS": 0.516932,
-					"sysS": 0.171282,
-					"wallS": 0.515844,
-					"cpuMinS": 0.617135,
-					"cpuMaxS": 0.715571,
-					"maxRssKb": 50876,
-					"throughputMiBs": 94.65676638673708,
-					"runs": [
-						{
-							"wall_s": 0.476668,
-							"user_s": 0.415796,
-							"sys_s": 0.201339,
-							"max_rss_kb": 50876,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.515844,
-							"user_s": 0.477877,
-							"sys_s": 0.19286,
-							"max_rss_kb": 51008,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.561206,
-							"user_s": 0.544289,
-							"sys_s": 0.171282,
-							"max_rss_kb": 50688,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.543016,
-							"user_s": 0.573667,
-							"sys_s": 0.115997,
-							"max_rss_kb": 50904,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.505298,
-							"user_s": 0.516932,
-							"sys_s": 0.145725,
-							"max_rss_kb": 50560,
-							"exit": 0
-						}
-					]
-				},
-				{
-					"op": "find",
-					"impl": "c",
-					"cpuS": 0.20958100000000002,
-					"userS": 0.075082,
-					"sysS": 0.140504,
-					"wallS": 0.213034,
-					"cpuMinS": 0.202213,
-					"cpuMaxS": 0.22135699999999997,
-					"maxRssKb": 5016,
-					"throughputMiBs": 229.20343701005473,
-					"runs": [
-						{
-							"wall_s": 0.221491,
-							"user_s": 0.075082,
-							"sys_s": 0.146275,
-							"max_rss_kb": 5016,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.20299,
-							"user_s": 0.080899,
-							"sys_s": 0.121314,
-							"max_rss_kb": 5012,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.213034,
-							"user_s": 0.077171,
-							"sys_s": 0.13241,
-							"max_rss_kb": 5012,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.209403,
-							"user_s": 0.063042,
-							"sys_s": 0.145606,
-							"max_rss_kb": 5016,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.213788,
-							"user_s": 0.07237,
-							"sys_s": 0.140504,
-							"max_rss_kb": 5016,
-							"exit": 0
-						}
-					]
-				},
-				{
-					"op": "find",
-					"impl": "cpp",
-					"cpuS": 0.23716500000000001,
-					"userS": 0.105904,
-					"sysS": 0.131723,
-					"wallS": 0.237517,
-					"cpuMinS": 0.22676600000000002,
-					"cpuMaxS": 0.26518600000000003,
-					"maxRssKb": 8332,
-					"throughputMiBs": 205.57739024996104,
-					"runs": [
-						{
-							"wall_s": 0.268472,
-							"user_s": 0.093799,
-							"sys_s": 0.171387,
-							"max_rss_kb": 8276,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.237517,
-							"user_s": 0.116615,
-							"sys_s": 0.12055,
-							"max_rss_kb": 8324,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.254115,
-							"user_s": 0.106785,
-							"sys_s": 0.14668,
-							"max_rss_kb": 8332,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.231159,
-							"user_s": 0.105904,
-							"sys_s": 0.122978,
-							"max_rss_kb": 8344,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.23047,
-							"user_s": 0.095043,
-							"sys_s": 0.131723,
-							"max_rss_kb": 8364,
-							"exit": 0
-						}
-					]
-				},
-				{
-					"op": "find",
-					"impl": "go",
-					"cpuS": 0.45254300000000003,
-					"userS": 0.191713,
-					"sysS": 0.252347,
-					"wallS": 0.403576,
-					"cpuMinS": 0.41453,
-					"cpuMaxS": 0.487099,
-					"maxRssKb": 12784,
-					"throughputMiBs": 120.98867375661585,
-					"runs": [
-						{
-							"wall_s": 0.414023,
-							"user_s": 0.200196,
-							"sys_s": 0.252347,
-							"max_rss_kb": 11376,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.403576,
-							"user_s": 0.191713,
-							"sys_s": 0.262707,
+							"wall_s": 0.095046,
+							"user_s": 0.072866,
+							"sys_s": 0.051006,
 							"max_rss_kb": 12912,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.442376,
-							"user_s": 0.197517,
-							"sys_s": 0.289582,
-							"max_rss_kb": 12784,
+							"wall_s": 0.098497,
+							"user_s": 0.093112,
+							"sys_s": 0.034708,
+							"max_rss_kb": 12144,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.383351,
-							"user_s": 0.174595,
-							"sys_s": 0.243505,
-							"max_rss_kb": 13756,
+							"wall_s": 0.081324,
+							"user_s": 0.087232,
+							"sys_s": 0.023566,
+							"max_rss_kb": 11256,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "read",
+					"impl": "ts",
+					"cpuS": 0.7851779999999999,
+					"userS": 0.650193,
+					"sysS": 0.168399,
+					"wallS": 0.648804,
+					"cpuMinS": 0.7302449999999999,
+					"cpuMaxS": 0.818848,
+					"maxRssKb": 50200,
+					"throughputMiBs": 75.2586682572857,
+					"runs": [
+						{
+							"wall_s": 0.648804,
+							"user_s": 0.652274,
+							"sys_s": 0.157071,
+							"max_rss_kb": 50656,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.380537,
-							"user_s": 0.191169,
-							"sys_s": 0.223361,
-							"max_rss_kb": 11844,
+							"wall_s": 0.548978,
+							"user_s": 0.536117,
+							"sys_s": 0.194128,
+							"max_rss_kb": 50076,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.651122,
+							"user_s": 0.651767,
+							"sys_s": 0.133411,
+							"max_rss_kb": 50064,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.651063,
+							"user_s": 0.650193,
+							"sys_s": 0.168655,
+							"max_rss_kb": 50200,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.627249,
+							"user_s": 0.598097,
+							"sys_s": 0.168399,
+							"max_rss_kb": 50476,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "read",
+					"impl": "py",
+					"cpuS": 4.388009,
+					"userS": 4.346265,
+					"sysS": 0.020002,
+					"wallS": 4.446805,
+					"cpuMinS": 4.173269,
+					"cpuMaxS": 4.780546,
+					"maxRssKb": 18380,
+					"throughputMiBs": 10.980496109004104,
+					"runs": [
+						{
+							"wall_s": 4.223661,
+							"user_s": 4.153588,
+							"sys_s": 0.019681,
+							"max_rss_kb": 18292,
+							"exit": 0
+						},
+						{
+							"wall_s": 4.613549,
+							"user_s": 4.547871,
+							"sys_s": 0.041109,
+							"max_rss_kb": 18084,
+							"exit": 0
+						},
+						{
+							"wall_s": 4.825339,
+							"user_s": 4.760544,
+							"sys_s": 0.020002,
+							"max_rss_kb": 18380,
+							"exit": 0
+						},
+						{
+							"wall_s": 4.446805,
+							"user_s": 4.346265,
+							"sys_s": 0.041744,
+							"max_rss_kb": 18428,
+							"exit": 0
+						},
+						{
+							"wall_s": 4.24811,
+							"user_s": 4.197896,
+							"sys_s": 0.019953,
+							"max_rss_kb": 18384,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "find",
+					"impl": "c",
+					"cpuS": 0.270033,
+					"userS": 0.112133,
+					"sysS": 0.162943,
+					"wallS": 0.27022,
+					"cpuMinS": 0.245801,
+					"cpuMaxS": 0.282127,
+					"maxRssKb": 5016,
+					"throughputMiBs": 180.69767226704167,
+					"runs": [
+						{
+							"wall_s": 0.27022,
+							"user_s": 0.088636,
+							"sys_s": 0.181397,
+							"max_rss_kb": 5080,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.253827,
+							"user_s": 0.079026,
+							"sys_s": 0.166775,
+							"max_rss_kb": 5012,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.272632,
+							"user_s": 0.112133,
+							"sys_s": 0.160192,
+							"max_rss_kb": 5012,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.24912,
+							"user_s": 0.112367,
+							"sys_s": 0.136505,
+							"max_rss_kb": 5016,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.282505,
+							"user_s": 0.119184,
+							"sys_s": 0.162943,
+							"max_rss_kb": 5016,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "find",
+					"impl": "cpp",
+					"cpuS": 0.241238,
+					"userS": 0.092319,
+					"sysS": 0.148919,
+					"wallS": 0.243926,
+					"cpuMinS": 0.233576,
+					"cpuMaxS": 0.244593,
+					"maxRssKb": 8320,
+					"throughputMiBs": 200.1759755007666,
+					"runs": [
+						{
+							"wall_s": 0.241604,
+							"user_s": 0.104588,
+							"sys_s": 0.136783,
+							"max_rss_kb": 8368,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.24486,
+							"user_s": 0.114373,
+							"sys_s": 0.13022,
+							"max_rss_kb": 8264,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.243926,
+							"user_s": 0.092319,
+							"sys_s": 0.148919,
+							"max_rss_kb": 8320,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.245334,
+							"user_s": 0.077586,
+							"sys_s": 0.16297,
+							"max_rss_kb": 8320,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.234073,
+							"user_s": 0.080674,
+							"sys_s": 0.152902,
+							"max_rss_kb": 8356,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "find",
+					"impl": "go",
+					"cpuS": 0.512135,
+					"userS": 0.237955,
+					"sysS": 0.264757,
+					"wallS": 0.465558,
+					"cpuMinS": 0.489599,
+					"cpuMaxS": 0.595657,
+					"maxRssKb": 12528,
+					"throughputMiBs": 104.88086339403468,
+					"runs": [
+						{
+							"wall_s": 0.468513,
+							"user_s": 0.217171,
+							"sys_s": 0.302554,
+							"max_rss_kb": 13244,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.44455,
+							"user_s": 0.237851,
+							"sys_s": 0.251748,
+							"max_rss_kb": 11324,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.464437,
+							"user_s": 0.240721,
+							"sys_s": 0.261828,
+							"max_rss_kb": 14448,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.465558,
+							"user_s": 0.247378,
+							"sys_s": 0.264757,
+							"max_rss_kb": 12144,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.545188,
+							"user_s": 0.237955,
+							"sys_s": 0.357702,
+							"max_rss_kb": 12528,
 							"exit": 0
 						}
 					]
@@ -568,48 +668,97 @@
 				{
 					"op": "find",
 					"impl": "ts",
-					"cpuS": 0.785431,
-					"userS": 0.532047,
-					"sysS": 0.253384,
-					"wallS": 0.692168,
-					"cpuMinS": 0.7421989999999999,
-					"cpuMaxS": 0.820116,
-					"maxRssKb": 62772,
-					"throughputMiBs": 70.54374804960645,
+					"cpuS": 0.93999,
+					"userS": 0.596128,
+					"sysS": 0.320803,
+					"wallS": 0.85063,
+					"cpuMinS": 0.892876,
+					"cpuMaxS": 1.226218,
+					"maxRssKb": 62452,
+					"throughputMiBs": 57.402307701350765,
 					"runs": [
 						{
-							"wall_s": 0.645391,
-							"user_s": 0.505666,
-							"sys_s": 0.236533,
-							"max_rss_kb": 62772,
+							"wall_s": 1.10683,
+							"user_s": 0.864395,
+							"sys_s": 0.361823,
+							"max_rss_kb": 62892,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.692168,
-							"user_s": 0.532047,
-							"sys_s": 0.253384,
-							"max_rss_kb": 63232,
+							"wall_s": 0.909012,
+							"user_s": 0.696271,
+							"sys_s": 0.320803,
+							"max_rss_kb": 62072,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.68189,
-							"user_s": 0.538389,
-							"sys_s": 0.240472,
-							"max_rss_kb": 62464,
+							"wall_s": 0.85063,
+							"user_s": 0.596128,
+							"sys_s": 0.343862,
+							"max_rss_kb": 62716,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.701165,
-							"user_s": 0.5358,
-							"sys_s": 0.26396,
-							"max_rss_kb": 62992,
+							"wall_s": 0.796934,
+							"user_s": 0.58704,
+							"sys_s": 0.305836,
+							"max_rss_kb": 62424,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.715713,
-							"user_s": 0.52279,
-							"sys_s": 0.297326,
-							"max_rss_kb": 62448,
+							"wall_s": 0.800196,
+							"user_s": 0.592561,
+							"sys_s": 0.303852,
+							"max_rss_kb": 62452,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "find",
+					"impl": "py",
+					"cpuS": 7.561684,
+					"userS": 5.079412,
+					"sysS": 2.523093,
+					"wallS": 7.605801,
+					"cpuMinS": 7.490009000000001,
+					"cpuMaxS": 8.044856,
+					"maxRssKb": 26308,
+					"throughputMiBs": 6.4198530831926846,
+					"runs": [
+						{
+							"wall_s": 7.530789,
+							"user_s": 4.908825,
+							"sys_s": 2.581184,
+							"max_rss_kb": 26308,
+							"exit": 0
+						},
+						{
+							"wall_s": 7.536606,
+							"user_s": 4.719851,
+							"sys_s": 2.800615,
+							"max_rss_kb": 26308,
+							"exit": 0
+						},
+						{
+							"wall_s": 8.112407,
+							"user_s": 5.521763,
+							"sys_s": 2.523093,
+							"max_rss_kb": 26324,
+							"exit": 0
+						},
+						{
+							"wall_s": 7.605801,
+							"user_s": 5.079412,
+							"sys_s": 2.482272,
+							"max_rss_kb": 26280,
+							"exit": 0
+						},
+						{
+							"wall_s": 8.047232,
+							"user_s": 5.590457,
+							"sys_s": 2.414347,
+							"max_rss_kb": 26312,
 							"exit": 0
 						}
 					]
@@ -625,54 +774,55 @@
 				"c": 131136192,
 				"cpp": 131136192,
 				"go": 131136192,
-				"ts": 131136192
+				"ts": 131136192,
+				"py": 131136192
 			},
 			"results": [
 				{
 					"op": "write",
 					"impl": "c",
-					"cpuS": 0.103578,
-					"userS": 0.058004,
-					"sysS": 0.044172,
-					"wallS": 0.103851,
-					"cpuMinS": 0.100234,
-					"cpuMaxS": 0.108545,
+					"cpuS": 0.117823,
+					"userS": 0.078916,
+					"sysS": 0.043338,
+					"wallS": 0.120167,
+					"cpuMinS": 0.117037,
+					"cpuMaxS": 0.126075,
 					"maxRssKb": 2072,
-					"throughputMiBs": 1203.6475334854745,
+					"throughputMiBs": 1040.219028518645,
 					"runs": [
 						{
-							"wall_s": 0.10051,
-							"user_s": 0.056062,
-							"sys_s": 0.044172,
+							"wall_s": 0.127057,
+							"user_s": 0.082737,
+							"sys_s": 0.043338,
 							"max_rss_kb": 2072,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.106265,
-							"user_s": 0.052892,
-							"sys_s": 0.052018,
-							"max_rss_kb": 2072,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.108914,
-							"user_s": 0.072436,
-							"sys_s": 0.036109,
-							"max_rss_kb": 2204,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.102465,
-							"user_s": 0.074647,
-							"sys_s": 0.027513,
+							"wall_s": 0.126669,
+							"user_s": 0.08429,
+							"sys_s": 0.040041,
 							"max_rss_kb": 2236,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.103851,
-							"user_s": 0.058004,
-							"sys_s": 0.045574,
+							"wall_s": 0.120167,
+							"user_s": 0.078916,
+							"sys_s": 0.038907,
 							"max_rss_kb": 2072,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.117311,
+							"user_s": 0.058515,
+							"sys_s": 0.058522,
+							"max_rss_kb": 2072,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.119059,
+							"user_s": 0.053301,
+							"sys_s": 0.063817,
+							"max_rss_kb": 2232,
 							"exit": 0
 						}
 					]
@@ -680,48 +830,48 @@
 				{
 					"op": "write",
 					"impl": "cpp",
-					"cpuS": 0.105677,
-					"userS": 0.06837,
-					"sysS": 0.040356,
-					"wallS": 0.106051,
-					"cpuMinS": 0.10122500000000001,
-					"cpuMaxS": 0.108726,
-					"maxRssKb": 4344,
-					"throughputMiBs": 1178.6781831383014,
+					"cpuS": 0.11210899999999999,
+					"userS": 0.075063,
+					"sysS": 0.044362,
+					"wallS": 0.113306,
+					"cpuMinS": 0.10671,
+					"cpuMaxS": 0.125936,
+					"maxRssKb": 4304,
+					"throughputMiBs": 1103.2072441000475,
 					"runs": [
 						{
-							"wall_s": 0.104255,
-							"user_s": 0.082139,
-							"sys_s": 0.019086,
-							"max_rss_kb": 4316,
+							"wall_s": 0.106972,
+							"user_s": 0.075063,
+							"sys_s": 0.031647,
+							"max_rss_kb": 4304,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.106051,
-							"user_s": 0.070528,
-							"sys_s": 0.035225,
-							"max_rss_kb": 4344,
+							"wall_s": 0.113306,
+							"user_s": 0.067235,
+							"sys_s": 0.044362,
+							"max_rss_kb": 4368,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.104673,
-							"user_s": 0.056238,
-							"sys_s": 0.048204,
-							"max_rss_kb": 4332,
+							"wall_s": 0.140466,
+							"user_s": 0.066659,
+							"sys_s": 0.048671,
+							"max_rss_kb": 4348,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.10623,
-							"user_s": 0.04891,
-							"sys_s": 0.056767,
-							"max_rss_kb": 4352,
+							"wall_s": 0.112447,
+							"user_s": 0.076108,
+							"sys_s": 0.036001,
+							"max_rss_kb": 4236,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.10941,
-							"user_s": 0.06837,
-							"sys_s": 0.040356,
-							"max_rss_kb": 4396,
+							"wall_s": 0.131903,
+							"user_s": 0.076392,
+							"sys_s": 0.049544,
+							"max_rss_kb": 4304,
 							"exit": 0
 						}
 					]
@@ -729,48 +879,48 @@
 				{
 					"op": "write",
 					"impl": "go",
-					"cpuS": 0.069871,
-					"userS": 0.02079,
-					"sysS": 0.04865,
-					"wallS": 0.068903,
-					"cpuMinS": 0.056773000000000004,
-					"cpuMaxS": 0.07413600000000001,
+					"cpuS": 0.072753,
+					"userS": 0.023839,
+					"sysS": 0.048914,
+					"wallS": 0.07233,
+					"cpuMinS": 0.064567,
+					"cpuMaxS": 0.086951,
 					"maxRssKb": 5360,
-					"throughputMiBs": 1814.1445220092012,
+					"throughputMiBs": 1728.190239181529,
 					"runs": [
 						{
-							"wall_s": 0.056332,
-							"user_s": 0.01521,
-							"sys_s": 0.041563,
-							"max_rss_kb": 5488,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.061436,
-							"user_s": 0.014936,
-							"sys_s": 0.049296,
+							"wall_s": 0.069307,
+							"user_s": 0.016109,
+							"sys_s": 0.048458,
 							"max_rss_kb": 5188,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.068903,
-							"user_s": 0.02079,
-							"sys_s": 0.050347,
+							"wall_s": 0.083602,
+							"user_s": 0.011338,
+							"sys_s": 0.075425,
+							"max_rss_kb": 5060,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.07233,
+							"user_s": 0.023839,
+							"sys_s": 0.048914,
+							"max_rss_kb": 5616,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.069359,
+							"user_s": 0.024129,
+							"sys_s": 0.046892,
 							"max_rss_kb": 5360,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.069993,
-							"user_s": 0.023515,
-							"sys_s": 0.046356,
-							"max_rss_kb": 5436,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.071018,
-							"user_s": 0.025486,
-							"sys_s": 0.04865,
-							"max_rss_kb": 5308,
+							"wall_s": 0.082531,
+							"user_s": 0.025906,
+							"sys_s": 0.061045,
+							"max_rss_kb": 5360,
 							"exit": 0
 						}
 					]
@@ -778,48 +928,97 @@
 				{
 					"op": "write",
 					"impl": "ts",
-					"cpuS": 0.264394,
-					"userS": 0.211349,
-					"sysS": 0.053851,
-					"wallS": 0.254735,
-					"cpuMinS": 0.246756,
-					"cpuMaxS": 0.276553,
-					"maxRssKb": 48700,
-					"throughputMiBs": 490.7060278328459,
+					"cpuS": 0.30246300000000004,
+					"userS": 0.247735,
+					"sysS": 0.054728,
+					"wallS": 0.292546,
+					"cpuMinS": 0.294433,
+					"cpuMaxS": 0.38971100000000003,
+					"maxRssKb": 48720,
+					"throughputMiBs": 427.2832306714158,
 					"runs": [
 						{
-							"wall_s": 0.236593,
-							"user_s": 0.215912,
-							"sys_s": 0.030844,
-							"max_rss_kb": 48648,
+							"wall_s": 0.292546,
+							"user_s": 0.258589,
+							"sys_s": 0.044525,
+							"max_rss_kb": 48640,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.267499,
-							"user_s": 0.223083,
-							"sys_s": 0.05347,
-							"max_rss_kb": 48716,
+							"wall_s": 0.289006,
+							"user_s": 0.244057,
+							"sys_s": 0.055695,
+							"max_rss_kb": 48584,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.254954,
-							"user_s": 0.205088,
-							"sys_s": 0.059306,
-							"max_rss_kb": 48936,
+							"wall_s": 0.284878,
+							"user_s": 0.243393,
+							"sys_s": 0.05104,
+							"max_rss_kb": 48720,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.254735,
-							"user_s": 0.211349,
-							"sys_s": 0.053851,
-							"max_rss_kb": 48700,
+							"wall_s": 0.389269,
+							"user_s": 0.304632,
+							"sys_s": 0.085079,
+							"max_rss_kb": 49236,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.249109,
-							"user_s": 0.191105,
-							"sys_s": 0.067688,
-							"max_rss_kb": 48572,
+							"wall_s": 0.301613,
+							"user_s": 0.247735,
+							"sys_s": 0.054728,
+							"max_rss_kb": 49548,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "write",
+					"impl": "py",
+					"cpuS": 6.734566,
+					"userS": 6.634918,
+					"sysS": 0.099648,
+					"wallS": 6.75088,
+					"cpuMinS": 6.512567,
+					"cpuMaxS": 7.0081039999999994,
+					"maxRssKb": 28820,
+					"throughputMiBs": 18.516104567108286,
+					"runs": [
+						{
+							"wall_s": 6.522683,
+							"user_s": 6.400607,
+							"sys_s": 0.11196,
+							"max_rss_kb": 28832,
+							"exit": 0
+						},
+						{
+							"wall_s": 6.75088,
+							"user_s": 6.634918,
+							"sys_s": 0.099648,
+							"max_rss_kb": 28796,
+							"exit": 0
+						},
+						{
+							"wall_s": 7.075245,
+							"user_s": 6.902409,
+							"sys_s": 0.105695,
+							"max_rss_kb": 28808,
+							"exit": 0
+						},
+						{
+							"wall_s": 6.893207,
+							"user_s": 6.75116,
+							"sys_s": 0.091945,
+							"max_rss_kb": 29000,
+							"exit": 0
+						},
+						{
+							"wall_s": 6.673461,
+							"user_s": 6.567594,
+							"sys_s": 0.076001,
+							"max_rss_kb": 28820,
 							"exit": 0
 						}
 					]
@@ -827,48 +1026,48 @@
 				{
 					"op": "read",
 					"impl": "c",
-					"cpuS": 0.087765,
-					"userS": 0.056814,
-					"sysS": 0.02863,
-					"wallS": 0.088032,
-					"cpuMinS": 0.08543,
-					"cpuMaxS": 0.09305,
-					"maxRssKb": 2148,
-					"throughputMiBs": 1419.9382042893494,
+					"cpuS": 0.10030700000000001,
+					"userS": 0.065934,
+					"sysS": 0.027656,
+					"wallS": 0.101103,
+					"cpuMinS": 0.09009500000000001,
+					"cpuMaxS": 0.11823900000000001,
+					"maxRssKb": 2116,
+					"throughputMiBs": 1236.362917025212,
 					"runs": [
 						{
-							"wall_s": 0.093152,
-							"user_s": 0.034894,
-							"sys_s": 0.058156,
-							"max_rss_kb": 2000,
+							"wall_s": 0.101103,
+							"user_s": 0.065934,
+							"sys_s": 0.034844,
+							"max_rss_kb": 2108,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.086222,
-							"user_s": 0.056814,
-							"sys_s": 0.02863,
-							"max_rss_kb": 2180,
+							"wall_s": 0.106264,
+							"user_s": 0.074912,
+							"sys_s": 0.025395,
+							"max_rss_kb": 2116,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.088032,
-							"user_s": 0.071808,
-							"sys_s": 0.015957,
-							"max_rss_kb": 2016,
+							"wall_s": 0.118549,
+							"user_s": 0.086693,
+							"sys_s": 0.031546,
+							"max_rss_kb": 2140,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.090392,
-							"user_s": 0.04097,
-							"sys_s": 0.049118,
-							"max_rss_kb": 2176,
+							"wall_s": 0.091138,
+							"user_s": 0.063235,
+							"sys_s": 0.027656,
+							"max_rss_kb": 2116,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.08568,
-							"user_s": 0.058249,
-							"sys_s": 0.027181,
-							"max_rss_kb": 2148,
+							"wall_s": 0.09038,
+							"user_s": 0.065529,
+							"sys_s": 0.024566,
+							"max_rss_kb": 2108,
 							"exit": 0
 						}
 					]
@@ -876,244 +1075,293 @@
 				{
 					"op": "read",
 					"impl": "cpp",
-					"cpuS": 0.08837500000000001,
-					"userS": 0.064402,
-					"sysS": 0.023973,
-					"wallS": 0.08884,
-					"cpuMinS": 0.087631,
-					"cpuMaxS": 0.08924499999999999,
-					"maxRssKb": 4212,
-					"throughputMiBs": 1407.0238631247184,
+					"cpuS": 0.094336,
+					"userS": 0.062751,
+					"sysS": 0.0315,
+					"wallS": 0.096463,
+					"cpuMinS": 0.093633,
+					"cpuMaxS": 0.096077,
+					"maxRssKb": 4248,
+					"throughputMiBs": 1295.8336356945151,
 					"runs": [
 						{
-							"wall_s": 0.088104,
-							"user_s": 0.07996,
-							"sys_s": 0.007945,
-							"max_rss_kb": 4308,
+							"wall_s": 0.096463,
+							"user_s": 0.062751,
+							"sys_s": 0.031585,
+							"max_rss_kb": 4248,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.088077,
-							"user_s": 0.059673,
-							"sys_s": 0.027958,
-							"max_rss_kb": 4212,
+							"wall_s": 0.096629,
+							"user_s": 0.075188,
+							"sys_s": 0.019945,
+							"max_rss_kb": 4228,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.089651,
-							"user_s": 0.065895,
-							"sys_s": 0.02335,
+							"wall_s": 0.096552,
+							"user_s": 0.072035,
+							"sys_s": 0.024042,
+							"max_rss_kb": 4260,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.095643,
+							"user_s": 0.062527,
+							"sys_s": 0.0315,
+							"max_rss_kb": 4228,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.094611,
+							"user_s": 0.058296,
+							"sys_s": 0.035337,
+							"max_rss_kb": 4388,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "read",
+					"impl": "go",
+					"cpuS": 0.12557800000000002,
+					"userS": 0.056661,
+					"sysS": 0.063254,
+					"wallS": 0.081124,
+					"cpuMinS": 0.10986100000000001,
+					"cpuMaxS": 0.128062,
+					"maxRssKb": 10864,
+					"throughputMiBs": 1540.8510428479858,
+					"runs": [
+						{
+							"wall_s": 0.070613,
+							"user_s": 0.046607,
+							"sys_s": 0.063254,
+							"max_rss_kb": 9968,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.081124,
+							"user_s": 0.073824,
+							"sys_s": 0.054238,
+							"max_rss_kb": 10224,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.082445,
+							"user_s": 0.062738,
+							"sys_s": 0.064575,
+							"max_rss_kb": 10864,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.085094,
+							"user_s": 0.043631,
+							"sys_s": 0.081947,
+							"max_rss_kb": 20220,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.075332,
+							"user_s": 0.056661,
+							"sys_s": 0.054353,
+							"max_rss_kb": 14384,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "read",
+					"impl": "ts",
+					"cpuS": 0.318173,
+					"userS": 0.255949,
+					"sysS": 0.055582,
+					"wallS": 0.30373,
+					"cpuMinS": 0.30181399999999997,
+					"cpuMaxS": 0.341001,
+					"maxRssKb": 80080,
+					"throughputMiBs": 411.54973166957495,
+					"runs": [
+						{
+							"wall_s": 0.321925,
+							"user_s": 0.239473,
+							"sys_s": 0.0787,
+							"max_rss_kb": 80272,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.326635,
+							"user_s": 0.285419,
+							"sys_s": 0.055582,
+							"max_rss_kb": 79208,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.30373,
+							"user_s": 0.251724,
+							"sys_s": 0.066857,
+							"max_rss_kb": 80044,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.284563,
+							"user_s": 0.263896,
+							"sys_s": 0.038651,
+							"max_rss_kb": 80200,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.2871,
+							"user_s": 0.255949,
+							"sys_s": 0.045865,
+							"max_rss_kb": 80080,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "read",
+					"impl": "py",
+					"cpuS": 6.916718,
+					"userS": 6.864734,
+					"sysS": 0.051984,
+					"wallS": 6.950145,
+					"cpuMinS": 6.770666,
+					"cpuMaxS": 7.113597,
+					"maxRssKb": 28752,
+					"throughputMiBs": 17.985236279243097,
+					"runs": [
+						{
+							"wall_s": 6.792896,
+							"user_s": 6.694661,
+							"sys_s": 0.076005,
+							"max_rss_kb": 28748,
+							"exit": 0
+						},
+						{
+							"wall_s": 6.950145,
+							"user_s": 6.864734,
+							"sys_s": 0.051984,
+							"max_rss_kb": 28736,
+							"exit": 0
+						},
+						{
+							"wall_s": 6.80947,
+							"user_s": 6.709841,
+							"sys_s": 0.071819,
+							"max_rss_kb": 28752,
+							"exit": 0
+						},
+						{
+							"wall_s": 7.08781,
+							"user_s": 7.021561,
+							"sys_s": 0.027965,
+							"max_rss_kb": 28756,
+							"exit": 0
+						},
+						{
+							"wall_s": 7.180383,
+							"user_s": 7.077598,
+							"sys_s": 0.035999,
+							"max_rss_kb": 28768,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "stream",
+					"impl": "c",
+					"cpuS": 0.09290799999999999,
+					"userS": 0.069388,
+					"sysS": 0.024496,
+					"wallS": 0.094017,
+					"cpuMinS": 0.091666,
+					"cpuMaxS": 0.097118,
+					"maxRssKb": 2116,
+					"throughputMiBs": 1329.5467840922386,
+					"runs": [
+						{
+							"wall_s": 0.097727,
+							"user_s": 0.084937,
+							"sys_s": 0.012181,
+							"max_rss_kb": 2112,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.092241,
+							"user_s": 0.060073,
+							"sys_s": 0.031943,
+							"max_rss_kb": 2116,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.102478,
+							"user_s": 0.045874,
+							"sys_s": 0.047034,
+							"max_rss_kb": 2100,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.091831,
+							"user_s": 0.079166,
+							"sys_s": 0.0125,
+							"max_rss_kb": 2116,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.094017,
+							"user_s": 0.069388,
+							"sys_s": 0.024496,
+							"max_rss_kb": 2116,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "stream",
+					"impl": "cpp",
+					"cpuS": 0.09896500000000001,
+					"userS": 0.071249,
+					"sysS": 0.027716,
+					"wallS": 0.099125,
+					"cpuMinS": 0.09429699999999999,
+					"cpuMaxS": 0.109342,
+					"maxRssKb": 4252,
+					"throughputMiBs": 1261.0340479192937,
+					"runs": [
+						{
+							"wall_s": 0.094581,
+							"user_s": 0.058947,
+							"sys_s": 0.03535,
 							"max_rss_kb": 4296,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.08884,
-							"user_s": 0.064402,
-							"sys_s": 0.023973,
-							"max_rss_kb": 4184,
+							"wall_s": 0.099125,
+							"user_s": 0.071249,
+							"sys_s": 0.027716,
+							"max_rss_kb": 4348,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.089052,
-							"user_s": 0.06059,
-							"sys_s": 0.028275,
-							"max_rss_kb": 4196,
-							"exit": 0
-						}
-					]
-				},
-				{
-					"op": "read",
-					"impl": "go",
-					"cpuS": 0.09617400000000001,
-					"userS": 0.046843,
-					"sysS": 0.048343,
-					"wallS": 0.066013,
-					"cpuMinS": 0.094026,
-					"cpuMaxS": 0.106741,
-					"maxRssKb": 9584,
-					"throughputMiBs": 1893.5664187357036,
-					"runs": [
-						{
-							"wall_s": 0.066013,
-							"user_s": 0.043033,
-							"sys_s": 0.050993,
-							"max_rss_kb": 9596,
+							"wall_s": 0.102831,
+							"user_s": 0.082049,
+							"sys_s": 0.019736,
+							"max_rss_kb": 4252,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.068268,
-							"user_s": 0.065085,
-							"sys_s": 0.041656,
-							"max_rss_kb": 10108,
+							"wall_s": 0.097779,
+							"user_s": 0.069019,
+							"sys_s": 0.028468,
+							"max_rss_kb": 4236,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.066552,
-							"user_s": 0.038263,
-							"sys_s": 0.064718,
-							"max_rss_kb": 9584,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.06579,
-							"user_s": 0.050297,
-							"sys_s": 0.045877,
-							"max_rss_kb": 9276,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.064502,
-							"user_s": 0.046843,
-							"sys_s": 0.048343,
-							"max_rss_kb": 9328,
-							"exit": 0
-						}
-					]
-				},
-				{
-					"op": "read",
-					"impl": "ts",
-					"cpuS": 0.280573,
-					"userS": 0.227139,
-					"sysS": 0.048854,
-					"wallS": 0.266159,
-					"cpuMinS": 0.270841,
-					"cpuMaxS": 0.321338,
-					"maxRssKb": 80232,
-					"throughputMiBs": 469.6440849266792,
-					"runs": [
-						{
-							"wall_s": 0.256364,
-							"user_s": 0.227139,
-							"sys_s": 0.044505,
-							"max_rss_kb": 80412,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.268891,
-							"user_s": 0.258019,
-							"sys_s": 0.024582,
-							"max_rss_kb": 80232,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.266159,
-							"user_s": 0.223671,
-							"sys_s": 0.056902,
-							"max_rss_kb": 80604,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.306291,
-							"user_s": 0.272484,
-							"sys_s": 0.048854,
-							"max_rss_kb": 80036,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.26257,
-							"user_s": 0.201512,
-							"sys_s": 0.069329,
-							"max_rss_kb": 79624,
-							"exit": 0
-						}
-					]
-				},
-				{
-					"op": "stream",
-					"impl": "c",
-					"cpuS": 0.083684,
-					"userS": 0.067743,
-					"sysS": 0.016629,
-					"wallS": 0.083797,
-					"cpuMinS": 0.082206,
-					"cpuMaxS": 0.08710499999999999,
-					"maxRssKb": 2168,
-					"throughputMiBs": 1491.7001801973818,
-					"runs": [
-						{
-							"wall_s": 0.083254,
-							"user_s": 0.066517,
-							"sys_s": 0.016629,
-							"max_rss_kb": 2176,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.090403,
-							"user_s": 0.068407,
-							"sys_s": 0.018698,
-							"max_rss_kb": 2180,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.082438,
-							"user_s": 0.057515,
-							"sys_s": 0.024691,
-							"max_rss_kb": 2016,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.085322,
-							"user_s": 0.068109,
-							"sys_s": 0.01624,
-							"max_rss_kb": 2168,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.083797,
-							"user_s": 0.067743,
-							"sys_s": 0.015941,
-							"max_rss_kb": 2016,
-							"exit": 0
-						}
-					]
-				},
-				{
-					"op": "stream",
-					"impl": "cpp",
-					"cpuS": 0.089287,
-					"userS": 0.071123,
-					"sysS": 0.016239,
-					"wallS": 0.089473,
-					"cpuMinS": 0.086939,
-					"cpuMaxS": 0.090196,
-					"maxRssKb": 4332,
-					"throughputMiBs": 1397.0695070021125,
-					"runs": [
-						{
-							"wall_s": 0.089473,
-							"user_s": 0.073048,
-							"sys_s": 0.016239,
-							"max_rss_kb": 4332,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.089889,
-							"user_s": 0.074119,
-							"sys_s": 0.015614,
-							"max_rss_kb": 4376,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.08812,
-							"user_s": 0.060013,
-							"sys_s": 0.028006,
-							"max_rss_kb": 4308,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.090522,
-							"user_s": 0.066619,
-							"sys_s": 0.023577,
-							"max_rss_kb": 4212,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.087144,
-							"user_s": 0.071123,
-							"sys_s": 0.015816,
-							"max_rss_kb": 4332,
+							"wall_s": 0.11135,
+							"user_s": 0.085517,
+							"sys_s": 0.023825,
+							"max_rss_kb": 4200,
 							"exit": 0
 						}
 					]
@@ -1121,48 +1369,48 @@
 				{
 					"op": "stream",
 					"impl": "go",
-					"cpuS": 0.105291,
-					"userS": 0.050606,
-					"sysS": 0.049655,
-					"wallS": 0.067743,
-					"cpuMinS": 0.097611,
-					"cpuMaxS": 0.107383,
-					"maxRssKb": 10236,
-					"throughputMiBs": 1845.2090990951094,
+					"cpuS": 0.114898,
+					"userS": 0.053325,
+					"sysS": 0.067958,
+					"wallS": 0.079424,
+					"cpuMinS": 0.10072900000000001,
+					"cpuMaxS": 0.12803900000000001,
+					"maxRssKb": 10232,
+					"throughputMiBs": 1573.8315874294924,
 					"runs": [
 						{
-							"wall_s": 0.067743,
-							"user_s": 0.047956,
-							"sys_s": 0.049655,
-							"max_rss_kb": 9200,
+							"wall_s": 0.083231,
+							"user_s": 0.056806,
+							"sys_s": 0.071233,
+							"max_rss_kb": 11504,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.067567,
-							"user_s": 0.046833,
-							"sys_s": 0.053243,
-							"max_rss_kb": 11256,
+							"wall_s": 0.086545,
+							"user_s": 0.041067,
+							"sys_s": 0.073831,
+							"max_rss_kb": 9532,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.067075,
-							"user_s": 0.062883,
-							"sys_s": 0.042408,
-							"max_rss_kb": 9776,
+							"wall_s": 0.079424,
+							"user_s": 0.053325,
+							"sys_s": 0.067958,
+							"max_rss_kb": 10232,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.06948,
-							"user_s": 0.050606,
-							"sys_s": 0.056777,
-							"max_rss_kb": 10236,
+							"wall_s": 0.069849,
+							"user_s": 0.049584,
+							"sys_s": 0.051145,
+							"max_rss_kb": 9264,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.071163,
-							"user_s": 0.062532,
-							"sys_s": 0.043499,
-							"max_rss_kb": 11440,
+							"wall_s": 0.073142,
+							"user_s": 0.054932,
+							"sys_s": 0.0586,
+							"max_rss_kb": 10488,
 							"exit": 0
 						}
 					]
@@ -1170,48 +1418,97 @@
 				{
 					"op": "stream",
 					"impl": "ts",
-					"cpuS": 0.265409,
-					"userS": 0.23375,
-					"sysS": 0.030864,
-					"wallS": 0.253256,
-					"cpuMinS": 0.24578999999999998,
-					"cpuMaxS": 0.295465,
-					"maxRssKb": 48840,
-					"throughputMiBs": 493.5717218940519,
+					"cpuS": 0.27835,
+					"userS": 0.240948,
+					"sysS": 0.037066,
+					"wallS": 0.26429,
+					"cpuMinS": 0.274145,
+					"cpuMaxS": 0.304731,
+					"maxRssKb": 48692,
+					"throughputMiBs": 472.9653032653524,
 					"runs": [
 						{
-							"wall_s": 0.253256,
-							"user_s": 0.23375,
-							"sys_s": 0.031659,
-							"max_rss_kb": 48840,
+							"wall_s": 0.26429,
+							"user_s": 0.24046,
+							"sys_s": 0.03948,
+							"max_rss_kb": 48728,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.286823,
-							"user_s": 0.268486,
-							"sys_s": 0.026979,
-							"max_rss_kb": 49092,
+							"wall_s": 0.287572,
+							"user_s": 0.267665,
+							"sys_s": 0.037066,
+							"max_rss_kb": 48692,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.247228,
-							"user_s": 0.226926,
-							"sys_s": 0.030864,
-							"max_rss_kb": 48800,
+							"wall_s": 0.257655,
+							"user_s": 0.221732,
+							"sys_s": 0.052413,
+							"max_rss_kb": 48628,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.261648,
-							"user_s": 0.245997,
-							"sys_s": 0.02815,
-							"max_rss_kb": 48868,
+							"wall_s": 0.26629,
+							"user_s": 0.254355,
+							"sys_s": 0.023995,
+							"max_rss_kb": 48764,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.235273,
-							"user_s": 0.20078,
-							"sys_s": 0.04501,
-							"max_rss_kb": 48820,
+							"wall_s": 0.262358,
+							"user_s": 0.240948,
+							"sys_s": 0.035569,
+							"max_rss_kb": 48640,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "stream",
+					"impl": "py",
+					"cpuS": 7.001116,
+					"userS": 6.961289,
+					"sysS": 0.039945,
+					"wallS": 7.089861,
+					"cpuMinS": 6.821998,
+					"cpuMaxS": 7.326879,
+					"maxRssKb": 28628,
+					"throughputMiBs": 17.630811097706992,
+					"runs": [
+						{
+							"wall_s": 6.996494,
+							"user_s": 6.927633,
+							"sys_s": 0.02786,
+							"max_rss_kb": 28580,
+							"exit": 0
+						},
+						{
+							"wall_s": 7.365335,
+							"user_s": 7.283549,
+							"sys_s": 0.04333,
+							"max_rss_kb": 28756,
+							"exit": 0
+						},
+						{
+							"wall_s": 7.089861,
+							"user_s": 6.961289,
+							"sys_s": 0.039827,
+							"max_rss_kb": 28628,
+							"exit": 0
+						},
+						{
+							"wall_s": 6.845082,
+							"user_s": 6.773994,
+							"sys_s": 0.048004,
+							"max_rss_kb": 28628,
+							"exit": 0
+						},
+						{
+							"wall_s": 7.093856,
+							"user_s": 7.001971,
+							"sys_s": 0.039945,
+							"max_rss_kb": 28648,
 							"exit": 0
 						}
 					]
@@ -1227,53 +1524,54 @@
 				"c": 201327552,
 				"cpp": 201327552,
 				"go": 201327552,
-				"ts": 201327552
+				"ts": 201327552,
+				"py": 201327552
 			},
 			"results": [
 				{
 					"op": "write",
 					"impl": "c",
-					"cpuS": 0.175139,
-					"userS": 0.099184,
-					"sysS": 0.075955,
-					"wallS": 0.176907,
-					"cpuMinS": 0.162093,
-					"cpuMaxS": 0.187541,
+					"cpuS": 0.190021,
+					"userS": 0.102646,
+					"sysS": 0.086736,
+					"wallS": 0.191872,
+					"cpuMinS": 0.18085800000000002,
+					"cpuMaxS": 0.19879200000000002,
 					"maxRssKb": 10136,
-					"throughputMiBs": 1085.3160134986178,
+					"throughputMiBs": 1000.6671114076051,
 					"runs": [
 						{
-							"wall_s": 0.165852,
-							"user_s": 0.09339,
-							"sys_s": 0.068703,
-							"max_rss_kb": 10156,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.187134,
-							"user_s": 0.105548,
-							"sys_s": 0.081015,
+							"wall_s": 0.191904,
+							"user_s": 0.102646,
+							"sys_s": 0.087375,
 							"max_rss_kb": 10136,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.195433,
-							"user_s": 0.101959,
-							"sys_s": 0.085582,
+							"wall_s": 0.200713,
+							"user_s": 0.115168,
+							"sys_s": 0.083624,
 							"max_rss_kb": 10136,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.167796,
-							"user_s": 0.091513,
-							"sys_s": 0.075706,
+							"wall_s": 0.191872,
+							"user_s": 0.09839,
+							"sys_s": 0.091728,
 							"max_rss_kb": 10136,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.176907,
-							"user_s": 0.099184,
-							"sys_s": 0.075955,
+							"wall_s": 0.188016,
+							"user_s": 0.09781,
+							"sys_s": 0.086736,
+							"max_rss_kb": 10136,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.184639,
+							"user_s": 0.105254,
+							"sys_s": 0.075604,
 							"max_rss_kb": 10136,
 							"exit": 0
 						}
@@ -1282,48 +1580,48 @@
 				{
 					"op": "write",
 					"impl": "cpp",
-					"cpuS": 0.16686600000000001,
-					"userS": 0.095363,
-					"sysS": 0.071503,
-					"wallS": 0.167365,
-					"cpuMinS": 0.162128,
-					"cpuMaxS": 0.176952,
-					"maxRssKb": 11960,
-					"throughputMiBs": 1147.193260239596,
+					"cpuS": 0.182246,
+					"userS": 0.102168,
+					"sysS": 0.079812,
+					"wallS": 0.186865,
+					"cpuMinS": 0.18088700000000002,
+					"cpuMaxS": 0.183294,
+					"maxRssKb": 11952,
+					"throughputMiBs": 1027.479731356862,
 					"runs": [
 						{
-							"wall_s": 0.180602,
-							"user_s": 0.108143,
-							"sys_s": 0.062244,
-							"max_rss_kb": 11976,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.167365,
-							"user_s": 0.095363,
-							"sys_s": 0.071503,
-							"max_rss_kb": 11936,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.167131,
-							"user_s": 0.09353,
-							"sys_s": 0.073207,
-							"max_rss_kb": 11960,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.178517,
-							"user_s": 0.102197,
-							"sys_s": 0.074755,
+							"wall_s": 0.182663,
+							"user_s": 0.101143,
+							"sys_s": 0.079812,
 							"max_rss_kb": 11952,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.162454,
-							"user_s": 0.09095,
-							"sys_s": 0.071178,
-							"max_rss_kb": 11976,
+							"wall_s": 0.191402,
+							"user_s": 0.106284,
+							"sys_s": 0.07701,
+							"max_rss_kb": 11944,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.186865,
+							"user_s": 0.105137,
+							"sys_s": 0.077109,
+							"max_rss_kb": 11964,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.206071,
+							"user_s": 0.097403,
+							"sys_s": 0.083484,
+							"max_rss_kb": 11908,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.186483,
+							"user_s": 0.102168,
+							"sys_s": 0.0806,
+							"max_rss_kb": 11964,
 							"exit": 0
 						}
 					]
@@ -1331,48 +1629,48 @@
 				{
 					"op": "write",
 					"impl": "go",
-					"cpuS": 0.09417,
-					"userS": 0.016059,
-					"sysS": 0.078111,
-					"wallS": 0.088165,
-					"cpuMinS": 0.08171600000000001,
-					"cpuMaxS": 0.122043,
-					"maxRssKb": 13936,
-					"throughputMiBs": 2177.734928826632,
+					"cpuS": 0.10055,
+					"userS": 0.019033,
+					"sysS": 0.085898,
+					"wallS": 0.095667,
+					"cpuMinS": 0.098068,
+					"cpuMaxS": 0.11764,
+					"maxRssKb": 13820,
+					"throughputMiBs": 2006.9616482172535,
 					"runs": [
 						{
-							"wall_s": 0.077132,
-							"user_s": 0.012105,
-							"sys_s": 0.069611,
-							"max_rss_kb": 13808,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.088165,
-							"user_s": 0.016059,
-							"sys_s": 0.078111,
-							"max_rss_kb": 13936,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.087049,
-							"user_s": 0.023864,
-							"sys_s": 0.066907,
+							"wall_s": 0.111518,
+							"user_s": 0.012627,
+							"sys_s": 0.105013,
 							"max_rss_kb": 14064,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.115961,
-							"user_s": 0.016333,
-							"sys_s": 0.10571,
-							"max_rss_kb": 13688,
+							"wall_s": 0.102584,
+							"user_s": 0.020291,
+							"sys_s": 0.088092,
+							"max_rss_kb": 13560,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.088894,
-							"user_s": 0.01183,
-							"sys_s": 0.083573,
-							"max_rss_kb": 13936,
+							"wall_s": 0.093209,
+							"user_s": 0.01217,
+							"sys_s": 0.085898,
+							"max_rss_kb": 13948,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.094175,
+							"user_s": 0.019033,
+							"sys_s": 0.079819,
+							"max_rss_kb": 13820,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.095667,
+							"user_s": 0.020888,
+							"sys_s": 0.079662,
+							"max_rss_kb": 13680,
 							"exit": 0
 						}
 					]
@@ -1380,48 +1678,97 @@
 				{
 					"op": "write",
 					"impl": "ts",
-					"cpuS": 0.33271399999999995,
-					"userS": 0.254121,
-					"sysS": 0.084491,
-					"wallS": 0.331962,
-					"cpuMinS": 0.326059,
-					"cpuMaxS": 0.354983,
-					"maxRssKb": 63108,
-					"throughputMiBs": 578.3794530699297,
+					"cpuS": 0.388059,
+					"userS": 0.299767,
+					"sysS": 0.088292,
+					"wallS": 0.387308,
+					"cpuMinS": 0.353933,
+					"cpuMaxS": 0.48173600000000005,
+					"maxRssKb": 62896,
+					"throughputMiBs": 495.7294969378376,
 					"runs": [
 						{
-							"wall_s": 0.323821,
-							"user_s": 0.241568,
-							"sys_s": 0.084491,
-							"max_rss_kb": 63568,
+							"wall_s": 0.35564,
+							"user_s": 0.266291,
+							"sys_s": 0.087642,
+							"max_rss_kb": 62888,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.354832,
-							"user_s": 0.263074,
-							"sys_s": 0.091909,
-							"max_rss_kb": 63012,
+							"wall_s": 0.481384,
+							"user_s": 0.373134,
+							"sys_s": 0.108602,
+							"max_rss_kb": 62896,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.328457,
-							"user_s": 0.258824,
-							"sys_s": 0.072601,
-							"max_rss_kb": 63108,
+							"wall_s": 0.412758,
+							"user_s": 0.354078,
+							"sys_s": 0.059781,
+							"max_rss_kb": 62880,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.35115,
-							"user_s": 0.252681,
-							"sys_s": 0.100256,
-							"max_rss_kb": 63060,
+							"wall_s": 0.387308,
+							"user_s": 0.299767,
+							"sys_s": 0.088292,
+							"max_rss_kb": 63452,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.331962,
-							"user_s": 0.254121,
-							"sys_s": 0.078593,
-							"max_rss_kb": 63352,
+							"wall_s": 0.375002,
+							"user_s": 0.275137,
+							"sys_s": 0.095322,
+							"max_rss_kb": 63208,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "write",
+					"impl": "py",
+					"cpuS": 12.109228,
+					"userS": 11.891105,
+					"sysS": 0.223509,
+					"wallS": 12.242486,
+					"cpuMinS": 12.04056,
+					"cpuMaxS": 14.238655,
+					"maxRssKb": 36904,
+					"throughputMiBs": 15.683089202634171,
+					"runs": [
+						{
+							"wall_s": 12.17517,
+							"user_s": 11.891105,
+							"sys_s": 0.206922,
+							"max_rss_kb": 36932,
+							"exit": 0
+						},
+						{
+							"wall_s": 12.242486,
+							"user_s": 11.848104,
+							"sys_s": 0.261124,
+							"max_rss_kb": 36772,
+							"exit": 0
+						},
+						{
+							"wall_s": 14.017494,
+							"user_s": 13.644443,
+							"sys_s": 0.211522,
+							"max_rss_kb": 36900,
+							"exit": 0
+						},
+						{
+							"wall_s": 14.391356,
+							"user_s": 13.908536,
+							"sys_s": 0.330119,
+							"max_rss_kb": 36908,
+							"exit": 0
+						},
+						{
+							"wall_s": 12.092823,
+							"user_s": 11.817051,
+							"sys_s": 0.223509,
+							"max_rss_kb": 36904,
 							"exit": 0
 						}
 					]
@@ -1429,48 +1776,48 @@
 				{
 					"op": "read",
 					"impl": "c",
-					"cpuS": 0.138481,
-					"userS": 0.100951,
-					"sysS": 0.039567,
-					"wallS": 0.139698,
-					"cpuMinS": 0.137293,
-					"cpuMaxS": 0.152644,
-					"maxRssKb": 10080,
-					"throughputMiBs": 1374.3933341923293,
+					"cpuS": 0.146254,
+					"userS": 0.106494,
+					"sysS": 0.038488,
+					"wallS": 0.147265,
+					"cpuMinS": 0.138312,
+					"cpuMaxS": 0.156412,
+					"maxRssKb": 10144,
+					"throughputMiBs": 1303.7721114996773,
 					"runs": [
 						{
-							"wall_s": 0.15304,
-							"user_s": 0.11251,
-							"sys_s": 0.040134,
-							"max_rss_kb": 10080,
+							"wall_s": 0.156661,
+							"user_s": 0.104275,
+							"sys_s": 0.052137,
+							"max_rss_kb": 10144,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.137394,
-							"user_s": 0.100951,
-							"sys_s": 0.036342,
-							"max_rss_kb": 10080,
+							"wall_s": 0.144438,
+							"user_s": 0.116172,
+							"sys_s": 0.028055,
+							"max_rss_kb": 10144,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.150151,
-							"user_s": 0.110403,
-							"sys_s": 0.039453,
-							"max_rss_kb": 10080,
+							"wall_s": 0.138599,
+							"user_s": 0.101685,
+							"sys_s": 0.036627,
+							"max_rss_kb": 10144,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.139698,
-							"user_s": 0.098914,
-							"sys_s": 0.039567,
-							"max_rss_kb": 10068,
+							"wall_s": 0.151847,
+							"user_s": 0.110095,
+							"sys_s": 0.038488,
+							"max_rss_kb": 10140,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.139647,
-							"user_s": 0.09778,
-							"sys_s": 0.039619,
-							"max_rss_kb": 10080,
+							"wall_s": 0.147265,
+							"user_s": 0.106494,
+							"sys_s": 0.03976,
+							"max_rss_kb": 10144,
 							"exit": 0
 						}
 					]
@@ -1478,48 +1825,48 @@
 				{
 					"op": "read",
 					"impl": "cpp",
-					"cpuS": 0.14785500000000001,
-					"userS": 0.105095,
-					"sysS": 0.043489,
-					"wallS": 0.148313,
-					"cpuMinS": 0.141484,
-					"cpuMaxS": 0.150005,
-					"maxRssKb": 12516,
-					"throughputMiBs": 1294.5594789398097,
+					"cpuS": 0.157628,
+					"userS": 0.107029,
+					"sysS": 0.050599,
+					"wallS": 0.163357,
+					"cpuMinS": 0.153361,
+					"cpuMaxS": 0.189035,
+					"maxRssKb": 12488,
+					"throughputMiBs": 1175.3398997288148,
 					"runs": [
 						{
-							"wall_s": 0.150053,
-							"user_s": 0.109365,
-							"sys_s": 0.040513,
-							"max_rss_kb": 12516,
+							"wall_s": 0.197961,
+							"user_s": 0.115825,
+							"sys_s": 0.07321,
+							"max_rss_kb": 12552,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.150571,
-							"user_s": 0.106516,
-							"sys_s": 0.043489,
-							"max_rss_kb": 12448,
+							"wall_s": 0.183894,
+							"user_s": 0.107029,
+							"sys_s": 0.050599,
+							"max_rss_kb": 12436,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.141653,
-							"user_s": 0.105095,
-							"sys_s": 0.036389,
-							"max_rss_kb": 12584,
+							"wall_s": 0.163357,
+							"user_s": 0.10613,
+							"sys_s": 0.051848,
+							"max_rss_kb": 12488,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.143311,
-							"user_s": 0.099448,
-							"sys_s": 0.043757,
-							"max_rss_kb": 12516,
+							"wall_s": 0.159349,
+							"user_s": 0.120245,
+							"sys_s": 0.034102,
+							"max_rss_kb": 12580,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.148313,
-							"user_s": 0.103816,
-							"sys_s": 0.044039,
-							"max_rss_kb": 12448,
+							"wall_s": 0.15428,
+							"user_s": 0.106486,
+							"sys_s": 0.046875,
+							"max_rss_kb": 12368,
 							"exit": 0
 						}
 					]
@@ -1527,48 +1874,48 @@
 				{
 					"op": "read",
 					"impl": "go",
-					"cpuS": 0.12170700000000001,
-					"userS": 0.053645,
-					"sysS": 0.072333,
-					"wallS": 0.100577,
-					"cpuMinS": 0.10650899999999999,
-					"cpuMaxS": 0.12976500000000002,
-					"maxRssKb": 23160,
-					"throughputMiBs": 1908.9851556518886,
+					"cpuS": 0.119695,
+					"userS": 0.056173,
+					"sysS": 0.067338,
+					"wallS": 0.101398,
+					"cpuMinS": 0.116098,
+					"cpuMaxS": 0.128502,
+					"maxRssKb": 22716,
+					"throughputMiBs": 1893.5284719619715,
 					"runs": [
 						{
-							"wall_s": 0.089396,
-							"user_s": 0.034176,
-							"sys_s": 0.072333,
+							"wall_s": 0.094194,
+							"user_s": 0.056173,
+							"sys_s": 0.059925,
+							"max_rss_kb": 23236,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.103237,
+							"user_s": 0.060301,
+							"sys_s": 0.067338,
+							"max_rss_kb": 23036,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.101398,
+							"user_s": 0.067236,
+							"sys_s": 0.061266,
 							"max_rss_kb": 22716,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.091163,
-							"user_s": 0.032812,
-							"sys_s": 0.083923,
-							"max_rss_kb": 23160,
+							"wall_s": 0.103865,
+							"user_s": 0.041941,
+							"sys_s": 0.076241,
+							"max_rss_kb": 22588,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.105915,
-							"user_s": 0.059155,
-							"sys_s": 0.07061,
-							"max_rss_kb": 23408,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.102885,
-							"user_s": 0.053645,
-							"sys_s": 0.073367,
-							"max_rss_kb": 23228,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.100577,
-							"user_s": 0.060647,
-							"sys_s": 0.06106,
-							"max_rss_kb": 22844,
+							"wall_s": 0.096212,
+							"user_s": 0.037686,
+							"sys_s": 0.082009,
+							"max_rss_kb": 22716,
 							"exit": 0
 						}
 					]
@@ -1576,48 +1923,97 @@
 				{
 					"op": "read",
 					"impl": "ts",
-					"cpuS": 0.354718,
-					"userS": 0.2687,
-					"sysS": 0.09008,
-					"wallS": 0.357075,
-					"cpuMinS": 0.344641,
-					"cpuMaxS": 0.441657,
-					"maxRssKb": 87992,
-					"throughputMiBs": 537.7021634110481,
+					"cpuS": 0.45074,
+					"userS": 0.319802,
+					"sysS": 0.119856,
+					"wallS": 0.447402,
+					"cpuMinS": 0.405418,
+					"cpuMaxS": 0.563661,
+					"maxRssKb": 87952,
+					"throughputMiBs": 429.1442595249909,
 					"runs": [
 						{
-							"wall_s": 0.353946,
-							"user_s": 0.2687,
-							"sys_s": 0.082865,
-							"max_rss_kb": 87840,
+							"wall_s": 0.447402,
+							"user_s": 0.319802,
+							"sys_s": 0.130938,
+							"max_rss_kb": 87952,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.43741,
-							"user_s": 0.349289,
-							"sys_s": 0.092368,
-							"max_rss_kb": 87936,
+							"wall_s": 0.558131,
+							"user_s": 0.443805,
+							"sys_s": 0.119856,
+							"max_rss_kb": 87896,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.357075,
-							"user_s": 0.294575,
-							"sys_s": 0.064311,
-							"max_rss_kb": 87992,
+							"wall_s": 0.406879,
+							"user_s": 0.318641,
+							"sys_s": 0.086777,
+							"max_rss_kb": 88016,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.345834,
-							"user_s": 0.254471,
-							"sys_s": 0.09017,
-							"max_rss_kb": 88012,
+							"wall_s": 0.408823,
+							"user_s": 0.312275,
+							"sys_s": 0.100829,
+							"max_rss_kb": 87868,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.358967,
-							"user_s": 0.264638,
-							"sys_s": 0.09008,
-							"max_rss_kb": 88192,
+							"wall_s": 0.474674,
+							"user_s": 0.354796,
+							"sys_s": 0.123655,
+							"max_rss_kb": 87980,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "read",
+					"impl": "py",
+					"cpuS": 12.063289,
+					"userS": 11.967671,
+					"sysS": 0.095618,
+					"wallS": 12.167683,
+					"cpuMinS": 11.681663,
+					"cpuMaxS": 12.836928,
+					"maxRssKb": 45124,
+					"throughputMiBs": 15.779503788847885,
+					"runs": [
+						{
+							"wall_s": 12.895671,
+							"user_s": 12.710194,
+							"sys_s": 0.126734,
+							"max_rss_kb": 44960,
+							"exit": 0
+						},
+						{
+							"wall_s": 12.148191,
+							"user_s": 11.967671,
+							"sys_s": 0.095618,
+							"max_rss_kb": 45136,
+							"exit": 0
+						},
+						{
+							"wall_s": 12.167683,
+							"user_s": 11.932371,
+							"sys_s": 0.073854,
+							"max_rss_kb": 45124,
+							"exit": 0
+						},
+						{
+							"wall_s": 12.512019,
+							"user_s": 12.379405,
+							"sys_s": 0.067873,
+							"max_rss_kb": 44936,
+							"exit": 0
+						},
+						{
+							"wall_s": 11.738906,
+							"user_s": 11.585883,
+							"sys_s": 0.09578,
+							"max_rss_kb": 45148,
 							"exit": 0
 						}
 					]
@@ -1625,48 +2021,48 @@
 				{
 					"op": "stream",
 					"impl": "c",
-					"cpuS": 0.126817,
-					"userS": 0.097647,
-					"sysS": 0.027715,
-					"wallS": 0.127302,
-					"cpuMinS": 0.125362,
-					"cpuMaxS": 0.1296,
-					"maxRssKb": 2016,
-					"throughputMiBs": 1508.224536927935,
+					"cpuS": 0.139019,
+					"userS": 0.102032,
+					"sysS": 0.038806,
+					"wallS": 0.142519,
+					"cpuMinS": 0.137748,
+					"cpuMaxS": 0.145295,
+					"maxRssKb": 2108,
+					"throughputMiBs": 1347.1887958798475,
 					"runs": [
 						{
-							"wall_s": 0.126392,
-							"user_s": 0.08923,
-							"sys_s": 0.036649,
-							"max_rss_kb": 2016,
+							"wall_s": 0.142519,
+							"user_s": 0.102786,
+							"sys_s": 0.036546,
+							"max_rss_kb": 2108,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.13261,
-							"user_s": 0.086895,
-							"sys_s": 0.042705,
-							"max_rss_kb": 2012,
+							"wall_s": 0.140379,
+							"user_s": 0.095056,
+							"sys_s": 0.043963,
+							"max_rss_kb": 2124,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.129656,
-							"user_s": 0.104931,
-							"sys_s": 0.024178,
-							"max_rss_kb": 2148,
+							"wall_s": 0.145612,
+							"user_s": 0.102032,
+							"sys_s": 0.043263,
+							"max_rss_kb": 2100,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.126875,
-							"user_s": 0.097647,
-							"sys_s": 0.027715,
-							"max_rss_kb": 2016,
+							"wall_s": 0.139036,
+							"user_s": 0.10603,
+							"sys_s": 0.031718,
+							"max_rss_kb": 2116,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.127302,
-							"user_s": 0.102206,
-							"sys_s": 0.024611,
-							"max_rss_kb": 2008,
+							"wall_s": 0.143191,
+							"user_s": 0.100063,
+							"sys_s": 0.038806,
+							"max_rss_kb": 2108,
 							"exit": 0
 						}
 					]
@@ -1674,48 +2070,48 @@
 				{
 					"op": "stream",
 					"impl": "cpp",
-					"cpuS": 0.131022,
-					"userS": 0.092041,
-					"sysS": 0.039875,
-					"wallS": 0.131679,
-					"cpuMinS": 0.128808,
-					"cpuMaxS": 0.132216,
-					"maxRssKb": 4212,
-					"throughputMiBs": 1458.0912674002689,
+					"cpuS": 0.138016,
+					"userS": 0.095455,
+					"sysS": 0.042561,
+					"wallS": 0.139893,
+					"cpuMinS": 0.137492,
+					"cpuMaxS": 0.149148,
+					"maxRssKb": 4232,
+					"throughputMiBs": 1372.4775364028224,
 					"runs": [
 						{
-							"wall_s": 0.132682,
-							"user_s": 0.104941,
-							"sys_s": 0.027275,
-							"max_rss_kb": 4308,
+							"wall_s": 0.150543,
+							"user_s": 0.113728,
+							"sys_s": 0.03542,
+							"max_rss_kb": 4372,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.130997,
-							"user_s": 0.101841,
-							"sys_s": 0.028616,
-							"max_rss_kb": 4212,
+							"wall_s": 0.138198,
+							"user_s": 0.094264,
+							"sys_s": 0.043398,
+							"max_rss_kb": 4232,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.131679,
-							"user_s": 0.091147,
-							"sys_s": 0.039875,
-							"max_rss_kb": 4208,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.132996,
-							"user_s": 0.092041,
-							"sys_s": 0.039933,
-							"max_rss_kb": 4384,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.128961,
-							"user_s": 0.076462,
-							"sys_s": 0.052346,
+							"wall_s": 0.13833,
+							"user_s": 0.076602,
+							"sys_s": 0.06089,
 							"max_rss_kb": 4188,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.139893,
+							"user_s": 0.10364,
+							"sys_s": 0.035946,
+							"max_rss_kb": 4284,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.141094,
+							"user_s": 0.095455,
+							"sys_s": 0.042561,
+							"max_rss_kb": 4220,
 							"exit": 0
 						}
 					]
@@ -1723,48 +2119,48 @@
 				{
 					"op": "stream",
 					"impl": "go",
-					"cpuS": 0.061529,
-					"userS": 0.024754,
-					"sysS": 0.037966,
-					"wallS": 0.059773,
-					"cpuMinS": 0.059362,
-					"cpuMaxS": 0.065692,
-					"maxRssKb": 7024,
-					"throughputMiBs": 3212.152644170445,
+					"cpuS": 0.06689,
+					"userS": 0.029634,
+					"sysS": 0.037256,
+					"wallS": 0.063492,
+					"cpuMinS": 0.06465,
+					"cpuMaxS": 0.07357,
+					"maxRssKb": 7100,
+					"throughputMiBs": 3024.0030240030237,
 					"runs": [
 						{
-							"wall_s": 0.059773,
-							"user_s": 0.037818,
-							"sys_s": 0.026103,
-							"max_rss_kb": 6972,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.0577,
-							"user_s": 0.019942,
-							"sys_s": 0.040008,
-							"max_rss_kb": 7024,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.057701,
-							"user_s": 0.024754,
-							"sys_s": 0.034608,
-							"max_rss_kb": 7024,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.060514,
-							"user_s": 0.015235,
-							"sys_s": 0.046294,
+							"wall_s": 0.063492,
+							"user_s": 0.027934,
+							"sys_s": 0.03865,
 							"max_rss_kb": 7152,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.063273,
-							"user_s": 0.027726,
-							"sys_s": 0.037966,
+							"wall_s": 0.061973,
+							"user_s": 0.032053,
+							"sys_s": 0.032597,
 							"max_rss_kb": 7024,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.064864,
+							"user_s": 0.028641,
+							"sys_s": 0.038796,
+							"max_rss_kb": 7228,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.063364,
+							"user_s": 0.029634,
+							"sys_s": 0.037256,
+							"max_rss_kb": 7032,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.070553,
+							"user_s": 0.045723,
+							"sys_s": 0.027847,
+							"max_rss_kb": 7100,
 							"exit": 0
 						}
 					]
@@ -1772,48 +2168,97 @@
 				{
 					"op": "stream",
 					"impl": "ts",
-					"cpuS": 0.359678,
-					"userS": 0.321447,
-					"sysS": 0.032634,
-					"wallS": 0.348238,
-					"cpuMinS": 0.35334,
-					"cpuMaxS": 0.366275,
-					"maxRssKb": 48848,
-					"throughputMiBs": 551.3470672356262,
+					"cpuS": 0.392557,
+					"userS": 0.344,
+					"sysS": 0.048557,
+					"wallS": 0.374613,
+					"cpuMinS": 0.376542,
+					"cpuMaxS": 0.492213,
+					"maxRssKb": 48816,
+					"throughputMiBs": 512.5289298556111,
 					"runs": [
 						{
-							"wall_s": 0.352615,
-							"user_s": 0.332784,
-							"sys_s": 0.032634,
-							"max_rss_kb": 48848,
+							"wall_s": 0.431197,
+							"user_s": 0.405351,
+							"sys_s": 0.044138,
+							"max_rss_kb": 48884,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.351943,
-							"user_s": 0.341878,
-							"sys_s": 0.024397,
-							"max_rss_kb": 48896,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.348238,
-							"user_s": 0.321447,
-							"sys_s": 0.031893,
+							"wall_s": 0.374613,
+							"user_s": 0.329376,
+							"sys_s": 0.050997,
 							"max_rss_kb": 48820,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.347919,
-							"user_s": 0.307757,
-							"sys_s": 0.051921,
-							"max_rss_kb": 49016,
+							"wall_s": 0.474889,
+							"user_s": 0.422448,
+							"sys_s": 0.069765,
+							"max_rss_kb": 48732,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.346527,
-							"user_s": 0.30536,
-							"sys_s": 0.05147,
-							"max_rss_kb": 48648,
+							"wall_s": 0.374479,
+							"user_s": 0.344,
+							"sys_s": 0.048557,
+							"max_rss_kb": 48792,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.359479,
+							"user_s": 0.336679,
+							"sys_s": 0.039863,
+							"max_rss_kb": 48816,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "stream",
+					"impl": "py",
+					"cpuS": 11.918156,
+					"userS": 11.863236,
+					"sysS": 0.057912,
+					"wallS": 11.969491,
+					"cpuMinS": 11.751935,
+					"cpuMaxS": 12.972181,
+					"maxRssKb": 28632,
+					"throughputMiBs": 16.040782352399113,
+					"runs": [
+						{
+							"wall_s": 11.87259,
+							"user_s": 11.720684,
+							"sys_s": 0.047853,
+							"max_rss_kb": 28632,
+							"exit": 0
+						},
+						{
+							"wall_s": 13.080344,
+							"user_s": 12.892359,
+							"sys_s": 0.079822,
+							"max_rss_kb": 28624,
+							"exit": 0
+						},
+						{
+							"wall_s": 11.969491,
+							"user_s": 11.863236,
+							"sys_s": 0.05492,
+							"max_rss_kb": 28768,
+							"exit": 0
+						},
+						{
+							"wall_s": 11.878513,
+							"user_s": 11.694023,
+							"sys_s": 0.057912,
+							"max_rss_kb": 28768,
+							"exit": 0
+						},
+						{
+							"wall_s": 12.289829,
+							"user_s": 12.119452,
+							"sys_s": 0.080003,
+							"max_rss_kb": 28452,
 							"exit": 0
 						}
 					]
@@ -1829,53 +2274,54 @@
 				"c": 67112128,
 				"cpp": 67112128,
 				"go": 67112128,
-				"ts": 67112128
+				"ts": 67112128,
+				"py": 67112128
 			},
 			"results": [
 				{
 					"op": "write",
 					"impl": "c",
-					"cpuS": 0.057472,
-					"userS": 0.036982,
-					"sysS": 0.022993,
-					"wallS": 0.057662,
-					"cpuMinS": 0.055131,
-					"cpuMaxS": 0.062271,
+					"cpuS": 0.070743,
+					"userS": 0.040185,
+					"sysS": 0.028221,
+					"wallS": 0.071024,
+					"cpuMinS": 0.06265599999999999,
+					"cpuMaxS": 0.076601,
 					"maxRssKb": 3992,
-					"throughputMiBs": 1109.9164094204157,
+					"throughputMiBs": 901.1038522189682,
 					"runs": [
 						{
-							"wall_s": 0.056267,
-							"user_s": 0.039736,
-							"sys_s": 0.015395,
+							"wall_s": 0.065229,
+							"user_s": 0.039795,
+							"sys_s": 0.022861,
 							"max_rss_kb": 3992,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.056691,
-							"user_s": 0.028248,
-							"sys_s": 0.028248,
+							"wall_s": 0.068484,
+							"user_s": 0.040185,
+							"sys_s": 0.027948,
 							"max_rss_kb": 3992,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.057662,
-							"user_s": 0.034479,
-							"sys_s": 0.022993,
+							"wall_s": 0.071024,
+							"user_s": 0.035382,
+							"sys_s": 0.035361,
 							"max_rss_kb": 3992,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.058625,
-							"user_s": 0.045922,
-							"sys_s": 0.012527,
-							"max_rss_kb": 3992,
+							"wall_s": 0.076766,
+							"user_s": 0.04838,
+							"sys_s": 0.028221,
+							"max_rss_kb": 3944,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.069227,
-							"user_s": 0.036982,
-							"sys_s": 0.025289,
+							"wall_s": 0.076609,
+							"user_s": 0.040206,
+							"sys_s": 0.036185,
 							"max_rss_kb": 3992,
 							"exit": 0
 						}
@@ -1884,48 +2330,48 @@
 				{
 					"op": "write",
 					"impl": "cpp",
-					"cpuS": 0.062197,
-					"userS": 0.037444,
-					"sysS": 0.024753,
-					"wallS": 0.06311,
-					"cpuMinS": 0.058813000000000004,
-					"cpuMaxS": 0.086018,
-					"maxRssKb": 5916,
-					"throughputMiBs": 1014.1023609570591,
+					"cpuS": 0.066202,
+					"userS": 0.042997,
+					"sysS": 0.024635,
+					"wallS": 0.066978,
+					"cpuMinS": 0.065737,
+					"cpuMaxS": 0.08018800000000001,
+					"maxRssKb": 5904,
+					"throughputMiBs": 955.5376392248202,
 					"runs": [
 						{
-							"wall_s": 0.059381,
-							"user_s": 0.029624,
-							"sys_s": 0.029189,
-							"max_rss_kb": 5944,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.064693,
-							"user_s": 0.037444,
-							"sys_s": 0.024753,
-							"max_rss_kb": 5952,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.061866,
-							"user_s": 0.042318,
-							"sys_s": 0.019279,
-							"max_rss_kb": 5900,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.06311,
-							"user_s": 0.027472,
-							"sys_s": 0.035403,
+							"wall_s": 0.066978,
+							"user_s": 0.042997,
+							"sys_s": 0.023205,
 							"max_rss_kb": 5916,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.086879,
-							"user_s": 0.065704,
-							"sys_s": 0.020314,
+							"wall_s": 0.066023,
+							"user_s": 0.041102,
+							"sys_s": 0.024635,
+							"max_rss_kb": 5868,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.079536,
+							"user_s": 0.039631,
+							"sys_s": 0.039631,
+							"max_rss_kb": 5936,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.066368,
+							"user_s": 0.045353,
+							"sys_s": 0.020492,
 							"max_rss_kb": 5904,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.08041,
+							"user_s": 0.048113,
+							"sys_s": 0.032075,
+							"max_rss_kb": 5880,
 							"exit": 0
 						}
 					]
@@ -1933,48 +2379,48 @@
 				{
 					"op": "write",
 					"impl": "go",
-					"cpuS": 0.11394300000000002,
-					"userS": 0.046495,
-					"sysS": 0.05361,
-					"wallS": 0.069757,
-					"cpuMinS": 0.08219699999999999,
-					"cpuMaxS": 0.13259200000000002,
+					"cpuS": 0.115928,
+					"userS": 0.056311,
+					"sysS": 0.060677,
+					"wallS": 0.077619,
+					"cpuMinS": 0.110188,
+					"cpuMaxS": 0.12992599999999999,
 					"maxRssKb": 12656,
-					"throughputMiBs": 917.470648107,
+					"throughputMiBs": 824.5403831536094,
 					"runs": [
 						{
-							"wall_s": 0.074014,
-							"user_s": 0.069738,
-							"sys_s": 0.05361,
+							"wall_s": 0.071031,
+							"user_s": 0.071197,
+							"sys_s": 0.038991,
+							"max_rss_kb": 12528,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.080063,
+							"user_s": 0.057515,
+							"sys_s": 0.072411,
+							"max_rss_kb": 21692,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.078576,
+							"user_s": 0.055251,
+							"sys_s": 0.060677,
 							"max_rss_kb": 12656,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.064551,
-							"user_s": 0.041445,
-							"sys_s": 0.04358,
-							"max_rss_kb": 11640,
+							"wall_s": 0.077619,
+							"user_s": 0.050904,
+							"sys_s": 0.077527,
+							"max_rss_kb": 15984,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.081925,
-							"user_s": 0.046495,
-							"sys_s": 0.086097,
-							"max_rss_kb": 14652,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.069757,
-							"user_s": 0.04676,
-							"sys_s": 0.067183,
-							"max_rss_kb": 14460,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.059558,
-							"user_s": 0.042666,
-							"sys_s": 0.039531,
-							"max_rss_kb": 11452,
+							"wall_s": 0.073785,
+							"user_s": 0.056311,
+							"sys_s": 0.058777,
+							"max_rss_kb": 12412,
 							"exit": 0
 						}
 					]
@@ -1982,48 +2428,97 @@
 				{
 					"op": "write",
 					"impl": "ts",
-					"cpuS": 0.17563700000000002,
-					"userS": 0.11445,
-					"sysS": 0.057217,
-					"wallS": 0.172424,
-					"cpuMinS": 0.169797,
-					"cpuMaxS": 0.191737,
-					"maxRssKb": 81912,
-					"throughputMiBs": 371.17802626084534,
+					"cpuS": 0.19033899999999998,
+					"userS": 0.129104,
+					"sysS": 0.072904,
+					"wallS": 0.20766,
+					"cpuMinS": 0.177518,
+					"cpuMaxS": 0.23884899999999998,
+					"maxRssKb": 81848,
+					"throughputMiBs": 308.1960897621111,
 					"runs": [
 						{
-							"wall_s": 0.172424,
-							"user_s": 0.129146,
-							"sys_s": 0.046491,
-							"max_rss_kb": 81912,
+							"wall_s": 0.173514,
+							"user_s": 0.129104,
+							"sys_s": 0.048414,
+							"max_rss_kb": 81848,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.167887,
-							"user_s": 0.11445,
-							"sys_s": 0.057217,
-							"max_rss_kb": 81940,
+							"wall_s": 0.180879,
+							"user_s": 0.098567,
+							"sys_s": 0.086267,
+							"max_rss_kb": 81796,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.16737,
-							"user_s": 0.132444,
-							"sys_s": 0.037353,
-							"max_rss_kb": 81656,
+							"wall_s": 0.230359,
+							"user_s": 0.178631,
+							"sys_s": 0.055593,
+							"max_rss_kb": 81900,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.185326,
-							"user_s": 0.11323,
-							"sys_s": 0.076813,
-							"max_rss_kb": 81852,
+							"wall_s": 0.20766,
+							"user_s": 0.117435,
+							"sys_s": 0.072904,
+							"max_rss_kb": 81796,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.187791,
-							"user_s": 0.110257,
-							"sys_s": 0.08148,
-							"max_rss_kb": 82092,
+							"wall_s": 0.23212,
+							"user_s": 0.131824,
+							"sys_s": 0.107025,
+							"max_rss_kb": 82740,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "write",
+					"impl": "py",
+					"cpuS": 3.86812,
+					"userS": 3.856115,
+					"sysS": 0.039991,
+					"wallS": 3.902268,
+					"cpuMinS": 3.607573,
+					"cpuMaxS": 4.372964,
+					"maxRssKb": 29600,
+					"throughputMiBs": 16.400718761499725,
+					"runs": [
+						{
+							"wall_s": 3.615273,
+							"user_s": 3.571583,
+							"sys_s": 0.03599,
+							"max_rss_kb": 29764,
+							"exit": 0
+						},
+						{
+							"wall_s": 3.82965,
+							"user_s": 3.750747,
+							"sys_s": 0.06344,
+							"max_rss_kb": 29596,
+							"exit": 0
+						},
+						{
+							"wall_s": 3.902268,
+							"user_s": 3.856115,
+							"sys_s": 0.012005,
+							"max_rss_kb": 29776,
+							"exit": 0
+						},
+						{
+							"wall_s": 4.016397,
+							"user_s": 3.949539,
+							"sys_s": 0.039991,
+							"max_rss_kb": 29600,
+							"exit": 0
+						},
+						{
+							"wall_s": 4.423384,
+							"user_s": 4.313892,
+							"sys_s": 0.059072,
+							"max_rss_kb": 29584,
 							"exit": 0
 						}
 					]
@@ -2031,48 +2526,48 @@
 				{
 					"op": "read",
 					"impl": "c",
-					"cpuS": 0.04942099999999999,
-					"userS": 0.033648,
-					"sysS": 0.012146,
-					"wallS": 0.050414,
-					"cpuMinS": 0.044535000000000005,
-					"cpuMaxS": 0.050896,
-					"maxRssKb": 3936,
-					"throughputMiBs": 1269.4886341095728,
+					"cpuS": 0.05319599999999999,
+					"userS": 0.03813,
+					"sysS": 0.015676,
+					"wallS": 0.055402,
+					"cpuMinS": 0.050959000000000004,
+					"cpuMaxS": 0.058724,
+					"maxRssKb": 4000,
+					"throughputMiBs": 1155.1929533229847,
 					"runs": [
 						{
-							"wall_s": 0.048314,
-							"user_s": 0.035772,
-							"sys_s": 0.011983,
-							"max_rss_kb": 3936,
+							"wall_s": 0.055402,
+							"user_s": 0.010949,
+							"sys_s": 0.043304,
+							"max_rss_kb": 4000,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.050771,
-							"user_s": 0.033648,
-							"sys_s": 0.015773,
-							"max_rss_kb": 3936,
+							"wall_s": 0.058968,
+							"user_s": 0.043048,
+							"sys_s": 0.015676,
+							"max_rss_kb": 3884,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.044634,
-							"user_s": 0.032389,
-							"sys_s": 0.012146,
-							"max_rss_kb": 3936,
+							"wall_s": 0.051164,
+							"user_s": 0.033973,
+							"sys_s": 0.016986,
+							"max_rss_kb": 4000,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.050996,
-							"user_s": 0.043066,
-							"sys_s": 0.00783,
-							"max_rss_kb": 3936,
+							"wall_s": 0.051976,
+							"user_s": 0.039754,
+							"sys_s": 0.011971,
+							"max_rss_kb": 4000,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.050414,
-							"user_s": 0.029262,
-							"sys_s": 0.020944,
-							"max_rss_kb": 3936,
+							"wall_s": 0.05541,
+							"user_s": 0.03813,
+							"sys_s": 0.015066,
+							"max_rss_kb": 3876,
 							"exit": 0
 						}
 					]
@@ -2080,48 +2575,48 @@
 				{
 					"op": "read",
 					"impl": "cpp",
-					"cpuS": 0.089439,
-					"userS": 0.048234,
-					"sysS": 0.040559,
-					"wallS": 0.089612,
-					"cpuMinS": 0.08627499999999999,
-					"cpuMaxS": 0.090457,
-					"maxRssKb": 5768,
-					"throughputMiBs": 714.190063830737,
+					"cpuS": 0.102061,
+					"userS": 0.04843,
+					"sysS": 0.055215,
+					"wallS": 0.109466,
+					"cpuMinS": 0.098447,
+					"cpuMaxS": 0.133514,
+					"maxRssKb": 5756,
+					"throughputMiBs": 584.656422998922,
 					"runs": [
 						{
-							"wall_s": 0.091146,
-							"user_s": 0.03308,
-							"sys_s": 0.057377,
-							"max_rss_kb": 5768,
+							"wall_s": 0.099498,
+							"user_s": 0.055151,
+							"sys_s": 0.043296,
+							"max_rss_kb": 5756,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.086377,
-							"user_s": 0.050981,
-							"sys_s": 0.035294,
-							"max_rss_kb": 5768,
+							"wall_s": 0.103103,
+							"user_s": 0.04729,
+							"sys_s": 0.054771,
+							"max_rss_kb": 5756,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.089383,
-							"user_s": 0.048234,
-							"sys_s": 0.040559,
-							"max_rss_kb": 5768,
+							"wall_s": 0.109466,
+							"user_s": 0.046694,
+							"sys_s": 0.055215,
+							"max_rss_kb": 5752,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.090381,
-							"user_s": 0.043159,
-							"sys_s": 0.047083,
-							"max_rss_kb": 5768,
+							"wall_s": 0.121303,
+							"user_s": 0.04843,
+							"sys_s": 0.072645,
+							"max_rss_kb": 5600,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.089612,
-							"user_s": 0.056916,
-							"sys_s": 0.032523,
-							"max_rss_kb": 5768,
+							"wall_s": 0.133689,
+							"user_s": 0.058903,
+							"sys_s": 0.074611,
+							"max_rss_kb": 5756,
 							"exit": 0
 						}
 					]
@@ -2129,48 +2624,48 @@
 				{
 					"op": "read",
 					"impl": "go",
-					"cpuS": 0.269887,
-					"userS": 0.12139,
-					"sysS": 0.147602,
-					"wallS": 0.132305,
-					"cpuMinS": 0.25258800000000003,
-					"cpuMaxS": 0.294853,
-					"maxRssKb": 16508,
-					"throughputMiBs": 483.73077359132304,
+					"cpuS": 0.315363,
+					"userS": 0.152842,
+					"sysS": 0.162256,
+					"wallS": 0.155235,
+					"cpuMinS": 0.30410099999999995,
+					"cpuMaxS": 0.330691,
+					"maxRssKb": 19964,
+					"throughputMiBs": 412.2781589203465,
 					"runs": [
 						{
-							"wall_s": 0.128646,
-							"user_s": 0.118028,
-							"sys_s": 0.13456,
-							"max_rss_kb": 23868,
+							"wall_s": 0.155329,
+							"user_s": 0.151715,
+							"sys_s": 0.155163,
+							"max_rss_kb": 18928,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.143254,
-							"user_s": 0.164176,
-							"sys_s": 0.130677,
-							"max_rss_kb": 14320,
+							"wall_s": 0.157871,
+							"user_s": 0.152842,
+							"sys_s": 0.177849,
+							"max_rss_kb": 19964,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.138978,
-							"user_s": 0.137224,
-							"sys_s": 0.147602,
-							"max_rss_kb": 14384,
+							"wall_s": 0.153739,
+							"user_s": 0.223532,
+							"sys_s": 0.094012,
+							"max_rss_kb": 14960,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.132305,
-							"user_s": 0.12139,
-							"sys_s": 0.148497,
-							"max_rss_kb": 16508,
+							"wall_s": 0.155235,
+							"user_s": 0.153107,
+							"sys_s": 0.162256,
+							"max_rss_kb": 23552,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.12344,
-							"user_s": 0.102628,
-							"sys_s": 0.154529,
-							"max_rss_kb": 17980,
+							"wall_s": 0.149394,
+							"user_s": 0.092968,
+							"sys_s": 0.211133,
+							"max_rss_kb": 25200,
 							"exit": 0
 						}
 					]
@@ -2178,48 +2673,97 @@
 				{
 					"op": "read",
 					"impl": "ts",
-					"cpuS": 0.17376599999999998,
-					"userS": 0.130262,
-					"sysS": 0.04917,
-					"wallS": 0.174516,
-					"cpuMinS": 0.171021,
-					"cpuMaxS": 0.252734,
-					"maxRssKb": 81000,
-					"throughputMiBs": 366.72855210983516,
+					"cpuS": 0.238083,
+					"userS": 0.157291,
+					"sysS": 0.063388,
+					"wallS": 0.237887,
+					"cpuMinS": 0.185788,
+					"cpuMaxS": 0.288736,
+					"maxRssKb": 80824,
+					"throughputMiBs": 269.0352982718686,
 					"runs": [
 						{
-							"wall_s": 0.169601,
-							"user_s": 0.121851,
-							"sys_s": 0.04917,
-							"max_rss_kb": 81000,
+							"wall_s": 0.183444,
+							"user_s": 0.138648,
+							"sys_s": 0.04714,
+							"max_rss_kb": 81896,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.248781,
-							"user_s": 0.232609,
-							"sys_s": 0.020125,
-							"max_rss_kb": 81040,
+							"wall_s": 0.271757,
+							"user_s": 0.218236,
+							"sys_s": 0.058457,
+							"max_rss_kb": 80536,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.169757,
-							"user_s": 0.113019,
-							"sys_s": 0.060558,
-							"max_rss_kb": 80936,
+							"wall_s": 0.283331,
+							"user_s": 0.176415,
+							"sys_s": 0.112321,
+							"max_rss_kb": 80720,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.174516,
-							"user_s": 0.130262,
-							"sys_s": 0.043504,
-							"max_rss_kb": 81032,
+							"wall_s": 0.237887,
+							"user_s": 0.157291,
+							"sys_s": 0.080792,
+							"max_rss_kb": 80824,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.197848,
-							"user_s": 0.141533,
-							"sys_s": 0.060235,
-							"max_rss_kb": 80888,
+							"wall_s": 0.186598,
+							"user_s": 0.125263,
+							"sys_s": 0.063388,
+							"max_rss_kb": 81836,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "read",
+					"impl": "py",
+					"cpuS": 4.009874,
+					"userS": 3.991052,
+					"sysS": 0.023834,
+					"wallS": 4.062392,
+					"cpuMinS": 3.600015,
+					"cpuMaxS": 4.548736,
+					"maxRssKb": 30796,
+					"throughputMiBs": 15.75426497492118,
+					"runs": [
+						{
+							"wall_s": 3.602751,
+							"user_s": 3.568059,
+							"sys_s": 0.031956,
+							"max_rss_kb": 30816,
+							"exit": 0
+						},
+						{
+							"wall_s": 4.062392,
+							"user_s": 3.991052,
+							"sys_s": 0.018822,
+							"max_rss_kb": 30772,
+							"exit": 0
+						},
+						{
+							"wall_s": 4.596979,
+							"user_s": 4.524902,
+							"sys_s": 0.023834,
+							"max_rss_kb": 30804,
+							"exit": 0
+						},
+						{
+							"wall_s": 4.06684,
+							"user_s": 4.003252,
+							"sys_s": 0.036022,
+							"max_rss_kb": 30796,
+							"exit": 0
+						},
+						{
+							"wall_s": 3.856615,
+							"user_s": 3.818029,
+							"sys_s": 0.016006,
+							"max_rss_kb": 30616,
 							"exit": 0
 						}
 					]
@@ -2235,54 +2779,55 @@
 				"c": 27343040,
 				"cpp": 27343040,
 				"go": 27334848,
-				"ts": 27341504
+				"ts": 27341504,
+				"py": 27343040
 			},
 			"results": [
 				{
 					"op": "write",
 					"impl": "c",
-					"cpuS": 0.905243,
-					"userS": 0.892946,
-					"sysS": 0.011988,
-					"wallS": 0.913212,
-					"cpuMinS": 0.894599,
-					"cpuMaxS": 0.987502,
-					"maxRssKb": 3640,
-					"throughputMiBs": 70.08230290447344,
+					"cpuS": 1.028473,
+					"userS": 1.016469,
+					"sysS": 0.012004,
+					"wallS": 1.04061,
+					"cpuMinS": 0.969899,
+					"cpuMaxS": 1.150062,
+					"maxRssKb": 3704,
+					"throughputMiBs": 61.50238802240993,
 					"runs": [
 						{
-							"wall_s": 0.901235,
-							"user_s": 0.892946,
-							"sys_s": 0.008009,
-							"max_rss_kb": 3640,
+							"wall_s": 1.045671,
+							"user_s": 1.025392,
+							"sys_s": 0.008011,
+							"max_rss_kb": 3704,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.991357,
-							"user_s": 0.975514,
-							"sys_s": 0.011988,
-							"max_rss_kb": 3640,
+							"wall_s": 1.028126,
+							"user_s": 1.015716,
+							"sys_s": 0.007999,
+							"max_rss_kb": 3700,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.896745,
-							"user_s": 0.87073,
-							"sys_s": 0.023869,
-							"max_rss_kb": 3640,
+							"wall_s": 1.161645,
+							"user_s": 1.126115,
+							"sys_s": 0.023947,
+							"max_rss_kb": 3704,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.915789,
-							"user_s": 0.893389,
-							"sys_s": 0.011854,
-							"max_rss_kb": 3640,
+							"wall_s": 0.975049,
+							"user_s": 0.945931,
+							"sys_s": 0.023968,
+							"max_rss_kb": 3704,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.913212,
-							"user_s": 0.878068,
-							"sys_s": 0.027871,
-							"max_rss_kb": 3636,
+							"wall_s": 1.04061,
+							"user_s": 1.016469,
+							"sys_s": 0.012004,
+							"max_rss_kb": 3704,
 							"exit": 0
 						}
 					]
@@ -2290,48 +2835,48 @@
 				{
 					"op": "write",
 					"impl": "cpp",
-					"cpuS": 0.9218630000000001,
-					"userS": 0.915231,
-					"sysS": 0.012038,
-					"wallS": 0.926899,
-					"cpuMinS": 0.887337,
-					"cpuMaxS": 0.948495,
-					"maxRssKb": 6180,
-					"throughputMiBs": 69.04743666785701,
+					"cpuS": 1.115804,
+					"userS": 1.103789,
+					"sysS": 0.011993,
+					"wallS": 1.117597,
+					"cpuMinS": 0.978704,
+					"cpuMaxS": 1.134595,
+					"maxRssKb": 6164,
+					"throughputMiBs": 57.265722796321036,
 					"runs": [
 						{
-							"wall_s": 0.9391,
-							"user_s": 0.915231,
-							"sys_s": 0.012038,
+							"wall_s": 1.013935,
+							"user_s": 0.970738,
+							"sys_s": 0.007966,
+							"max_rss_kb": 6124,
+							"exit": 0
+						},
+						{
+							"wall_s": 1.140181,
+							"user_s": 1.112384,
+							"sys_s": 0.01197,
 							"max_rss_kb": 6200,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.926899,
-							"user_s": 0.917869,
-							"sys_s": 0.003994,
-							"max_rss_kb": 6176,
+							"wall_s": 1.117597,
+							"user_s": 1.103789,
+							"sys_s": 0.012015,
+							"max_rss_kb": 6164,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.950771,
-							"user_s": 0.924431,
-							"sys_s": 0.024064,
-							"max_rss_kb": 6180,
+							"wall_s": 1.1389,
+							"user_s": 1.114712,
+							"sys_s": 0.019883,
+							"max_rss_kb": 6164,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.917225,
-							"user_s": 0.899864,
-							"sys_s": 0.015947,
-							"max_rss_kb": 6244,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.894705,
-							"user_s": 0.875303,
-							"sys_s": 0.012034,
-							"max_rss_kb": 6172,
+							"wall_s": 1.004218,
+							"user_s": 0.983607,
+							"sys_s": 0.011993,
+							"max_rss_kb": 6160,
 							"exit": 0
 						}
 					]
@@ -2339,48 +2884,48 @@
 				{
 					"op": "write",
 					"impl": "go",
-					"cpuS": 0.86778,
-					"userS": 0.824554,
-					"sysS": 0.049503,
-					"wallS": 0.834165,
-					"cpuMinS": 0.827528,
-					"cpuMaxS": 0.924443,
-					"maxRssKb": 12912,
-					"throughputMiBs": 76.72343001684318,
+					"cpuS": 0.957602,
+					"userS": 0.896841,
+					"sysS": 0.048671,
+					"wallS": 0.914555,
+					"cpuMinS": 0.881573,
+					"cpuMaxS": 0.9824539999999999,
+					"maxRssKb": 12784,
+					"throughputMiBs": 69.97938888311802,
 					"runs": [
 						{
-							"wall_s": 0.816007,
-							"user_s": 0.804453,
-							"sys_s": 0.049503,
-							"max_rss_kb": 12912,
+							"wall_s": 0.860483,
+							"user_s": 0.832902,
+							"sys_s": 0.048671,
+							"max_rss_kb": 12792,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.794373,
-							"user_s": 0.782491,
-							"sys_s": 0.045037,
-							"max_rss_kb": 13744,
+							"wall_s": 0.932981,
+							"user_s": 0.937541,
+							"sys_s": 0.044913,
+							"max_rss_kb": 12784,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.834165,
-							"user_s": 0.824554,
-							"sys_s": 0.043226,
-							"max_rss_kb": 12912,
+							"wall_s": 0.929066,
+							"user_s": 0.930303,
+							"sys_s": 0.031438,
+							"max_rss_kb": 12664,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.887706,
-							"user_s": 0.847526,
-							"sys_s": 0.076917,
-							"max_rss_kb": 12720,
+							"wall_s": 0.892417,
+							"user_s": 0.854032,
+							"sys_s": 0.066764,
+							"max_rss_kb": 12784,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.836038,
-							"user_s": 0.827896,
-							"sys_s": 0.052827,
-							"max_rss_kb": 13680,
+							"wall_s": 0.914555,
+							"user_s": 0.896841,
+							"sys_s": 0.060761,
+							"max_rss_kb": 12784,
 							"exit": 0
 						}
 					]
@@ -2388,48 +2933,97 @@
 				{
 					"op": "write",
 					"impl": "ts",
-					"cpuS": 0.942187,
-					"userS": 0.892099,
-					"sysS": 0.051352,
-					"wallS": 0.939334,
-					"cpuMinS": 0.9275990000000001,
-					"cpuMaxS": 0.963994,
-					"maxRssKb": 82356,
-					"throughputMiBs": 68.13337960725364,
+					"cpuS": 0.982996,
+					"userS": 0.936006,
+					"sysS": 0.045169,
+					"wallS": 0.985235,
+					"cpuMinS": 0.944815,
+					"cpuMaxS": 1.035836,
+					"maxRssKb": 82684,
+					"throughputMiBs": 64.95912142788269,
 					"runs": [
 						{
-							"wall_s": 0.983266,
-							"user_s": 0.909908,
-							"sys_s": 0.054086,
-							"max_rss_kb": 82916,
+							"wall_s": 0.941051,
+							"user_s": 0.908751,
+							"sys_s": 0.036064,
+							"max_rss_kb": 82536,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.932444,
-							"user_s": 0.892099,
-							"sys_s": 0.043619,
-							"max_rss_kb": 82188,
+							"wall_s": 1.067661,
+							"user_s": 1.008176,
+							"sys_s": 0.02766,
+							"max_rss_kb": 82076,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.96739,
-							"user_s": 0.914128,
-							"sys_s": 0.031963,
-							"max_rss_kb": 82516,
+							"wall_s": 1.00722,
+							"user_s": 0.938208,
+							"sys_s": 0.045169,
+							"max_rss_kb": 83024,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.923605,
-							"user_s": 0.875217,
-							"sys_s": 0.052382,
-							"max_rss_kb": 81740,
+							"wall_s": 0.959461,
+							"user_s": 0.912436,
+							"sys_s": 0.048148,
+							"max_rss_kb": 82684,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.939334,
-							"user_s": 0.890835,
-							"sys_s": 0.051352,
-							"max_rss_kb": 82356,
+							"wall_s": 0.985235,
+							"user_s": 0.936006,
+							"sys_s": 0.04699,
+							"max_rss_kb": 83040,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "write",
+					"impl": "py",
+					"cpuS": 3.486032,
+					"userS": 3.410026,
+					"sysS": 0.067901,
+					"wallS": 3.539605,
+					"cpuMinS": 3.231736,
+					"cpuMaxS": 4.02109,
+					"maxRssKb": 31664,
+					"throughputMiBs": 18.08111357058203,
+					"runs": [
+						{
+							"wall_s": 3.247574,
+							"user_s": 3.163835,
+							"sys_s": 0.067901,
+							"max_rss_kb": 31684,
+							"exit": 0
+						},
+						{
+							"wall_s": 3.826476,
+							"user_s": 3.687477,
+							"sys_s": 0.055086,
+							"max_rss_kb": 31668,
+							"exit": 0
+						},
+						{
+							"wall_s": 4.067577,
+							"user_s": 3.953251,
+							"sys_s": 0.067839,
+							"max_rss_kb": 31664,
+							"exit": 0
+						},
+						{
+							"wall_s": 3.327437,
+							"user_s": 3.233022,
+							"sys_s": 0.076039,
+							"max_rss_kb": 31488,
+							"exit": 0
+						},
+						{
+							"wall_s": 3.539605,
+							"user_s": 3.410026,
+							"sys_s": 0.076006,
+							"max_rss_kb": 31476,
 							"exit": 0
 						}
 					]
@@ -2437,48 +3031,48 @@
 				{
 					"op": "read",
 					"impl": "c",
-					"cpuS": 0.16603600000000002,
-					"userS": 0.16409,
-					"sysS": 0.003922,
-					"wallS": 0.171576,
-					"cpuMinS": 0.162494,
-					"cpuMaxS": 0.173999,
-					"maxRssKb": 3328,
-					"throughputMiBs": 373.01254254674313,
+					"cpuS": 0.201488,
+					"userS": 0.193429,
+					"sysS": 0.007952,
+					"wallS": 0.20166,
+					"cpuMinS": 0.174571,
+					"cpuMaxS": 0.21070299999999997,
+					"maxRssKb": 3392,
+					"throughputMiBs": 317.36586333432507,
 					"runs": [
 						{
-							"wall_s": 0.172988,
-							"user_s": 0.16409,
-							"sys_s": 0.003922,
-							"max_rss_kb": 3328,
+							"wall_s": 0.210936,
+							"user_s": 0.202751,
+							"sys_s": 0.007952,
+							"max_rss_kb": 3392,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.171576,
-							"user_s": 0.165464,
-							"sys_s": 0.000484,
-							"max_rss_kb": 3328,
+							"wall_s": 0.192907,
+							"user_s": 0.181699,
+							"sys_s": 0.004016,
+							"max_rss_kb": 3388,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.163845,
-							"user_s": 0.162494,
-							"sys_s": 0,
-							"max_rss_kb": 3328,
+							"wall_s": 0.204254,
+							"user_s": 0.196052,
+							"sys_s": 0.008002,
+							"max_rss_kb": 3392,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.166193,
-							"user_s": 0.162082,
-							"sys_s": 0.003954,
-							"max_rss_kb": 3328,
+							"wall_s": 0.20166,
+							"user_s": 0.193429,
+							"sys_s": 0.008059,
+							"max_rss_kb": 3388,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.176897,
-							"user_s": 0.169981,
-							"sys_s": 0.004018,
-							"max_rss_kb": 3352,
+							"wall_s": 0.176684,
+							"user_s": 0.170664,
+							"sys_s": 0.003907,
+							"max_rss_kb": 3392,
 							"exit": 0
 						}
 					]
@@ -2486,48 +3080,48 @@
 				{
 					"op": "read",
 					"impl": "cpp",
-					"cpuS": 0.18545799999999998,
-					"userS": 0.169674,
-					"sysS": 0.011923,
-					"wallS": 0.185626,
-					"cpuMinS": 0.170198,
-					"cpuMaxS": 0.186708,
-					"maxRssKb": 5716,
-					"throughputMiBs": 344.77928738431035,
+					"cpuS": 0.17902400000000002,
+					"userS": 0.172358,
+					"sysS": 0.008021,
+					"wallS": 0.185663,
+					"cpuMinS": 0.176378,
+					"cpuMaxS": 0.210092,
+					"maxRssKb": 5804,
+					"throughputMiBs": 344.71057776724496,
 					"runs": [
 						{
-							"wall_s": 0.185626,
-							"user_s": 0.169674,
-							"sys_s": 0.015784,
-							"max_rss_kb": 5864,
+							"wall_s": 0.210306,
+							"user_s": 0.197972,
+							"sys_s": 0.01212,
+							"max_rss_kb": 5720,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.202757,
-							"user_s": 0.184568,
-							"sys_s": 0.00214,
-							"max_rss_kb": 5676,
+							"wall_s": 0.18868,
+							"user_s": 0.180541,
+							"sys_s": 0.007856,
+							"max_rss_kb": 5852,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.193981,
-							"user_s": 0.182022,
-							"sys_s": 0.003954,
-							"max_rss_kb": 5776,
+							"wall_s": 0.177125,
+							"user_s": 0.172358,
+							"sys_s": 0.00402,
+							"max_rss_kb": 5660,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.176679,
-							"user_s": 0.164473,
-							"sys_s": 0.012038,
-							"max_rss_kb": 5712,
+							"wall_s": 0.17664,
+							"user_s": 0.168363,
+							"sys_s": 0.008021,
+							"max_rss_kb": 5804,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.171077,
-							"user_s": 0.158275,
-							"sys_s": 0.011923,
-							"max_rss_kb": 5716,
+							"wall_s": 0.185663,
+							"user_s": 0.167273,
+							"sys_s": 0.011751,
+							"max_rss_kb": 5848,
 							"exit": 0
 						}
 					]
@@ -2535,48 +3129,48 @@
 				{
 					"op": "read",
 					"impl": "go",
-					"cpuS": 0.694673,
-					"userS": 0.535291,
-					"sysS": 0.159382,
-					"wallS": 0.474379,
-					"cpuMinS": 0.675479,
-					"cpuMaxS": 0.74092,
-					"maxRssKb": 12016,
-					"throughputMiBs": 134.91322339310972,
+					"cpuS": 0.749119,
+					"userS": 0.527164,
+					"sysS": 0.204626,
+					"wallS": 0.515957,
+					"cpuMinS": 0.718989,
+					"cpuMaxS": 0.7587280000000001,
+					"maxRssKb": 11644,
+					"throughputMiBs": 124.04134453064887,
 					"runs": [
 						{
-							"wall_s": 0.507604,
-							"user_s": 0.581735,
-							"sys_s": 0.137294,
-							"max_rss_kb": 11068,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.500908,
-							"user_s": 0.524892,
-							"sys_s": 0.216028,
-							"max_rss_kb": 12144,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.469131,
-							"user_s": 0.537983,
-							"sys_s": 0.140181,
-							"max_rss_kb": 11504,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.474379,
-							"user_s": 0.535291,
-							"sys_s": 0.159382,
-							"max_rss_kb": 14064,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.433294,
-							"user_s": 0.497829,
-							"sys_s": 0.17765,
+							"wall_s": 0.498596,
+							"user_s": 0.527164,
+							"sys_s": 0.197469,
 							"max_rss_kb": 12016,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.529314,
+							"user_s": 0.512456,
+							"sys_s": 0.246272,
+							"max_rss_kb": 11644,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.488616,
+							"user_s": 0.52365,
+							"sys_s": 0.195339,
+							"max_rss_kb": 11376,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.515957,
+							"user_s": 0.53525,
+							"sys_s": 0.215125,
+							"max_rss_kb": 12016,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.51679,
+							"user_s": 0.544493,
+							"sys_s": 0.204626,
+							"max_rss_kb": 11436,
 							"exit": 0
 						}
 					]
@@ -2584,48 +3178,97 @@
 				{
 					"op": "read",
 					"impl": "ts",
-					"cpuS": 0.253374,
-					"userS": 0.219229,
-					"sysS": 0.049487,
-					"wallS": 0.245988,
-					"cpuMinS": 0.241868,
-					"cpuMaxS": 0.307085,
-					"maxRssKb": 82124,
-					"throughputMiBs": 260.1752931037286,
+					"cpuS": 0.276124,
+					"userS": 0.242455,
+					"sysS": 0.050943,
+					"wallS": 0.264952,
+					"cpuMinS": 0.263423,
+					"cpuMaxS": 0.342819,
+					"maxRssKb": 82000,
+					"throughputMiBs": 241.55318699236085,
 					"runs": [
 						{
-							"wall_s": 0.239905,
-							"user_s": 0.184805,
-							"sys_s": 0.068569,
-							"max_rss_kb": 82628,
+							"wall_s": 0.3278,
+							"user_s": 0.281561,
+							"sys_s": 0.061258,
+							"max_rss_kb": 82000,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.288477,
-							"user_s": 0.256596,
-							"sys_s": 0.050489,
-							"max_rss_kb": 81752,
+							"wall_s": 0.284509,
+							"user_s": 0.251119,
+							"sys_s": 0.050943,
+							"max_rss_kb": 81632,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.225993,
-							"user_s": 0.194289,
-							"sys_s": 0.047579,
+							"wall_s": 0.264952,
+							"user_s": 0.223248,
+							"sys_s": 0.052876,
 							"max_rss_kb": 82124,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.287412,
-							"user_s": 0.251635,
-							"sys_s": 0.049487,
-							"max_rss_kb": 81500,
+							"wall_s": 0.253538,
+							"user_s": 0.242455,
+							"sys_s": 0.027405,
+							"max_rss_kb": 81952,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.245988,
-							"user_s": 0.219229,
-							"sys_s": 0.033467,
-							"max_rss_kb": 82176,
+							"wall_s": 0.249666,
+							"user_s": 0.220445,
+							"sys_s": 0.042978,
+							"max_rss_kb": 82020,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "read",
+					"impl": "py",
+					"cpuS": 2.100424,
+					"userS": 2.029023,
+					"sysS": 0.071401,
+					"wallS": 2.110725,
+					"cpuMinS": 1.9692,
+					"cpuMaxS": 2.378908,
+					"maxRssKb": 33124,
+					"throughputMiBs": 30.32133508628552,
+					"runs": [
+						{
+							"wall_s": 2.255904,
+							"user_s": 2.186596,
+							"sys_s": 0.063137,
+							"max_rss_kb": 33136,
+							"exit": 0
+						},
+						{
+							"wall_s": 1.976035,
+							"user_s": 1.901305,
+							"sys_s": 0.067895,
+							"max_rss_kb": 33124,
+							"exit": 0
+						},
+						{
+							"wall_s": 2.110725,
+							"user_s": 2.029023,
+							"sys_s": 0.071401,
+							"max_rss_kb": 33096,
+							"exit": 0
+						},
+						{
+							"wall_s": 2.044643,
+							"user_s": 1.968619,
+							"sys_s": 0.072013,
+							"max_rss_kb": 32948,
+							"exit": 0
+						},
+						{
+							"wall_s": 2.392091,
+							"user_s": 2.298912,
+							"sys_s": 0.079996,
+							"max_rss_kb": 33136,
 							"exit": 0
 						}
 					]
@@ -2641,54 +3284,55 @@
 				"c": 25742528,
 				"cpp": 25742528,
 				"go": 25737920,
-				"ts": 25735360
+				"ts": 25735360,
+				"py": 25742528
 			},
 			"results": [
 				{
 					"op": "write",
 					"impl": "c",
-					"cpuS": 0.235432,
-					"userS": 0.224056,
-					"sysS": 0.007986,
-					"wallS": 0.235909,
-					"cpuMinS": 0.224873,
-					"cpuMaxS": 0.238145,
-					"maxRssKb": 4360,
-					"throughputMiBs": 271.29104866707075,
+					"cpuS": 0.254218,
+					"userS": 0.24208,
+					"sysS": 0.012138,
+					"wallS": 0.255078,
+					"cpuMinS": 0.24678499999999998,
+					"cpuMaxS": 0.259566,
+					"maxRssKb": 4420,
+					"throughputMiBs": 250.9036451595198,
 					"runs": [
 						{
-							"wall_s": 0.238701,
-							"user_s": 0.230192,
-							"sys_s": 0.007953,
-							"max_rss_kb": 4360,
+							"wall_s": 0.247342,
+							"user_s": 0.218878,
+							"sys_s": 0.027907,
+							"max_rss_kb": 4420,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.23178,
-							"user_s": 0.223628,
-							"sys_s": 0.007986,
-							"max_rss_kb": 4496,
+							"wall_s": 0.255078,
+							"user_s": 0.24208,
+							"sys_s": 0.012138,
+							"max_rss_kb": 4420,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.248204,
-							"user_s": 0.224056,
-							"sys_s": 0.011376,
-							"max_rss_kb": 4360,
+							"wall_s": 0.250314,
+							"user_s": 0.23329,
+							"sys_s": 0.016133,
+							"max_rss_kb": 4420,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.235909,
-							"user_s": 0.231582,
-							"sys_s": 0.003995,
-							"max_rss_kb": 4364,
+							"wall_s": 0.26239,
+							"user_s": 0.246341,
+							"sys_s": 0.012103,
+							"max_rss_kb": 4424,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.225089,
-							"user_s": 0.212825,
-							"sys_s": 0.012048,
-							"max_rss_kb": 4352,
+							"wall_s": 0.260639,
+							"user_s": 0.251553,
+							"sys_s": 0.008013,
+							"max_rss_kb": 4416,
 							"exit": 0
 						}
 					]
@@ -2696,48 +3340,48 @@
 				{
 					"op": "write",
 					"impl": "cpp",
-					"cpuS": 0.247027,
-					"userS": 0.235078,
-					"sysS": 0.011949,
-					"wallS": 0.248386,
-					"cpuMinS": 0.239549,
-					"cpuMaxS": 0.310829,
-					"maxRssKb": 6960,
-					"throughputMiBs": 257.6634753971641,
+					"cpuS": 0.286713,
+					"userS": 0.270767,
+					"sysS": 0.015946,
+					"wallS": 0.287382,
+					"cpuMinS": 0.255165,
+					"cpuMaxS": 0.34246099999999996,
+					"maxRssKb": 6908,
+					"throughputMiBs": 222.70009951910694,
 					"runs": [
 						{
-							"wall_s": 0.311033,
-							"user_s": 0.302754,
-							"sys_s": 0.008075,
-							"max_rss_kb": 6988,
+							"wall_s": 0.342674,
+							"user_s": 0.338479,
+							"sys_s": 0.003982,
+							"max_rss_kb": 6980,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.260592,
-							"user_s": 0.232186,
-							"sys_s": 0.027539,
-							"max_rss_kb": 6860,
+							"wall_s": 0.312268,
+							"user_s": 0.294523,
+							"sys_s": 0.015951,
+							"max_rss_kb": 6872,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.241819,
-							"user_s": 0.235522,
-							"sys_s": 0.004027,
-							"max_rss_kb": 7000,
+							"wall_s": 0.285261,
+							"user_s": 0.249895,
+							"sys_s": 0.019525,
+							"max_rss_kb": 6976,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.245705,
-							"user_s": 0.229161,
-							"sys_s": 0.01584,
+							"wall_s": 0.258906,
+							"user_s": 0.243035,
+							"sys_s": 0.01213,
 							"max_rss_kb": 6896,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.248386,
-							"user_s": 0.235078,
-							"sys_s": 0.011949,
-							"max_rss_kb": 6960,
+							"wall_s": 0.287382,
+							"user_s": 0.270767,
+							"sys_s": 0.015946,
+							"max_rss_kb": 6908,
 							"exit": 0
 						}
 					]
@@ -2745,48 +3389,48 @@
 				{
 					"op": "write",
 					"impl": "go",
-					"cpuS": 0.628019,
-					"userS": 0.537366,
-					"sysS": 0.091744,
-					"wallS": 0.521629,
-					"cpuMinS": 0.580922,
-					"cpuMaxS": 0.682986,
-					"maxRssKb": 54896,
-					"throughputMiBs": 122.69256502226678,
+					"cpuS": 0.770343,
+					"userS": 0.651694,
+					"sysS": 0.123192,
+					"wallS": 0.657161,
+					"cpuMinS": 0.758896,
+					"cpuMaxS": 0.929351,
+					"maxRssKb": 64752,
+					"throughputMiBs": 97.38861557517869,
 					"runs": [
 						{
-							"wall_s": 0.487347,
-							"user_s": 0.515013,
-							"sys_s": 0.065909,
-							"max_rss_kb": 54896,
+							"wall_s": 0.625787,
+							"user_s": 0.617905,
+							"sys_s": 0.140991,
+							"max_rss_kb": 64836,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.578561,
-							"user_s": 0.582291,
-							"sys_s": 0.100695,
-							"max_rss_kb": 52164,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.572648,
-							"user_s": 0.543073,
-							"sys_s": 0.132817,
+							"wall_s": 0.657161,
+							"user_s": 0.635849,
+							"sys_s": 0.123192,
 							"max_rss_kb": 64752,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.521629,
-							"user_s": 0.537366,
-							"sys_s": 0.090653,
-							"max_rss_kb": 65144,
+							"wall_s": 0.761629,
+							"user_s": 0.744174,
+							"sys_s": 0.185177,
+							"max_rss_kb": 65008,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.521377,
-							"user_s": 0.534043,
-							"sys_s": 0.091744,
-							"max_rss_kb": 54524,
+							"wall_s": 0.647708,
+							"user_s": 0.651694,
+							"sys_s": 0.118649,
+							"max_rss_kb": 50864,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.659347,
+							"user_s": 0.678691,
+							"sys_s": 0.114873,
+							"max_rss_kb": 49340,
 							"exit": 0
 						}
 					]
@@ -2794,48 +3438,97 @@
 				{
 					"op": "write",
 					"impl": "ts",
-					"cpuS": 0.398705,
-					"userS": 0.334432,
-					"sysS": 0.064633,
-					"wallS": 0.39566,
-					"cpuMinS": 0.347348,
-					"cpuMaxS": 0.422161,
-					"maxRssKb": 127368,
-					"throughputMiBs": 161.7550422079563,
+					"cpuS": 0.419709,
+					"userS": 0.353593,
+					"sysS": 0.063357,
+					"wallS": 0.418398,
+					"cpuMinS": 0.37124300000000005,
+					"cpuMaxS": 0.451107,
+					"maxRssKb": 125160,
+					"throughputMiBs": 152.96440231549863,
 					"runs": [
 						{
-							"wall_s": 0.431244,
-							"user_s": 0.366242,
-							"sys_s": 0.055919,
-							"max_rss_kb": 127312,
+							"wall_s": 0.445702,
+							"user_s": 0.364091,
+							"sys_s": 0.075722,
+							"max_rss_kb": 125088,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.39566,
-							"user_s": 0.331233,
-							"sys_s": 0.067472,
-							"max_rss_kb": 127368,
+							"wall_s": 0.368755,
+							"user_s": 0.311524,
+							"sys_s": 0.059719,
+							"max_rss_kb": 127448,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.374455,
-							"user_s": 0.334432,
-							"sys_s": 0.043914,
-							"max_rss_kb": 127052,
+							"wall_s": 0.376519,
+							"user_s": 0.31424,
+							"sys_s": 0.062696,
+							"max_rss_kb": 128356,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.416644,
-							"user_s": 0.335799,
-							"sys_s": 0.085075,
-							"max_rss_kb": 127780,
+							"wall_s": 0.449057,
+							"user_s": 0.353593,
+							"sys_s": 0.097514,
+							"max_rss_kb": 125160,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.342763,
-							"user_s": 0.282715,
-							"sys_s": 0.064633,
-							"max_rss_kb": 127768,
+							"wall_s": 0.418398,
+							"user_s": 0.356352,
+							"sys_s": 0.063357,
+							"max_rss_kb": 122768,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "write",
+					"impl": "py",
+					"cpuS": 2.117728,
+					"userS": 2.101138,
+					"sysS": 0.027512,
+					"wallS": 2.121638,
+					"cpuMinS": 1.9309589999999999,
+					"cpuMaxS": 2.1763719999999998,
+					"maxRssKb": 32008,
+					"throughputMiBs": 30.16537222655326,
+					"runs": [
+						{
+							"wall_s": 2.238357,
+							"user_s": 2.160741,
+							"sys_s": 0.015631,
+							"max_rss_kb": 32008,
+							"exit": 0
+						},
+						{
+							"wall_s": 2.121638,
+							"user_s": 2.101705,
+							"sys_s": 0.016023,
+							"max_rss_kb": 31992,
+							"exit": 0
+						},
+						{
+							"wall_s": 2.094057,
+							"user_s": 2.040729,
+							"sys_s": 0.027512,
+							"max_rss_kb": 32164,
+							"exit": 0
+						},
+						{
+							"wall_s": 1.936889,
+							"user_s": 1.896985,
+							"sys_s": 0.033974,
+							"max_rss_kb": 31904,
+							"exit": 0
+						},
+						{
+							"wall_s": 2.14204,
+							"user_s": 2.101138,
+							"sys_s": 0.032057,
+							"max_rss_kb": 32024,
 							"exit": 0
 						}
 					]
@@ -2843,48 +3536,48 @@
 				{
 					"op": "read",
 					"impl": "c",
-					"cpuS": 0.03096,
-					"userS": 0.02745,
-					"sysS": 0.00387,
-					"wallS": 0.031221,
-					"cpuMinS": 0.030222,
-					"cpuMaxS": 0.035261,
-					"maxRssKb": 3624,
-					"throughputMiBs": 2049.9023093430706,
+					"cpuS": 0.033573,
+					"userS": 0.029491,
+					"sysS": 0.003705,
+					"wallS": 0.035357,
+					"cpuMinS": 0.033196,
+					"cpuMaxS": 0.039047,
+					"maxRssKb": 3564,
+					"throughputMiBs": 1810.1083236699947,
 					"runs": [
 						{
-							"wall_s": 0.031221,
-							"user_s": 0.031063,
+							"wall_s": 0.039335,
+							"user_s": 0.039047,
 							"sys_s": 0,
-							"max_rss_kb": 3624,
+							"max_rss_kb": 3560,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.031247,
-							"user_s": 0.026331,
-							"sys_s": 0.003891,
-							"max_rss_kb": 3628,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.035617,
-							"user_s": 0.02745,
-							"sys_s": 0.007811,
+							"wall_s": 0.03346,
+							"user_s": 0.029491,
+							"sys_s": 0.003705,
 							"max_rss_kb": 3616,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.031068,
-							"user_s": 0.02709,
-							"sys_s": 0.00387,
-							"max_rss_kb": 3512,
+							"wall_s": 0.033717,
+							"user_s": 0.016489,
+							"sys_s": 0.016728,
+							"max_rss_kb": 3564,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.030861,
-							"user_s": 0.030595,
+							"wall_s": 0.03611,
+							"user_s": 0.023948,
+							"sys_s": 0.012011,
+							"max_rss_kb": 3616,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.035357,
+							"user_s": 0.033573,
 							"sys_s": 0,
-							"max_rss_kb": 3624,
+							"max_rss_kb": 3536,
 							"exit": 0
 						}
 					]
@@ -2892,48 +3585,48 @@
 				{
 					"op": "read",
 					"impl": "cpp",
-					"cpuS": 0.033839,
-					"userS": 0.033506,
-					"sysS": 0,
-					"wallS": 0.034507,
-					"cpuMinS": 0.033506,
-					"cpuMaxS": 0.038041000000000005,
-					"maxRssKb": 6008,
-					"throughputMiBs": 1854.6961486075288,
+					"cpuS": 0.038077,
+					"userS": 0.034199,
+					"sysS": 0.004022,
+					"wallS": 0.039005,
+					"cpuMinS": 0.036574,
+					"cpuMaxS": 0.048269,
+					"maxRssKb": 5896,
+					"throughputMiBs": 1640.815280092296,
 					"runs": [
 						{
-							"wall_s": 0.033711,
-							"user_s": 0.033506,
-							"sys_s": 0,
+							"wall_s": 0.039005,
+							"user_s": 0.034199,
+							"sys_s": 0.003878,
+							"max_rss_kb": 5828,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.048399,
+							"user_s": 0.044247,
+							"sys_s": 0.004022,
 							"max_rss_kb": 6036,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.038149,
-							"user_s": 0.025361,
-							"sys_s": 0.01268,
-							"max_rss_kb": 6008,
+							"wall_s": 0.048212,
+							"user_s": 0.044084,
+							"sys_s": 0.004007,
+							"max_rss_kb": 5896,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.034515,
-							"user_s": 0.033839,
-							"sys_s": 0,
-							"max_rss_kb": 5904,
+							"wall_s": 0.037288,
+							"user_s": 0.025981,
+							"sys_s": 0.011134,
+							"max_rss_kb": 6016,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.034507,
-							"user_s": 0.021404,
-							"sys_s": 0.012851,
-							"max_rss_kb": 6052,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.033808,
-							"user_s": 0.03367,
-							"sys_s": 0,
-							"max_rss_kb": 5880,
+							"wall_s": 0.036864,
+							"user_s": 0.028485,
+							"sys_s": 0.008089,
+							"max_rss_kb": 5884,
 							"exit": 0
 						}
 					]
@@ -2941,48 +3634,48 @@
 				{
 					"op": "read",
 					"impl": "go",
-					"cpuS": 0.33904,
-					"userS": 0.193478,
-					"sysS": 0.13232,
-					"wallS": 0.151646,
-					"cpuMinS": 0.317149,
-					"cpuMaxS": 0.35404599999999997,
-					"maxRssKb": 23408,
-					"throughputMiBs": 422.03553011619164,
+					"cpuS": 0.388479,
+					"userS": 0.228324,
+					"sysS": 0.166771,
+					"wallS": 0.175286,
+					"cpuMinS": 0.36476,
+					"cpuMaxS": 0.403821,
+					"maxRssKb": 25072,
+					"throughputMiBs": 365.1175792704494,
 					"runs": [
 						{
-							"wall_s": 0.158558,
-							"user_s": 0.193478,
-							"sys_s": 0.160568,
-							"max_rss_kb": 24176,
+							"wall_s": 0.172142,
+							"user_s": 0.194415,
+							"sys_s": 0.190031,
+							"max_rss_kb": 26480,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.155035,
-							"user_s": 0.207339,
-							"sys_s": 0.131701,
-							"max_rss_kb": 23280,
+							"wall_s": 0.178483,
+							"user_s": 0.23705,
+							"sys_s": 0.166771,
+							"max_rss_kb": 25072,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.14982,
-							"user_s": 0.187969,
-							"sys_s": 0.135982,
-							"max_rss_kb": 23288,
+							"wall_s": 0.175286,
+							"user_s": 0.214396,
+							"sys_s": 0.174083,
+							"max_rss_kb": 24184,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.151646,
-							"user_s": 0.209869,
-							"sys_s": 0.13232,
-							"max_rss_kb": 24952,
+							"wall_s": 0.168695,
+							"user_s": 0.228324,
+							"sys_s": 0.136436,
+							"max_rss_kb": 27504,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.147092,
-							"user_s": 0.190876,
-							"sys_s": 0.126273,
-							"max_rss_kb": 23408,
+							"wall_s": 0.177658,
+							"user_s": 0.251106,
+							"sys_s": 0.151203,
+							"max_rss_kb": 23024,
 							"exit": 0
 						}
 					]
@@ -2990,48 +3683,97 @@
 				{
 					"op": "read",
 					"impl": "ts",
-					"cpuS": 0.162307,
-					"userS": 0.118926,
-					"sysS": 0.050324,
-					"wallS": 0.149276,
-					"cpuMinS": 0.156881,
-					"cpuMaxS": 0.190845,
-					"maxRssKb": 94444,
-					"throughputMiBs": 428.7360325839385,
+					"cpuS": 0.195466,
+					"userS": 0.136108,
+					"sysS": 0.05334,
+					"wallS": 0.178992,
+					"cpuMinS": 0.173947,
+					"cpuMaxS": 0.233395,
+					"maxRssKb": 94616,
+					"throughputMiBs": 357.55787968177344,
 					"runs": [
 						{
-							"wall_s": 0.149276,
-							"user_s": 0.130371,
-							"sys_s": 0.032592,
-							"max_rss_kb": 95124,
+							"wall_s": 0.216979,
+							"user_s": 0.197798,
+							"sys_s": 0.035597,
+							"max_rss_kb": 93820,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.147201,
-							"user_s": 0.108911,
-							"sys_s": 0.050324,
-							"max_rss_kb": 94184,
+							"wall_s": 0.178992,
+							"user_s": 0.142126,
+							"sys_s": 0.05334,
+							"max_rss_kb": 94096,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.176694,
-							"user_s": 0.122985,
-							"sys_s": 0.06786,
-							"max_rss_kb": 94888,
+							"wall_s": 0.189303,
+							"user_s": 0.129724,
+							"sys_s": 0.077036,
+							"max_rss_kb": 94616,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.14353,
-							"user_s": 0.104591,
-							"sys_s": 0.05229,
-							"max_rss_kb": 94332,
+							"wall_s": 0.160343,
+							"user_s": 0.135811,
+							"sys_s": 0.038136,
+							"max_rss_kb": 94892,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.152762,
-							"user_s": 0.118926,
-							"sys_s": 0.043381,
-							"max_rss_kb": 94444,
+							"wall_s": 0.176023,
+							"user_s": 0.136108,
+							"sys_s": 0.054368,
+							"max_rss_kb": 94816,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "read",
+					"impl": "py",
+					"cpuS": 1.7980099999999999,
+					"userS": 1.774192,
+					"sysS": 0.023818,
+					"wallS": 1.816729,
+					"cpuMinS": 1.621736,
+					"cpuMaxS": 1.93876,
+					"maxRssKb": 32032,
+					"throughputMiBs": 35.2281490525004,
+					"runs": [
+						{
+							"wall_s": 1.62778,
+							"user_s": 1.601714,
+							"sys_s": 0.020022,
+							"max_rss_kb": 31928,
+							"exit": 0
+						},
+						{
+							"wall_s": 1.816729,
+							"user_s": 1.774192,
+							"sys_s": 0.023818,
+							"max_rss_kb": 32040,
+							"exit": 0
+						},
+						{
+							"wall_s": 1.93436,
+							"user_s": 1.904832,
+							"sys_s": 0.015967,
+							"max_rss_kb": 32032,
+							"exit": 0
+						},
+						{
+							"wall_s": 1.780031,
+							"user_s": 1.739613,
+							"sys_s": 0.02785,
+							"max_rss_kb": 31964,
+							"exit": 0
+						},
+						{
+							"wall_s": 1.955461,
+							"user_s": 1.910652,
+							"sys_s": 0.028108,
+							"max_rss_kb": 32048,
 							"exit": 0
 						}
 					]
@@ -3047,54 +3789,55 @@
 				"c": 30025920,
 				"cpp": 30025920,
 				"go": 30380224,
-				"ts": 29472448
+				"ts": 29472448,
+				"py": 30025920
 			},
 			"results": [
 				{
 					"op": "write",
 					"impl": "c",
-					"cpuS": 0.07943499999999999,
+					"cpuS": 0.084577,
 					"userS": 0.071458,
-					"sysS": 0.007757,
-					"wallS": 0.080122,
-					"cpuMinS": 0.077337,
-					"cpuMaxS": 0.082538,
-					"maxRssKb": 3404,
-					"throughputMiBs": 798.7818576670577,
+					"sysS": 0.019245,
+					"wallS": 0.085443,
+					"cpuMinS": 0.083013,
+					"cpuMaxS": 0.10432,
+					"maxRssKb": 3464,
+					"throughputMiBs": 749.0373699425347,
 					"runs": [
 						{
-							"wall_s": 0.080122,
-							"user_s": 0.07597,
-							"sys_s": 0.004001,
-							"max_rss_kb": 3404,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.08276,
-							"user_s": 0.078407,
-							"sys_s": 0.004131,
-							"max_rss_kb": 3368,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.077677,
-							"user_s": 0.06958,
-							"sys_s": 0.007757,
-							"max_rss_kb": 3404,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.079298,
-							"user_s": 0.070721,
-							"sys_s": 0.008331,
-							"max_rss_kb": 3404,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.080126,
+							"wall_s": 0.083544,
 							"user_s": 0.071458,
-							"sys_s": 0.007977,
-							"max_rss_kb": 3404,
+							"sys_s": 0.011909,
+							"max_rss_kb": 3468,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.084069,
+							"user_s": 0.059102,
+							"sys_s": 0.023911,
+							"max_rss_kb": 3440,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.108448,
+							"user_s": 0.089916,
+							"sys_s": 0.010252,
+							"max_rss_kb": 3464,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.085443,
+							"user_s": 0.065332,
+							"sys_s": 0.019245,
+							"max_rss_kb": 3452,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.10452,
+							"user_s": 0.081133,
+							"sys_s": 0.023187,
+							"max_rss_kb": 3468,
 							"exit": 0
 						}
 					]
@@ -3102,48 +3845,48 @@
 				{
 					"op": "write",
 					"impl": "cpp",
-					"cpuS": 0.080698,
-					"userS": 0.068385,
-					"sysS": 0.012054,
-					"wallS": 0.080974,
-					"cpuMinS": 0.077229,
-					"cpuMaxS": 0.08569299999999999,
-					"maxRssKb": 5960,
-					"throughputMiBs": 790.3771581001308,
+					"cpuS": 0.093112,
+					"userS": 0.080224,
+					"sysS": 0.008235,
+					"wallS": 0.093415,
+					"cpuMinS": 0.08641499999999999,
+					"cpuMaxS": 0.127498,
+					"maxRssKb": 5944,
+					"throughputMiBs": 685.1148102553124,
 					"runs": [
 						{
-							"wall_s": 0.077928,
-							"user_s": 0.064946,
-							"sys_s": 0.012283,
-							"max_rss_kb": 5948,
+							"wall_s": 0.086659,
+							"user_s": 0.07818,
+							"sys_s": 0.008235,
+							"max_rss_kb": 5916,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.080736,
-							"user_s": 0.068385,
-							"sys_s": 0.012054,
-							"max_rss_kb": 5932,
+							"wall_s": 0.093415,
+							"user_s": 0.073687,
+							"sys_s": 0.019425,
+							"max_rss_kb": 5940,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.080974,
-							"user_s": 0.076657,
-							"sys_s": 0.004041,
-							"max_rss_kb": 5968,
+							"wall_s": 0.106562,
+							"user_s": 0.097913,
+							"sys_s": 0.008183,
+							"max_rss_kb": 5980,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.088856,
-							"user_s": 0.077648,
-							"sys_s": 0.008045,
+							"wall_s": 0.088581,
+							"user_s": 0.080224,
+							"sys_s": 0.008035,
+							"max_rss_kb": 5944,
+							"exit": 0
+						},
+						{
+							"wall_s": 0.127656,
+							"user_s": 0.111558,
+							"sys_s": 0.01594,
 							"max_rss_kb": 5960,
-							"exit": 0
-						},
-						{
-							"wall_s": 0.084258,
-							"user_s": 0.067986,
-							"sys_s": 0.015988,
-							"max_rss_kb": 5972,
 							"exit": 0
 						}
 					]
@@ -3151,48 +3894,48 @@
 				{
 					"op": "write",
 					"impl": "go",
-					"cpuS": 0.285326,
-					"userS": 0.251531,
-					"sysS": 0.033795,
-					"wallS": 0.274599,
-					"cpuMinS": 0.27390800000000004,
-					"cpuMaxS": 0.316706,
-					"maxRssKb": 26608,
-					"throughputMiBs": 233.06712697424246,
+					"cpuS": 0.336221,
+					"userS": 0.28718,
+					"sysS": 0.042297,
+					"wallS": 0.320325,
+					"cpuMinS": 0.302575,
+					"cpuMaxS": 0.38599,
+					"maxRssKb": 26800,
+					"throughputMiBs": 199.79708108951843,
 					"runs": [
 						{
-							"wall_s": 0.297118,
-							"user_s": 0.258225,
-							"sys_s": 0.058481,
-							"max_rss_kb": 31728,
+							"wall_s": 0.289836,
+							"user_s": 0.277124,
+							"sys_s": 0.025451,
+							"max_rss_kb": 16572,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.280012,
-							"user_s": 0.251531,
-							"sys_s": 0.033795,
-							"max_rss_kb": 27120,
+							"wall_s": 0.314369,
+							"user_s": 0.28718,
+							"sys_s": 0.037985,
+							"max_rss_kb": 26172,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.274599,
-							"user_s": 0.234718,
-							"sys_s": 0.05629,
-							"max_rss_kb": 26608,
+							"wall_s": 0.323912,
+							"user_s": 0.285693,
+							"sys_s": 0.055883,
+							"max_rss_kb": 26800,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.264743,
-							"user_s": 0.244204,
-							"sys_s": 0.032054,
-							"max_rss_kb": 24956,
+							"wall_s": 0.35839,
+							"user_s": 0.336442,
+							"sys_s": 0.049548,
+							"max_rss_kb": 31992,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.258482,
-							"user_s": 0.261475,
-							"sys_s": 0.012433,
-							"max_rss_kb": 22904,
+							"wall_s": 0.320325,
+							"user_s": 0.293924,
+							"sys_s": 0.042297,
+							"max_rss_kb": 28528,
 							"exit": 0
 						}
 					]
@@ -3200,48 +3943,97 @@
 				{
 					"op": "write",
 					"impl": "ts",
-					"cpuS": 0.612808,
-					"userS": 0.576273,
-					"sysS": 0.039377,
-					"wallS": 0.588023,
-					"cpuMinS": 0.604092,
-					"cpuMaxS": 0.621859,
-					"maxRssKb": 67420,
-					"throughputMiBs": 108.83928009618673,
+					"cpuS": 0.729089,
+					"userS": 0.664899,
+					"sysS": 0.04392,
+					"wallS": 0.713769,
+					"cpuMinS": 0.685588,
+					"cpuMaxS": 0.9103359999999999,
+					"maxRssKb": 69504,
+					"throughputMiBs": 89.66486356230097,
 					"runs": [
 						{
-							"wall_s": 0.58962,
-							"user_s": 0.576273,
-							"sys_s": 0.036535,
-							"max_rss_kb": 67420,
+							"wall_s": 0.662778,
+							"user_s": 0.650111,
+							"sys_s": 0.040144,
+							"max_rss_kb": 72964,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.580455,
-							"user_s": 0.560742,
-							"sys_s": 0.044277,
-							"max_rss_kb": 67588,
+							"wall_s": 0.713769,
+							"user_s": 0.664899,
+							"sys_s": 0.06419,
+							"max_rss_kb": 67032,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.580872,
-							"user_s": 0.564715,
-							"sys_s": 0.039377,
-							"max_rss_kb": 66828,
+							"wall_s": 0.657528,
+							"user_s": 0.661678,
+							"sys_s": 0.02391,
+							"max_rss_kb": 69504,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.593019,
-							"user_s": 0.57694,
-							"sys_s": 0.044919,
-							"max_rss_kb": 66308,
+							"wall_s": 0.778114,
+							"user_s": 0.752435,
+							"sys_s": 0.04392,
+							"max_rss_kb": 67164,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.588023,
-							"user_s": 0.579195,
-							"sys_s": 0.035228,
-							"max_rss_kb": 67452,
+							"wall_s": 0.874798,
+							"user_s": 0.830158,
+							"sys_s": 0.080178,
+							"max_rss_kb": 79864,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "write",
+					"impl": "py",
+					"cpuS": 1.944001,
+					"userS": 1.86064,
+					"sysS": 0.063809,
+					"wallS": 1.98171,
+					"cpuMinS": 1.877505,
+					"cpuMaxS": 2.183456,
+					"maxRssKb": 31396,
+					"throughputMiBs": 32.29534089246156,
+					"runs": [
+						{
+							"wall_s": 1.901579,
+							"user_s": 1.845119,
+							"sys_s": 0.056103,
+							"max_rss_kb": 31356,
+							"exit": 0
+						},
+						{
+							"wall_s": 1.878244,
+							"user_s": 1.797676,
+							"sys_s": 0.079829,
+							"max_rss_kb": 31400,
+							"exit": 0
+						},
+						{
+							"wall_s": 2.193377,
+							"user_s": 2.119647,
+							"sys_s": 0.063809,
+							"max_rss_kb": 31504,
+							"exit": 0
+						},
+						{
+							"wall_s": 2.140463,
+							"user_s": 2.068214,
+							"sys_s": 0.059687,
+							"max_rss_kb": 31396,
+							"exit": 0
+						},
+						{
+							"wall_s": 1.98171,
+							"user_s": 1.86064,
+							"sys_s": 0.083361,
+							"max_rss_kb": 31380,
 							"exit": 0
 						}
 					]
@@ -3249,48 +4041,48 @@
 				{
 					"op": "read",
 					"impl": "c",
-					"cpuS": 0.026646999999999997,
-					"userS": 0.018707,
-					"sysS": 0.007514,
-					"wallS": 0.026751,
-					"cpuMinS": 0.026175,
-					"cpuMaxS": 0.027846000000000003,
-					"maxRssKb": 3324,
-					"throughputMiBs": 2392.433927703637,
+					"cpuS": 0.029493,
+					"userS": 0.021811,
+					"sysS": 0.008747,
+					"wallS": 0.030505,
+					"cpuMinS": 0.02862,
+					"cpuMaxS": 0.03102,
+					"maxRssKb": 3412,
+					"throughputMiBs": 2098.016718570726,
 					"runs": [
 						{
-							"wall_s": 0.026271,
-							"user_s": 0.01745,
-							"sys_s": 0.008725,
-							"max_rss_kb": 3312,
+							"wall_s": 0.030752,
+							"user_s": 0.021811,
+							"sys_s": 0.008747,
+							"max_rss_kb": 3412,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.027979,
-							"user_s": 0.023865,
-							"sys_s": 0.003981,
-							"max_rss_kb": 3336,
+							"wall_s": 0.030505,
+							"user_s": 0.021901,
+							"sys_s": 0.007592,
+							"max_rss_kb": 3412,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.027208,
-							"user_s": 0.023243,
-							"sys_s": 0.003873,
-							"max_rss_kb": 3324,
+							"wall_s": 0.032041,
+							"user_s": 0.019754,
+							"sys_s": 0.011266,
+							"max_rss_kb": 3396,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.026383,
-							"user_s": 0.018707,
-							"sys_s": 0.007514,
-							"max_rss_kb": 3348,
+							"wall_s": 0.02882,
+							"user_s": 0.016384,
+							"sys_s": 0.012236,
+							"max_rss_kb": 3404,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.026751,
-							"user_s": 0.017765,
-							"sys_s": 0.008882,
-							"max_rss_kb": 3320,
+							"wall_s": 0.028809,
+							"user_s": 0.028705,
+							"sys_s": 0,
+							"max_rss_kb": 3412,
 							"exit": 0
 						}
 					]
@@ -3298,48 +4090,48 @@
 				{
 					"op": "read",
 					"impl": "cpp",
-					"cpuS": 0.029841,
-					"userS": 0.025651,
-					"sysS": 0.004275,
-					"wallS": 0.029957,
-					"cpuMinS": 0.028952,
-					"cpuMaxS": 0.02995,
-					"maxRssKb": 5724,
-					"throughputMiBs": 2136.395500216978,
+					"cpuS": 0.033044000000000004,
+					"userS": 0.02449,
+					"sysS": 0.008166,
+					"wallS": 0.033156,
+					"cpuMinS": 0.032656000000000004,
+					"cpuMaxS": 0.03499,
+					"maxRssKb": 5680,
+					"throughputMiBs": 1930.26903124623,
 					"runs": [
 						{
-							"wall_s": 0.030043,
-							"user_s": 0.022463,
-							"sys_s": 0.007487,
-							"max_rss_kb": 5676,
+							"wall_s": 0.032802,
+							"user_s": 0.02449,
+							"sys_s": 0.008166,
+							"max_rss_kb": 5704,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.029957,
-							"user_s": 0.029841,
-							"sys_s": 0,
-							"max_rss_kb": 5724,
+							"wall_s": 0.037565,
+							"user_s": 0.021541,
+							"sys_s": 0.013449,
+							"max_rss_kb": 5704,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.029095,
-							"user_s": 0.02067,
-							"sys_s": 0.008282,
-							"max_rss_kb": 5728,
+							"wall_s": 0.033005,
+							"user_s": 0.025544,
+							"sys_s": 0.007306,
+							"max_rss_kb": 5672,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.029489,
-							"user_s": 0.029348,
-							"sys_s": 0,
-							"max_rss_kb": 5696,
+							"wall_s": 0.034341,
+							"user_s": 0.029834,
+							"sys_s": 0.004282,
+							"max_rss_kb": 5672,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.03001,
-							"user_s": 0.025651,
-							"sys_s": 0.004275,
-							"max_rss_kb": 5732,
+							"wall_s": 0.033156,
+							"user_s": 0.020653,
+							"sys_s": 0.012391,
+							"max_rss_kb": 5680,
 							"exit": 0
 						}
 					]
@@ -3347,48 +4139,48 @@
 				{
 					"op": "read",
 					"impl": "go",
-					"cpuS": 0.33463,
-					"userS": 0.197714,
-					"sysS": 0.137704,
-					"wallS": 0.162788,
-					"cpuMinS": 0.32170299999999996,
-					"cpuMaxS": 0.347134,
-					"maxRssKb": 20336,
-					"throughputMiBs": 393.1493721895963,
+					"cpuS": 0.382702,
+					"userS": 0.200652,
+					"sysS": 0.150867,
+					"wallS": 0.187096,
+					"cpuMinS": 0.300474,
+					"cpuMaxS": 0.39956400000000003,
+					"maxRssKb": 19888,
+					"throughputMiBs": 342.0703809808868,
 					"runs": [
 						{
-							"wall_s": 0.159963,
-							"user_s": 0.204059,
-							"sys_s": 0.127909,
-							"max_rss_kb": 20336,
+							"wall_s": 0.191218,
+							"user_s": 0.238082,
+							"sys_s": 0.14462,
+							"max_rss_kb": 24688,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.171505,
-							"user_s": 0.200689,
-							"sys_s": 0.142353,
-							"max_rss_kb": 17724,
+							"wall_s": 0.194668,
+							"user_s": 0.220087,
+							"sys_s": 0.179477,
+							"max_rss_kb": 15224,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.16753,
-							"user_s": 0.187672,
-							"sys_s": 0.159462,
-							"max_rss_kb": 19580,
+							"wall_s": 0.151394,
+							"user_s": 0.155452,
+							"sys_s": 0.145022,
+							"max_rss_kb": 19888,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.162788,
-							"user_s": 0.197714,
-							"sys_s": 0.136916,
-							"max_rss_kb": 24368,
+							"wall_s": 0.187096,
+							"user_s": 0.185908,
+							"sys_s": 0.207834,
+							"max_rss_kb": 21808,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.156899,
-							"user_s": 0.183999,
-							"sys_s": 0.137704,
-							"max_rss_kb": 25404,
+							"wall_s": 0.171155,
+							"user_s": 0.200652,
+							"sys_s": 0.150867,
+							"max_rss_kb": 17852,
 							"exit": 0
 						}
 					]
@@ -3396,48 +4188,97 @@
 				{
 					"op": "read",
 					"impl": "ts",
-					"cpuS": 0.185987,
-					"userS": 0.144545,
-					"sysS": 0.038409,
-					"wallS": 0.177323,
-					"cpuMinS": 0.176279,
-					"cpuMaxS": 0.195737,
-					"maxRssKb": 81664,
-					"throughputMiBs": 360.92328688325824,
+					"cpuS": 0.220521,
+					"userS": 0.160351,
+					"sysS": 0.056633,
+					"wallS": 0.213428,
+					"cpuMinS": 0.19821699999999998,
+					"cpuMaxS": 0.240281,
+					"maxRssKb": 80816,
+					"throughputMiBs": 299.86693404801616,
 					"runs": [
 						{
-							"wall_s": 0.183242,
-							"user_s": 0.144545,
-							"sys_s": 0.043811,
-							"max_rss_kb": 80644,
+							"wall_s": 0.213428,
+							"user_s": 0.167224,
+							"sys_s": 0.05566,
+							"max_rss_kb": 81400,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.197067,
-							"user_s": 0.157328,
-							"sys_s": 0.038409,
-							"max_rss_kb": 81700,
+							"wall_s": 0.229909,
+							"user_s": 0.160351,
+							"sys_s": 0.07993,
+							"max_rss_kb": 80816,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.173278,
-							"user_s": 0.125039,
-							"sys_s": 0.056469,
-							"max_rss_kb": 81120,
+							"wall_s": 0.18879,
+							"user_s": 0.141584,
+							"sys_s": 0.056633,
+							"max_rss_kb": 80496,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.168679,
-							"user_s": 0.141036,
-							"sys_s": 0.035243,
-							"max_rss_kb": 82124,
+							"wall_s": 0.206372,
+							"user_s": 0.167405,
+							"sys_s": 0.040786,
+							"max_rss_kb": 80600,
 							"exit": 0
 						},
 						{
-							"wall_s": 0.177323,
-							"user_s": 0.161771,
-							"sys_s": 0.024216,
-							"max_rss_kb": 81664,
+							"wall_s": 0.213876,
+							"user_s": 0.159136,
+							"sys_s": 0.061385,
+							"max_rss_kb": 81444,
+							"exit": 0
+						}
+					]
+				},
+				{
+					"op": "read",
+					"impl": "py",
+					"cpuS": 2.092559,
+					"userS": 2.072601,
+					"sysS": 0.019996,
+					"wallS": 2.095016,
+					"cpuMinS": 1.831494,
+					"cpuMaxS": 2.297449,
+					"maxRssKb": 32068,
+					"throughputMiBs": 30.54869270688147,
+					"runs": [
+						{
+							"wall_s": 2.31201,
+							"user_s": 2.268817,
+							"sys_s": 0.012007,
+							"max_rss_kb": 32152,
+							"exit": 0
+						},
+						{
+							"wall_s": 2.306097,
+							"user_s": 2.26966,
+							"sys_s": 0.027789,
+							"max_rss_kb": 32156,
+							"exit": 0
+						},
+						{
+							"wall_s": 2.095016,
+							"user_s": 2.072601,
+							"sys_s": 0.019958,
+							"max_rss_kb": 32068,
+							"exit": 0
+						},
+						{
+							"wall_s": 1.850064,
+							"user_s": 1.811497,
+							"sys_s": 0.019997,
+							"max_rss_kb": 32028,
+							"exit": 0
+						},
+						{
+							"wall_s": 1.999044,
+							"user_s": 1.971772,
+							"sys_s": 0.019996,
+							"max_rss_kb": 31996,
 							"exit": 0
 						}
 					]
@@ -3451,35 +4292,35 @@
 			"workload": "small",
 			"op": "read",
 			"tool": "gprof",
-			"totalSamplesOrMs": 250,
+			"totalSamplesOrMs": 270,
 			"unit": "ms",
 			"top": [
 				{
-					"name": "read",
-					"selfPercent": 28.000000000000004
-				},
-				{
 					"name": "binpazer_crc32c",
-					"selfPercent": 20
+					"selfPercent": 29.629629629629626
 				},
 				{
-					"name": "get_u32",
-					"selfPercent": 16
+					"name": "read",
+					"selfPercent": 29.629629629629626
 				},
 				{
-					"name": "_IO_sgetn",
-					"selfPercent": 8
+					"name": "_IO_file_xsgetn",
+					"selfPercent": 7.4074074074074066
 				},
 				{
-					"name": "mix",
-					"selfPercent": 8
+					"name": "fread",
+					"selfPercent": 7.4074074074074066
+				},
+				{
+					"name": "_IO_file_underflow",
+					"selfPercent": 3.7037037037037033
 				},
 				{
 					"name": "__memmove_avx512_unaligned_erms",
-					"selfPercent": 4
+					"selfPercent": 3.7037037037037033
 				}
 			],
-			"runs": 10
+			"runs": 7
 		},
 		{
 			"impl": "cpp",
@@ -3490,98 +4331,133 @@
 			"unit": "ms",
 			"top": [
 				{
-					"name": "read",
-					"selfPercent": 15.384615384615385
+					"name": "binpazer_crc32c",
+					"selfPercent": 26.923076923076923
 				},
 				{
-					"name": "binpazer_crc32c",
+					"name": "fread",
 					"selfPercent": 11.538461538461538
 				},
 				{
-					"name": "__memcpy_avx512_unaligned_erms",
+					"name": "_int_free",
 					"selfPercent": 7.6923076923076925
 				},
 				{
-					"name": "binpazer::Reader::next",
+					"name": "read",
 					"selfPercent": 7.6923076923076925
 				},
 				{
-					"name": "malloc",
+					"name": "void*&& std::forward<void*>",
 					"selfPercent": 7.6923076923076925
 				},
 				{
-					"name": "r_block_from_header",
-					"selfPercent": 7.6923076923076925
+					"name": "(anonymous namespace)::File::File",
+					"selfPercent": 3.8461538461538463
 				}
 			],
-			"runs": 4
+			"runs": 3
 		},
 		{
 			"impl": "go",
 			"workload": "small",
 			"op": "read",
 			"tool": "pprof",
-			"totalSamplesOrMs": 330,
+			"totalSamplesOrMs": 260,
 			"unit": "ms",
 			"top": [
 				{
-					"name": "runtime.scanObject",
-					"selfPercent": 9.090909090909092
-				},
-				{
-					"name": "bufio.(*Reader).Read",
-					"selfPercent": 6.0606060606060606
-				},
-				{
-					"name": "cosmo.Syscall6",
-					"selfPercent": 6.0606060606060606
-				},
-				{
-					"name": "maps.memHashAES",
-					"selfPercent": 6.0606060606060606
-				},
-				{
-					"name": "runtime.futex",
-					"selfPercent": 6.0606060606060606
-				},
-				{
 					"name": "runtime.madvise",
-					"selfPercent": 6.0606060606060606
+					"selfPercent": 11.538461538461538
+				},
+				{
+					"name": "crc32.castagnoliSSE42",
+					"selfPercent": 7.6923076923076925
+				},
+				{
+					"name": "runtime.(*mspan).moveInlineMarks",
+					"selfPercent": 7.6923076923076925
+				},
+				{
+					"name": "runtime.(*sweepLocked).sweep",
+					"selfPercent": 7.6923076923076925
+				},
+				{
+					"name": "runtime.lock2",
+					"selfPercent": 7.6923076923076925
+				},
+				{
+					"name": "binary.littleEndian.Uint16",
+					"selfPercent": 3.8461538461538463
 				}
 			],
-			"runs": 3
+			"runs": 2
 		},
 		{
 			"impl": "ts",
 			"workload": "small",
 			"op": "read",
 			"tool": "v8 cpu-prof",
-			"totalSamplesOrMs": 487.517,
+			"totalSamplesOrMs": 541.431,
 			"unit": "ms",
 			"top": [
 				{
 					"name": "readPayload",
-					"selfPercent": 61.174687241675706
+					"selfPercent": 39.02547138970617
 				},
 				{
 					"name": "readPayloadInto",
-					"selfPercent": 14.081149990666972
+					"selfPercent": 23.985327770297605
 				},
 				{
 					"name": "(garbage collector)",
-					"selfPercent": 6.170861734052346
-				},
-				{
-					"name": "read",
-					"selfPercent": 2.6807270310573768
+					"selfPercent": 11.342350179431913
 				},
 				{
 					"name": "readUpTo",
-					"selfPercent": 2.2661773845835103
+					"selfPercent": 6.257861112496328
 				},
 				{
-					"name": "(program)",
-					"selfPercent": 1.9476243905340724
+					"name": "next",
+					"selfPercent": 2.8871638306635563
+				},
+				{
+					"name": "read",
+					"selfPercent": 2.256243177801049
+				}
+			],
+			"runs": 1
+		},
+		{
+			"impl": "py",
+			"workload": "small",
+			"op": "read",
+			"tool": "cProfile",
+			"totalSamplesOrMs": 6753.381,
+			"unit": "ms",
+			"top": [
+				{
+					"name": "format.py:crc32c",
+					"selfPercent": 50.711739524099784
+				},
+				{
+					"name": "reader.py:read_payload",
+					"selfPercent": 8.29225282718642
+				},
+				{
+					"name": "reader.py:_read_up_to",
+					"selfPercent": 6.410123182784903
+				},
+				{
+					"name": "built-in method builtins.len",
+					"selfPercent": 4.994404543583615
+				},
+				{
+					"name": "reader.py:next",
+					"selfPercent": 4.688770676925974
+				},
+				{
+					"name": "reader.py:_parse_header",
+					"selfPercent": 4.409520779352075
 				}
 			],
 			"runs": 1
@@ -3591,20 +4467,20 @@
 			"workload": "medium",
 			"op": "write",
 			"tool": "gprof",
-			"totalSamplesOrMs": 260,
+			"totalSamplesOrMs": 250,
 			"unit": "ms",
 			"top": [
 				{
 					"name": "write",
-					"selfPercent": 50
+					"selfPercent": 72
 				},
 				{
 					"name": "get_u32",
-					"selfPercent": 26.923076923076923
+					"selfPercent": 16
 				},
 				{
 					"name": "binpazer_crc32c",
-					"selfPercent": 23.076923076923077
+					"selfPercent": 12
 				},
 				{
 					"name": "align8",
@@ -3619,162 +4495,34 @@
 					"selfPercent": 0
 				}
 			],
-			"runs": 6
+			"runs": 3
 		},
 		{
 			"impl": "cpp",
 			"workload": "medium",
 			"op": "write",
 			"tool": "gprof",
-			"totalSamplesOrMs": 310,
+			"totalSamplesOrMs": 270,
 			"unit": "ms",
 			"top": [
 				{
 					"name": "write",
-					"selfPercent": 61.29032258064516
+					"selfPercent": 51.85185185185185
 				},
 				{
 					"name": "binpazer_crc32c",
-					"selfPercent": 22.58064516129032
+					"selfPercent": 37.03703703703704
 				},
 				{
 					"name": "get_u32",
-					"selfPercent": 9.67741935483871
-				},
-				{
-					"name": "__memcpy_avx512_unaligned_erms",
-					"selfPercent": 3.225806451612903
-				},
-				{
-					"name": "binpazer_writer_block",
-					"selfPercent": 3.225806451612903
+					"selfPercent": 11.11111111111111
 				},
 				{
 					"name": "(anonymous namespace)::File::File",
 					"selfPercent": 0
-				}
-			],
-			"runs": 5
-		},
-		{
-			"impl": "go",
-			"workload": "medium",
-			"op": "write",
-			"tool": "pprof",
-			"totalSamplesOrMs": 280,
-			"unit": "ms",
-			"top": [
-				{
-					"name": "cosmo.Syscall6",
-					"selfPercent": 82.14285714285714
 				},
 				{
-					"name": "crc32.castagnoliSSE42Triple",
-					"selfPercent": 14.285714285714285
-				},
-				{
-					"name": "runtime.scanObjectsSmall",
-					"selfPercent": 3.571428571428571
-				}
-			],
-			"runs": 6
-		},
-		{
-			"impl": "ts",
-			"workload": "medium",
-			"op": "write",
-			"tool": "v8 cpu-prof",
-			"totalSamplesOrMs": 276.487,
-			"unit": "ms",
-			"top": [
-				{
-					"name": "crc32c",
-					"selfPercent": 62.313598831048125
-				},
-				{
-					"name": "writeBuffer",
-					"selfPercent": 26.805961943961176
-				},
-				{
-					"name": "(program)",
-					"selfPercent": 4.0121235356454354
-				},
-				{
-					"name": "compileForInternalLoader",
-					"selfPercent": 1.235139445977568
-				},
-				{
-					"name": "block",
-					"selfPercent": 1.1718453308835493
-				},
-				{
-					"name": "lstat",
-					"selfPercent": 0.45933443525373685
-				}
-			],
-			"runs": 1
-		},
-		{
-			"impl": "c",
-			"workload": "medium",
-			"op": "read",
-			"tool": "gprof",
-			"totalSamplesOrMs": 290,
-			"unit": "ms",
-			"top": [
-				{
-					"name": "binpazer_crc32c",
-					"selfPercent": 44.827586206896555
-				},
-				{
-					"name": "read",
-					"selfPercent": 41.37931034482759
-				},
-				{
-					"name": "get_u32",
-					"selfPercent": 13.793103448275861
-				},
-				{
-					"name": "align8",
-					"selfPercent": 0
-				},
-				{
-					"name": "binpazer_reader_begin",
-					"selfPercent": 0
-				},
-				{
-					"name": "binpazer_reader_next",
-					"selfPercent": 0
-				}
-			],
-			"runs": 5
-		},
-		{
-			"impl": "cpp",
-			"workload": "medium",
-			"op": "read",
-			"tool": "gprof",
-			"totalSamplesOrMs": 250,
-			"unit": "ms",
-			"top": [
-				{
-					"name": "read",
-					"selfPercent": 64
-				},
-				{
-					"name": "binpazer_crc32c",
-					"selfPercent": 16
-				},
-				{
-					"name": "get_u32",
-					"selfPercent": 16
-				},
-				{
-					"name": "__memset_avx512_unaligned_erms",
-					"selfPercent": 4
-				},
-				{
-					"name": "(anonymous namespace)::File::File",
+					"name": "(anonymous namespace)::File::close",
 					"selfPercent": 0
 				},
 				{
@@ -3787,34 +4535,205 @@
 		{
 			"impl": "go",
 			"workload": "medium",
+			"op": "write",
+			"tool": "pprof",
+			"totalSamplesOrMs": 280,
+			"unit": "ms",
+			"top": [
+				{
+					"name": "cosmo.Syscall6",
+					"selfPercent": 78.57142857142857
+				},
+				{
+					"name": "crc32.castagnoliSSE42Triple",
+					"selfPercent": 10.714285714285714
+				},
+				{
+					"name": "atomic.(*UnsafePointer).StoreNoWB",
+					"selfPercent": 3.571428571428571
+				},
+				{
+					"name": "bufio.(*Writer).Write",
+					"selfPercent": 3.571428571428571
+				},
+				{
+					"name": "runtime.scanblock",
+					"selfPercent": 3.571428571428571
+				}
+			],
+			"runs": 5
+		},
+		{
+			"impl": "ts",
+			"workload": "medium",
+			"op": "write",
+			"tool": "v8 cpu-prof",
+			"totalSamplesOrMs": 277.219,
+			"unit": "ms",
+			"top": [
+				{
+					"name": "crc32c",
+					"selfPercent": 68.42099567489961
+				},
+				{
+					"name": "writeBuffer",
+					"selfPercent": 17.395993781090034
+				},
+				{
+					"name": "(program)",
+					"selfPercent": 4.298767400502851
+				},
+				{
+					"name": "(garbage collector)",
+					"selfPercent": 1.0922772248655395
+				},
+				{
+					"name": "compileSourceTextModule",
+					"selfPercent": 0.795039301058008
+				},
+				{
+					"name": "block",
+					"selfPercent": 0.7914320447011206
+				}
+			],
+			"runs": 1
+		},
+		{
+			"impl": "py",
+			"workload": "medium",
+			"op": "write",
+			"tool": "cProfile",
+			"totalSamplesOrMs": 6987.738,
+			"unit": "ms",
+			"top": [
+				{
+					"name": "format.py:crc32c",
+					"selfPercent": 97.51544912793922
+				},
+				{
+					"name": "method 'write' of '_io.BufferedWriter' objects",
+					"selfPercent": 1.395911596042772
+				},
+				{
+					"name": "writer.py:_write_block",
+					"selfPercent": 0.3813373201931062
+				},
+				{
+					"name": "format.py:_word_tables",
+					"selfPercent": 0.19148477543715592
+				},
+				{
+					"name": "method 'join' of 'bytes' objects",
+					"selfPercent": 0.14790343201805048
+				},
+				{
+					"name": "built-in method _struct.pack",
+					"selfPercent": 0.059211380407805915
+				}
+			],
+			"runs": 1
+		},
+		{
+			"impl": "c",
+			"workload": "medium",
+			"op": "read",
+			"tool": "gprof",
+			"totalSamplesOrMs": 270,
+			"unit": "ms",
+			"top": [
+				{
+					"name": "binpazer_crc32c",
+					"selfPercent": 55.55555555555556
+				},
+				{
+					"name": "read",
+					"selfPercent": 25.925925925925924
+				},
+				{
+					"name": "get_u32",
+					"selfPercent": 14.814814814814813
+				},
+				{
+					"name": "__underflow",
+					"selfPercent": 3.7037037037037033
+				},
+				{
+					"name": "align8",
+					"selfPercent": 0
+				},
+				{
+					"name": "binpazer_reader_begin",
+					"selfPercent": 0
+				}
+			],
+			"runs": 4
+		},
+		{
+			"impl": "cpp",
+			"workload": "medium",
+			"op": "read",
+			"tool": "gprof",
+			"totalSamplesOrMs": 310,
+			"unit": "ms",
+			"top": [
+				{
+					"name": "binpazer_crc32c",
+					"selfPercent": 51.61290322580645
+				},
+				{
+					"name": "read",
+					"selfPercent": 29.03225806451613
+				},
+				{
+					"name": "get_u32",
+					"selfPercent": 12.903225806451612
+				},
+				{
+					"name": "(anonymous namespace)::run",
+					"selfPercent": 3.225806451612903
+				},
+				{
+					"name": "__memset_avx512_unaligned_erms",
+					"selfPercent": 3.225806451612903
+				},
+				{
+					"name": "(anonymous namespace)::File::File",
+					"selfPercent": 0
+				}
+			],
+			"runs": 5
+		},
+		{
+			"impl": "go",
+			"workload": "medium",
 			"op": "read",
 			"tool": "pprof",
 			"totalSamplesOrMs": 270,
 			"unit": "ms",
 			"top": [
 				{
-					"name": "cosmo.Syscall6",
-					"selfPercent": 33.33333333333333
+					"name": "runtime.futex",
+					"selfPercent": 25.925925925925924
 				},
 				{
-					"name": "runtime.futex",
+					"name": "cosmo.Syscall6",
 					"selfPercent": 14.814814814814813
+				},
+				{
+					"name": "runtime.memclrNoHeapPointers",
+					"selfPercent": 11.11111111111111
 				},
 				{
 					"name": "crc32.castagnoliSSE42Triple",
 					"selfPercent": 7.4074074074074066
 				},
 				{
-					"name": "runtime.nanotime",
-					"selfPercent": 7.4074074074074066
-				},
-				{
-					"name": "runtime.tryDeferToSpanScan",
-					"selfPercent": 7.4074074074074066
-				},
-				{
 					"name": "runtime.typePointers.next",
 					"selfPercent": 7.4074074074074066
+				},
+				{
+					"name": "atomic.(*Uint64).CompareAndSwap",
+					"selfPercent": 3.7037037037037033
 				}
 			],
 			"runs": 3
@@ -3824,32 +4743,67 @@
 			"workload": "medium",
 			"op": "read",
 			"tool": "v8 cpu-prof",
-			"totalSamplesOrMs": 278.714,
+			"totalSamplesOrMs": 295.14,
 			"unit": "ms",
 			"top": [
 				{
 					"name": "crc32c",
-					"selfPercent": 73.21268396994768
+					"selfPercent": 67.79358948295724
 				},
 				{
 					"name": "readPayload",
-					"selfPercent": 9.557467511499246
+					"selfPercent": 10.660364572745133
 				},
 				{
 					"name": "read",
-					"selfPercent": 5.135371743077132
+					"selfPercent": 8.046350884326078
 				},
 				{
 					"name": "(program)",
-					"selfPercent": 3.3611515747325216
+					"selfPercent": 3.5705089110252746
 				},
 				{
 					"name": "readUpTo",
-					"selfPercent": 1.6439791327310431
+					"selfPercent": 2.532357525242257
 				},
 				{
-					"name": "compileForInternalLoader",
-					"selfPercent": 1.1861621590591072
+					"name": "verifyCRC",
+					"selfPercent": 1.1320051500982582
+				}
+			],
+			"runs": 1
+		},
+		{
+			"impl": "py",
+			"workload": "medium",
+			"op": "read",
+			"tool": "cProfile",
+			"totalSamplesOrMs": 6808.062,
+			"unit": "ms",
+			"top": [
+				{
+					"name": "format.py:crc32c",
+					"selfPercent": 97.91907063496204
+				},
+				{
+					"name": "method 'read' of '_io.BufferedReader' objects",
+					"selfPercent": 0.6649494923653776
+				},
+				{
+					"name": "reader.py:read_payload",
+					"selfPercent": 0.3975715999907022
+				},
+				{
+					"name": "format.py:_word_tables",
+					"selfPercent": 0.20271445120470605
+				},
+				{
+					"name": "reader.py:_read_up_to",
+					"selfPercent": 0.11181443834329216
+				},
+				{
+					"name": "bench.py:read",
+					"selfPercent": 0.10407843329689964
 				}
 			],
 			"runs": 1
@@ -3859,16 +4813,20 @@
 			"workload": "lz4",
 			"op": "write",
 			"tool": "gprof",
-			"totalSamplesOrMs": 290,
+			"totalSamplesOrMs": 310,
 			"unit": "ms",
 			"top": [
 				{
 					"name": "LZ4_compress_fast_continue",
-					"selfPercent": 79.3103448275862
+					"selfPercent": 80.64516129032258
+				},
+				{
+					"name": "get_u32",
+					"selfPercent": 9.67741935483871
 				},
 				{
 					"name": "write",
-					"selfPercent": 20.689655172413794
+					"selfPercent": 9.67741935483871
 				},
 				{
 					"name": "align8",
@@ -3881,10 +4839,6 @@
 				{
 					"name": "binpazer_compress",
 					"selfPercent": 0
-				},
-				{
-					"name": "binpazer_compress_bound",
-					"selfPercent": 0
 				}
 			],
 			"runs": 3
@@ -3894,31 +4848,31 @@
 			"workload": "lz4",
 			"op": "write",
 			"tool": "gprof",
-			"totalSamplesOrMs": 280,
+			"totalSamplesOrMs": 250,
 			"unit": "ms",
 			"top": [
 				{
 					"name": "LZ4_compress_fast_continue",
-					"selfPercent": 64.28571428571429
+					"selfPercent": 72
 				},
 				{
 					"name": "write",
-					"selfPercent": 17.857142857142858
+					"selfPercent": 16
 				},
 				{
-					"name": "get_u32",
-					"selfPercent": 10.714285714285714
+					"name": "__memset_avx512_unaligned_erms",
+					"selfPercent": 4
 				},
 				{
 					"name": "binpazer_crc32c",
-					"selfPercent": 7.142857142857142
+					"selfPercent": 4
+				},
+				{
+					"name": "get_u32",
+					"selfPercent": 4
 				},
 				{
 					"name": "(anonymous namespace)::File::File",
-					"selfPercent": 0
-				},
-				{
-					"name": "(anonymous namespace)::File::close",
 					"selfPercent": 0
 				}
 			],
@@ -3929,32 +4883,32 @@
 			"workload": "lz4",
 			"op": "write",
 			"tool": "pprof",
-			"totalSamplesOrMs": 270,
+			"totalSamplesOrMs": 310,
 			"unit": "ms",
 			"top": [
 				{
-					"name": "lz4block.(*Compressor).get",
-					"selfPercent": 44.44444444444444
-				},
-				{
 					"name": "lz4block.(*Compressor).CompressBlock",
-					"selfPercent": 22.22222222222222
-				},
-				{
-					"name": "lz4block.blockHash",
-					"selfPercent": 11.11111111111111
-				},
-				{
-					"name": "atomic.(*UnsafePointer).StoreNoWB",
-					"selfPercent": 3.7037037037037033
+					"selfPercent": 48.38709677419355
 				},
 				{
 					"name": "binary.littleEndian.Uint32",
-					"selfPercent": 3.7037037037037033
+					"selfPercent": 6.451612903225806
 				},
 				{
-					"name": "runtime.madvise",
-					"selfPercent": 3.7037037037037033
+					"name": "cosmo.Syscall6",
+					"selfPercent": 6.451612903225806
+				},
+				{
+					"name": "lz4block.(*Compressor).get",
+					"selfPercent": 6.451612903225806
+				},
+				{
+					"name": "lz4block.blockHash",
+					"selfPercent": 6.451612903225806
+				},
+				{
+					"name": "runtime.memclrNoHeapPointers",
+					"selfPercent": 6.451612903225806
 				}
 			],
 			"runs": 1
@@ -3964,32 +4918,67 @@
 			"workload": "lz4",
 			"op": "write",
 			"tool": "v8 cpu-prof",
-			"totalSamplesOrMs": 660.735,
+			"totalSamplesOrMs": 649.323,
 			"unit": "ms",
 			"top": [
 				{
 					"name": "compressBlock",
-					"selfPercent": 82.41322163953778
+					"selfPercent": 81.85109721971962
 				},
 				{
 					"name": "crc32c",
-					"selfPercent": 8.795810725934
+					"selfPercent": 8.993828957236994
 				},
 				{
 					"name": "lz4FrameCompress",
-					"selfPercent": 2.713795999909192
+					"selfPercent": 3.4653015525401063
 				},
 				{
 					"name": "(program)",
-					"selfPercent": 1.6079063467199408
+					"selfPercent": 1.5579303366737354
 				},
 				{
 					"name": "writeBuffer",
-					"selfPercent": 0.9908662323019065
+					"selfPercent": 0.947294335792818
 				},
 				{
-					"name": "writeBlock",
-					"selfPercent": 0.6460986628527323
+					"name": "compileForInternalLoader",
+					"selfPercent": 0.6868692468925326
+				}
+			],
+			"runs": 1
+		},
+		{
+			"impl": "py",
+			"workload": "lz4",
+			"op": "write",
+			"tool": "cProfile",
+			"totalSamplesOrMs": 2177.625,
+			"unit": "ms",
+			"top": [
+				{
+					"name": "format.py:crc32c",
+					"selfPercent": 93.34968845311586
+				},
+				{
+					"name": "codec.py:compress_into",
+					"selfPercent": 3.2123793862201584
+				},
+				{
+					"name": "codec.py:compress",
+					"selfPercent": 1.6644533590831747
+				},
+				{
+					"name": "format.py:_word_tables",
+					"selfPercent": 0.6456844833446718
+				},
+				{
+					"name": "method 'write' of '_io.BufferedWriter' objects",
+					"selfPercent": 0.34762132743815644
+				},
+				{
+					"name": "codec.py:compress_block",
+					"selfPercent": 0.17473024364971249
 				}
 			],
 			"runs": 1
@@ -3999,147 +4988,183 @@
 			"workload": "lz4",
 			"op": "read",
 			"tool": "gprof",
-			"totalSamplesOrMs": 280,
+			"totalSamplesOrMs": 260,
 			"unit": "ms",
 			"top": [
 				{
 					"name": "LZ4_decompress_safe_withPrefix64k",
-					"selfPercent": 39.285714285714285
+					"selfPercent": 38.46153846153847
 				},
 				{
 					"name": "binpazer_crc32c",
-					"selfPercent": 21.428571428571427
-				},
-				{
-					"name": "get_u32",
-					"selfPercent": 21.428571428571427
+					"selfPercent": 34.61538461538461
 				},
 				{
 					"name": "read",
-					"selfPercent": 14.285714285714285
+					"selfPercent": 19.230769230769234
 				},
 				{
-					"name": "munmap",
-					"selfPercent": 3.571428571428571
+					"name": "get_u32",
+					"selfPercent": 7.6923076923076925
 				},
 				{
 					"name": "align8",
 					"selfPercent": 0
+				},
+				{
+					"name": "binpazer_codec_lookup",
+					"selfPercent": 0
 				}
 			],
-			"runs": 15
+			"runs": 8
 		},
 		{
 			"impl": "cpp",
 			"workload": "lz4",
 			"op": "read",
 			"tool": "gprof",
-			"totalSamplesOrMs": 250,
+			"totalSamplesOrMs": 260,
 			"unit": "ms",
 			"top": [
 				{
 					"name": "LZ4_decompress_safe_withPrefix64k",
-					"selfPercent": 40
+					"selfPercent": 30.76923076923077
 				},
 				{
 					"name": "binpazer_crc32c",
-					"selfPercent": 28.000000000000004
-				},
-				{
-					"name": "read",
-					"selfPercent": 12
+					"selfPercent": 23.076923076923077
 				},
 				{
 					"name": "__memset_avx512_unaligned_erms",
-					"selfPercent": 8
+					"selfPercent": 19.230769230769234
 				},
 				{
 					"name": "get_u32",
-					"selfPercent": 8
+					"selfPercent": 15.384615384615385
 				},
 				{
-					"name": "__memcpy_avx512_unaligned_erms",
-					"selfPercent": 4
+					"name": "read",
+					"selfPercent": 11.538461538461538
+				},
+				{
+					"name": "(anonymous namespace)::File::File",
+					"selfPercent": 0
 				}
 			],
-			"runs": 9
+			"runs": 12
 		},
 		{
 			"impl": "go",
 			"workload": "lz4",
 			"op": "read",
 			"tool": "pprof",
-			"totalSamplesOrMs": 500,
+			"totalSamplesOrMs": 250,
 			"unit": "ms",
 			"top": [
 				{
 					"name": "runtime.memmove",
-					"selfPercent": 26
+					"selfPercent": 24
 				},
 				{
 					"name": "runtime.futex",
-					"selfPercent": 10
+					"selfPercent": 16
+				},
+				{
+					"name": "runtime.madvise",
+					"selfPercent": 16
 				},
 				{
 					"name": "lz4block.decodeBlock",
 					"selfPercent": 8
 				},
 				{
-					"name": "runtime.madvise",
-					"selfPercent": 6
+					"name": "runtime.(*mspan).writeHeapBitsSmall",
+					"selfPercent": 4
 				},
 				{
-					"name": "runtime.nanotime",
-					"selfPercent": 6
-				},
-				{
-					"name": "runtime.scanblock",
-					"selfPercent": 6
+					"name": "runtime.(*stkframe).getStackMap",
+					"selfPercent": 4
 				}
 			],
-			"runs": 2
+			"runs": 1
 		},
 		{
 			"impl": "ts",
 			"workload": "lz4",
 			"op": "read",
 			"tool": "v8 cpu-prof",
-			"totalSamplesOrMs": 352.406,
+			"totalSamplesOrMs": 301.688,
 			"unit": "ms",
 			"top": [
 				{
-					"name": "crc32c",
-					"selfPercent": 41.34322344114458
+					"name": "decodeBlock",
+					"selfPercent": 41.70301768714699
 				},
 				{
-					"name": "decodeBlock",
-					"selfPercent": 31.68419379919752
+					"name": "crc32c",
+					"selfPercent": 34.48264432128557
 				},
 				{
 					"name": "read",
-					"selfPercent": 5.678393670936364
+					"selfPercent": 5.494418074301928
 				},
 				{
 					"name": "(program)",
-					"selfPercent": 5.337309807438012
-				},
-				{
-					"name": "readPayload",
-					"selfPercent": 2.036003927288412
+					"selfPercent": 4.329638566996366
 				},
 				{
 					"name": "(garbage collector)",
-					"selfPercent": 1.3265948933900102
+					"selfPercent": 1.5476253613004163
+				},
+				{
+					"name": "readPayloadInto",
+					"selfPercent": 1.1346158945665719
 				}
 			],
-			"runs": 2
+			"runs": 1
+		},
+		{
+			"impl": "py",
+			"workload": "lz4",
+			"op": "read",
+			"tool": "cProfile",
+			"totalSamplesOrMs": 1995.8,
+			"unit": "ms",
+			"top": [
+				{
+					"name": "format.py:crc32c",
+					"selfPercent": 96.73705288457177
+				},
+				{
+					"name": "codec.py:decompress_into",
+					"selfPercent": 0.8032008259490516
+				},
+				{
+					"name": "format.py:_word_tables",
+					"selfPercent": 0.6758758189880321
+				},
+				{
+					"name": "method 'read' of '_io.BufferedReader' objects",
+					"selfPercent": 0.4866469520354893
+				},
+				{
+					"name": "codec.py:decompress",
+					"selfPercent": 0.460551947515757
+				},
+				{
+					"name": "method 'tobytes' of 'memoryview' objects",
+					"selfPercent": 0.2406805253138199
+				}
+			],
+			"runs": 1
 		}
 	],
 	"impls": [
 		"c",
 		"cpp",
 		"go",
-		"ts"
+		"ts",
+		"py"
 	],
 	"reference": "c",
 	"commands": [
@@ -4147,6 +5172,6 @@
 		"make -C bench prof",
 		"(cd go && go-toolchain)",
 		"(cd ts && ts0 build)",
-		"node bench/run.ts --profile"
+		"node bench/run.ts --profile --work-dir /mnt/cc-tmpfs/bpz-full"
 	]
 }
