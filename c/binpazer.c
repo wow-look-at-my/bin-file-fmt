@@ -321,11 +321,11 @@ static const uint32_t crc_table[8][256] = {
  * Every function here takes and returns the inverted CRC.
  * c/tools/crc32c_constants.mjs derives the multiply constants and checks them. */
 #ifndef BINPAZER_CRC_TIER
-#if defined(__aarch64__) && !defined(__APPLE__)
-/* On the arm64 server core that CI measures, the streams of crc_three are faster than the folding of crc_wide. Apple silicon is the reverse. */
-#define BINPAZER_CRC_TIER 2
-#else
 #define BINPAZER_CRC_TIER 3
+#if defined(__aarch64__) && !defined(__APPLE__)
+/* Which of crc_three and crc_wide is faster differs between arm64 CPUs: the server core that CI measures and Apple silicon are opposites.
+ * With no tier named by the build, the first long input times both on the running CPU and the winner stays. */
+#define BINPAZER_CRC_AUTO 1
 #endif
 #endif
 
@@ -528,6 +528,45 @@ CRC_WIDE static uint32_t crc_wide(uint32_t crc, const uint8_t *p, size_t n) {
     return crc_three(crc_three(0, rest, sizeof rest), p, n);
 }
 #endif
+
+#ifdef BINPAZER_CRC_AUTO
+#include <time.h>
+enum { CRC_UNTIMED, CRC_WIDE_FASTER, CRC_THREE_FASTER };
+static int crc_wide_state = CRC_UNTIMED;
+
+static double crc_now(void) {
+    struct timespec t;
+    timespec_get(&t, TIME_UTC);
+    return (double)t.tv_sec + (double)t.tv_nsec * 1e-9;
+}
+
+/* Times both paths on a buffer that stays in the cache, and keeps the answer. Threads can time
+ * at once. Each stores an answer, and either answer is correct to use. */
+CRC_WIDE static int crc_wide_wins(void) {
+    int state = __atomic_load_n(&crc_wide_state, __ATOMIC_RELAXED);
+    if (state == CRC_UNTIMED) {
+        uint8_t buf[8192];
+        double best_three = 1e9, best_wide = 1e9;
+        uint32_t sink = 0;
+        for (size_t i = 0; i < sizeof buf; i++) buf[i] = (uint8_t)(i * 131u + (i >> 8));
+        for (int round = 0; round < 5; round++) {
+            double t0 = crc_now();
+            for (int r = 0; r < 32; r++) sink = crc_three(sink, buf, sizeof buf);
+            double t1 = crc_now();
+            for (int r = 0; r < 32; r++) sink = crc_wide(sink, buf, sizeof buf);
+            double t2 = crc_now();
+            if (t1 - t0 < best_three) best_three = t1 - t0;
+            if (t2 - t1 < best_wide) best_wide = t2 - t1;
+        }
+        /* sink goes into the comparison so the compiler keeps both loops. */
+        state = (best_wide < best_three || sink == 0x5eed5eedu) ? CRC_WIDE_FASTER : CRC_THREE_FASTER;
+        __atomic_store_n(&crc_wide_state, state, __ATOMIC_RELAXED);
+    }
+    return state == CRC_WIDE_FASTER;
+}
+#else
+#define crc_wide_wins() 1
+#endif
 #endif
 #endif
 
@@ -538,7 +577,7 @@ uint32_t binpazer_crc32c(uint32_t crc, const void *data, size_t n) {
     {
         int tier = crc_tier();
 #ifdef CRC_WIDE
-        if (tier >= 3 && n >= 2 * CRC_WIDE_STEP) return ~crc_wide(crc, p, n);
+        if (tier >= 3 && n >= 2 * CRC_WIDE_STEP && crc_wide_wins()) return ~crc_wide(crc, p, n);
 #endif
         if (tier >= 2 && n >= 3 * CRC_TINY) return ~crc_three(crc, p, n);
         if (tier >= 1) return ~crc_one(crc, p, n);
