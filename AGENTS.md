@@ -93,7 +93,7 @@ Its deflate and zstd go through `node:zlib`, which allocates the codec output be
 | 2 | three streams, joined with a carry-less multiply | x86-64 PCLMULQDQ, or arm64 PMULL |
 | 3 | carry-less folding across several vector accumulators | x86-64 AVX-512F, AVX-512VL and VPCLMULQDQ, or arm64 PMULL |
 
-The folding tier and the streams tier trade places between CPUs: the fold wins on the x86-64 and Apple silicon machines measured below. Apple loses on the arm64 Linux one. So the choice is never fixed. `crc_wide_wins` times both on the first long input, on every platform, and keeps the winner for the process. A build that names `BINPAZER_CRC_TIER` gets that tier and no timing.
+The folding tier and the streams tier trade places between CPUs: the fold wins on the x86-64 and Apple silicon machines measured below. The streams win on the arm64 Linux machine. So the choice is never fixed. `crc_wide_wins` times both on the first long input, on every platform, and keeps the winner for the process. A build that names `BINPAZER_CRC_TIER` gets that tier and no timing.
 
 - `-DBINPAZER_CRC_TIER=<n>` caps the tier at build time. `make -C c test` runs the core tests at every tier, so no path goes untested on a CPU that has a better one.
 - `c/tools/crc32c_constants.mjs` derives the multiply constants and checks each one. `c/tools/crc_speed.c` prints the throughput per buffer size.
