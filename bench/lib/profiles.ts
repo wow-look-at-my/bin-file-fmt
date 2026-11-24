@@ -16,6 +16,14 @@ export const PROFILE_PAIRS: readonly { workload: string; op: Op }[] = [
 	{ workload: "lz4", op: "read" },
 ];
 
+// A profiled run of these workloads uses this many times the full block count.
+const PROFILE_BLOCK_FACTOR: Record<string, number> = { lz4: 8 };
+
+// The workload a profiled run uses: the full block count, times the factor of the workload.
+export function profileWorkload(full: Workload): Workload {
+	return { ...full, blocks: full.blocks * (PROFILE_BLOCK_FACTOR[full.name] ?? 1), ops: [...full.ops] };
+}
+
 export function profileOps(w: Workload): Op[] {
 	return PROFILE_PAIRS.filter((p) => p.workload === w.name).map((p) => p.op);
 }

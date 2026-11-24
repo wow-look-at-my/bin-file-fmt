@@ -6,7 +6,7 @@ import { BUILD_COMMANDS, benchArgv } from "./args.ts";
 import type { Options } from "./args.ts";
 import { generatePayload } from "./payload.ts";
 import { collectEnvironment, describeArgv, requireTool, runDirect, runMeasured, sha256File } from "./proc.ts";
-import { profileOps } from "./profiles.ts";
+import { profileOps, profileWorkload } from "./profiles.ts";
 import { profiledRun } from "./profrun.ts";
 import { formatMiB } from "./report.ts";
 import type { OpResult, ProfileSummary, Results, WorkloadResult } from "./report.ts";
@@ -130,7 +130,7 @@ export class Bench {
 	profileWorkload(timed: Workload, payload: string, ref: Impl, opLines: Map<Op, string>): void {
 		const ops = profileOps(timed);
 		if (ops.length === 0) return;
-		const w = fullWorkload(timed.name);
+		const w = profileWorkload(fullWorkload(timed.name));
 		const base = path.join(this.opts.workDir, "prof");
 		this.made.add(base);
 		fs.mkdirSync(base, { recursive: true });

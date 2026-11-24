@@ -312,9 +312,275 @@ static const uint32_t crc_table[8][256] = {
     },
 };
 
+/* Hardware CRC-32C, in tiers. Each tier is faster than the one before it:
+ *   - a single stream through the CPU's CRC instruction (crc_one);
+ *   - several streams at once, joined with a carry-less multiply (crc_three);
+ *   - wide carry-less folding, on a CPU with AVX-512 and VPCLMULQDQ (crc_wide).
+ * binpazer_crc32c asks the running CPU and takes the highest tier it has.
+ * BINPAZER_CRC_TIER caps the tier at build time. Zero builds the tables alone. A test can so run each tier.
+ * Every function here takes and returns the inverted CRC.
+ * c/tools/crc32c_constants.mjs derives the multiply constants and checks them. */
+#ifndef BINPAZER_CRC_TIER
+#define BINPAZER_CRC_TIER 3
+/* Which of crc_three and crc_wide is faster differs between CPUs: the arm64 server core that CI measures and Apple silicon are opposites.
+ * With no tier named by the build, the first long input times both on the running CPU and the winner stays. */
+#define BINPAZER_CRC_AUTO 1
+#endif
+
+#if BINPAZER_CRC_TIER > 0 && (defined(__GNUC__) || defined(__clang__)) && defined(__x86_64__)
+#include <immintrin.h>
+#define BINPAZER_HW_CRC 1
+#define CRC_ONE   __attribute__((target("sse4.2")))
+#define CRC_THREE __attribute__((target("sse4.2,pclmul")))
+#define CRC_WIDE  __attribute__((target("sse4.2,pclmul,avx512f,avx512vl,vpclmulqdq")))
+#define CRC_U64(c, v) _mm_crc32_u64((c), (v))
+#define CRC_U8(c, b)  _mm_crc32_u8((uint32_t)(c), (b))
+/* The low half of the carry-less (a * ka) ^ (b * kb). */
+CRC_THREE static inline uint64_t crc_mul2(uint64_t a, uint32_t ka, uint64_t b, uint32_t kb) {
+    __m128i x = _mm_clmulepi64_si128(_mm_cvtsi64_si128((long long)a), _mm_cvtsi32_si128((int)ka), 0);
+    __m128i y = _mm_clmulepi64_si128(_mm_cvtsi64_si128((long long)b), _mm_cvtsi32_si128((int)kb), 0);
+    return (uint64_t)_mm_cvtsi128_si64(_mm_xor_si128(x, y));
+}
+static int crc_tier(void) {
+    if (!__builtin_cpu_supports("sse4.2")) return 0;
+    if (BINPAZER_CRC_TIER < 2 || !__builtin_cpu_supports("pclmul")) return 1;
+    if (BINPAZER_CRC_TIER >= 3 && __builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512vl") &&
+        __builtin_cpu_supports("vpclmulqdq"))
+        return 3;
+    return 2;
+}
+#elif BINPAZER_CRC_TIER > 0 && (defined(__GNUC__) || defined(__clang__)) && defined(__aarch64__) && \
+    defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__ && (defined(__APPLE__) || defined(__linux__))
+#include <arm_acle.h>
+#include <arm_neon.h>
+#if defined(__linux__)
+#include <asm/hwcap.h>
+#include <sys/auxv.h>
+#endif
+#define BINPAZER_HW_CRC 1
+#if defined(__clang__)
+#define CRC_ONE   __attribute__((target("crc")))
+#define CRC_THREE __attribute__((target("crc,aes")))
+#else
+#define CRC_ONE   __attribute__((target("+crc")))
+#define CRC_THREE __attribute__((target("+crc+aes")))
+#endif
+#define CRC_WIDE CRC_THREE
+#define CRC_U64(c, v) ((uint64_t)__crc32cd((uint32_t)(c), (v)))
+#define CRC_U8(c, b)  ((uint64_t)__crc32cb((uint32_t)(c), (b)))
+CRC_THREE static inline uint64_t crc_mul2(uint64_t a, uint32_t ka, uint64_t b, uint32_t kb) {
+    uint64_t x = vgetq_lane_u64(vreinterpretq_u64_p128(vmull_p64((poly64_t)a, (poly64_t)ka)), 0);
+    uint64_t y = vgetq_lane_u64(vreinterpretq_u64_p128(vmull_p64((poly64_t)b, (poly64_t)kb)), 0);
+    return x ^ y;
+}
+#if defined(__APPLE__)
+/* Every Apple arm64 CPU has the CRC and the polynomial multiply extensions. */
+static int crc_tier(void) { return BINPAZER_CRC_TIER < 3 ? BINPAZER_CRC_TIER : 3; }
+#else
+static int crc_tier(void) {
+    unsigned long caps = getauxval(AT_HWCAP);
+    if (!(caps & HWCAP_CRC32)) return 0;
+    if (BINPAZER_CRC_TIER < 2 || !(caps & HWCAP_PMULL)) return 1;
+    return BINPAZER_CRC_TIER < 3 ? 2 : 3;
+}
+#endif
+#endif
+
+#ifdef BINPAZER_HW_CRC
+static inline uint64_t crc_load(const uint8_t *p) {
+    uint64_t v;
+    memcpy(&v, p, 8);
+    return v;
+}
+
+CRC_ONE static uint32_t crc_one(uint32_t crc, const uint8_t *p, size_t n) {
+    uint64_t c = crc;
+    while (n >= 8) {
+        c = CRC_U64(c, crc_load(p));
+        p += 8;
+        n -= 8;
+    }
+    while (n--) c = CRC_U8(c, *p++);
+    return (uint32_t)c;
+}
+
+/* One CRC instruction waits for the one before it, so independent streams run in the time of one.
+ * Returns the CRC of the len-byte streams at p, read together. k2 moves the first stream to the end,
+ * and k1 moves the middle stream there. */
+CRC_THREE static inline uint32_t crc_three_block(uint32_t crc, const uint8_t *p, size_t len, uint32_t k2, uint32_t k1) {
+    uint64_t a = crc, b = 0, c = 0;
+    for (size_t i = 0; i + 8 < len; i += 8) {
+        a = CRC_U64(a, crc_load(p + i));
+        b = CRC_U64(b, crc_load(p + len + i));
+        c = CRC_U64(c, crc_load(p + 2 * len + i));
+    }
+    a = CRC_U64(a, crc_load(p + len - 8));
+    b = CRC_U64(b, crc_load(p + 2 * len - 8));
+    /* The moved a and b go into the last word of the third stream, and its CRC step finishes the multiply. */
+    return (uint32_t)CRC_U64(c, crc_load(p + 3 * len - 8) ^ crc_mul2(a, k2, b, k1));
+}
+
+#define CRC_LONG  2048
+#define CRC_SHORT 128
+#define CRC_TINY  32
+
+CRC_THREE static uint32_t crc_three(uint32_t crc, const uint8_t *p, size_t n) {
+    while (n >= 3 * CRC_LONG) {
+        crc = crc_three_block(crc, p, CRC_LONG, 0x82f89c77u, 0xa51b6135u);
+        p += 3 * CRC_LONG;
+        n -= 3 * CRC_LONG;
+    }
+    while (n >= 3 * CRC_SHORT) {
+        crc = crc_three_block(crc, p, CRC_SHORT, 0xb9e02b86u, 0x0d3b6092u);
+        p += 3 * CRC_SHORT;
+        n -= 3 * CRC_SHORT;
+    }
+    while (n >= 3 * CRC_TINY) {
+        crc = crc_three_block(crc, p, CRC_TINY, 0x9e4addf8u, 0xba4fc28eu);
+        p += 3 * CRC_TINY;
+        n -= 3 * CRC_TINY;
+    }
+    return crc_one(crc, p, n);
+}
+
+#ifdef CRC_WIDE
+#if defined(__x86_64__)
+/* The loop keeps one accumulator per lane of CRC_LANES. A loop with twice as many measured no faster: the multiplier is already busy every cycle. */
+#define CRC_LANES(X) X(0) X(1) X(2) X(3)
+#define CRC_WIDE_STEP 256
+#define CRC_WIDE_K_LO 0xdcb17aa4
+#define CRC_WIDE_K_HI 0xb9e02b86
+/* The accumulators hold a message of CRC_WIDE_STEP bytes that has the CRC of every byte read so far.
+ * A step multiplies each lane forward by CRC_WIDE_STEP bytes and adds the next input.
+ * n must be at least CRC_WIDE_STEP. */
+CRC_WIDE static uint32_t crc_wide(uint32_t crc, const uint8_t *p, size_t n) {
+    const __m512i k = _mm512_broadcast_i32x4(_mm_set_epi64x(CRC_WIDE_K_HI, CRC_WIDE_K_LO));
+    uint8_t rest[CRC_WIDE_STEP];
+    /* Each accumulator is its own variable: as an array, the compiler kept them in memory and the loop lost a third of its speed. */
+#define CRC_LOAD(i) __m512i a##i = _mm512_loadu_si512(p + 64 * i);
+#define CRC_FOLD(i) \
+    a##i = _mm512_ternarylogic_epi64(_mm512_clmulepi64_epi128(a##i, k, 0x00), _mm512_clmulepi64_epi128(a##i, k, 0x11), \
+                                     _mm512_loadu_si512(p + 64 * i), 0x96);
+#define CRC_STORE(i) _mm512_storeu_si512(rest + 64 * i, a##i);
+    CRC_LANES(CRC_LOAD)
+    a0 = _mm512_xor_si512(a0, _mm512_zextsi128_si512(_mm_cvtsi32_si128((int)crc)));
+    p += CRC_WIDE_STEP;
+    n -= CRC_WIDE_STEP;
+    while (n >= CRC_WIDE_STEP) {
+        CRC_LANES(CRC_FOLD)
+        p += CRC_WIDE_STEP;
+        n -= CRC_WIDE_STEP;
+    }
+    CRC_LANES(CRC_STORE)
+#undef CRC_LOAD
+#undef CRC_FOLD
+#undef CRC_STORE
+    /* crc_three runs SSE-encoded multiplies, which are slow while the upper vector halves hold data. */
+    _mm256_zeroupper();
+    return crc_three(crc_three(0, rest, sizeof rest), p, n);
+}
+#else
+/* The arm64 form of the same loop: each accumulator is one NEON register, and PMULL is the multiply.
+ * CRC_NEON_LANES picks the count of accumulators, so a build can time each count. */
+#ifndef CRC_NEON_LANES
+#define CRC_NEON_LANES 16
+#endif
+#if CRC_NEON_LANES == 8
+#define CRC_LANES(X) X(0) X(1) X(2) X(3) X(4) X(5) X(6) X(7)
+#define CRC_WIDE_K_LO 0x6992cea2
+#define CRC_WIDE_K_HI 0x0d3b6092
+#elif CRC_NEON_LANES == 12
+#define CRC_LANES(X) X(0) X(1) X(2) X(3) X(4) X(5) X(6) X(7) X(8) X(9) X(10) X(11)
+#define CRC_WIDE_K_LO 0xa87ab8a8
+#define CRC_WIDE_K_HI 0xab7aff2a
+#elif CRC_NEON_LANES == 16
+#define CRC_LANES(X) X(0) X(1) X(2) X(3) X(4) X(5) X(6) X(7) X(8) X(9) X(10) X(11) X(12) X(13) X(14) X(15)
+#define CRC_WIDE_K_LO 0xdcb17aa4
+#define CRC_WIDE_K_HI 0xb9e02b86
+#else
+#error "CRC_NEON_LANES must be 8, 12 or 16"
+#endif
+#define CRC_WIDE_STEP (16 * CRC_NEON_LANES)
+CRC_WIDE static uint32_t crc_wide(uint32_t crc, const uint8_t *p, size_t n) {
+    const poly64x2_t k = vreinterpretq_p64_u64(vcombine_u64(vcreate_u64(CRC_WIDE_K_LO), vcreate_u64(CRC_WIDE_K_HI)));
+    uint8_t rest[CRC_WIDE_STEP];
+#define CRC_LOAD(i) uint64x2_t a##i = vreinterpretq_u64_u8(vld1q_u8(p + 16 * i));
+#define CRC_FOLD(i) \
+    a##i = veorq_u64(veorq_u64(vreinterpretq_u64_p128(vmull_p64((poly64_t)vgetq_lane_u64(a##i, 0), (poly64_t)CRC_WIDE_K_LO)), \
+                               vreinterpretq_u64_p128(vmull_high_p64(vreinterpretq_p64_u64(a##i), k))), \
+                     vreinterpretq_u64_u8(vld1q_u8(p + 16 * i)));
+#define CRC_STORE(i) vst1q_u8(rest + 16 * i, vreinterpretq_u8_u64(a##i));
+    CRC_LANES(CRC_LOAD)
+    a0 = veorq_u64(a0, vcombine_u64(vcreate_u64(crc), vcreate_u64(0)));
+    p += CRC_WIDE_STEP;
+    n -= CRC_WIDE_STEP;
+    while (n >= CRC_WIDE_STEP) {
+        CRC_LANES(CRC_FOLD)
+        p += CRC_WIDE_STEP;
+        n -= CRC_WIDE_STEP;
+    }
+    CRC_LANES(CRC_STORE)
+#undef CRC_LOAD
+#undef CRC_FOLD
+#undef CRC_STORE
+    return crc_three(crc_three(0, rest, sizeof rest), p, n);
+}
+#endif
+
+#ifdef BINPAZER_CRC_AUTO
+#include <time.h>
+enum { CRC_UNTIMED, CRC_WIDE_FASTER, CRC_THREE_FASTER };
+static int crc_wide_state = CRC_UNTIMED;
+
+static double crc_now(void) {
+    struct timespec t;
+    timespec_get(&t, TIME_UTC);
+    return (double)t.tv_sec + (double)t.tv_nsec * 1e-9;
+}
+
+/* Times both paths on a buffer that stays in the cache, and keeps the answer. Threads can time
+ * at once. Each stores an answer, and either answer is correct to use. */
+CRC_WIDE static int crc_wide_wins(void) {
+    int state = __atomic_load_n(&crc_wide_state, __ATOMIC_RELAXED);
+    if (state == CRC_UNTIMED) {
+        uint8_t buf[8192];
+        double best_three = 1e9, best_wide = 1e9;
+        uint32_t sink = 0;
+        for (size_t i = 0; i < sizeof buf; i++) buf[i] = (uint8_t)(i * 131u + (i >> 8));
+        for (int round = 0; round < 5; round++) {
+            double t0 = crc_now();
+            for (int r = 0; r < 32; r++) sink = crc_three(sink, buf, sizeof buf);
+            double t1 = crc_now();
+            for (int r = 0; r < 32; r++) sink = crc_wide(sink, buf, sizeof buf);
+            double t2 = crc_now();
+            if (t1 - t0 < best_three) best_three = t1 - t0;
+            if (t2 - t1 < best_wide) best_wide = t2 - t1;
+        }
+        /* sink goes into the comparison so the compiler keeps both loops. */
+        state = (best_wide < best_three || sink == 0x5eed5eedu) ? CRC_WIDE_FASTER : CRC_THREE_FASTER;
+        __atomic_store_n(&crc_wide_state, state, __ATOMIC_RELAXED);
+    }
+    return state == CRC_WIDE_FASTER;
+}
+#else
+#define crc_wide_wins() 1
+#endif
+#endif
+#endif
+
 uint32_t binpazer_crc32c(uint32_t crc, const void *data, size_t n) {
     const uint8_t *p = (const uint8_t *)data;
     crc = ~crc;
+#ifdef BINPAZER_HW_CRC
+    {
+        int tier = crc_tier();
+#ifdef CRC_WIDE
+        if (tier >= 3 && n >= 2 * CRC_WIDE_STEP && crc_wide_wins()) return ~crc_wide(crc, p, n);
+#endif
+        if (tier >= 2 && n >= 3 * CRC_TINY) return ~crc_three(crc, p, n);
+        if (tier >= 1) return ~crc_one(crc, p, n);
+    }
+#endif
     /* Bytes are combined by value, not by a word load, so the result does not depend on host byte order. */
     while (n >= 8) {
         uint32_t lo = crc ^ get_u32(p);

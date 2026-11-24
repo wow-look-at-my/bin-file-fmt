@@ -82,6 +82,51 @@ This is because that is how it learns that the file grew. TypeScript holds every
 
 Its deflate and zstd go through `node:zlib`, which allocates the codec output before the copy into the caller's buffer.
 
+## CRC-32C in the C core
+
+`binpazer_crc32c` asks the running CPU and takes the fastest path it has, with GCC or Clang:
+
+| Tier | Path | Needs |
+|---|---|---|
+| 0 | slicing tables | nothing: every other target and compiler |
+| 1 | one stream through the CRC instruction | x86-64 SSE4.2, or arm64 CRC |
+| 2 | three streams, joined with a carry-less multiply | x86-64 PCLMULQDQ, or arm64 PMULL |
+| 3 | carry-less folding across several vector accumulators | x86-64 AVX-512F, AVX-512VL and VPCLMULQDQ, or arm64 PMULL |
+
+The folding tier and the streams tier trade places between CPUs: the fold wins on the x86-64 and Apple silicon machines measured below. Apple loses on the arm64 Linux one. So the choice is never fixed. `crc_wide_wins` times both on the first long input, on every platform, and keeps the winner for the process. A build that names `BINPAZER_CRC_TIER` gets that tier and no timing.
+
+- `-DBINPAZER_CRC_TIER=<n>` caps the tier at build time. `make -C c test` runs the core tests at every tier, so no path goes untested on a CPU that has a better one.
+- `c/tools/crc32c_constants.mjs` derives the multiply constants and checks each one. `c/tools/crc_speed.c` prints the throughput per buffer size.
+- The wide path must clear the upper vector state before it calls the SSE-encoded code. Without `_mm256_zeroupper()` a 4 KiB input ran a few times slower.
+- C++ and Python call the same function, so they get every tier.
+
+Measured with `c/tools/crc_speed.c` on a Xeon with AVX-512 and VPCLMULQDQ, in GiB/s. The XXH3 column is xxHash 0.8.2 built with `-O3 -march=native`, for scale: a different hash is not a faster one here.
+
+| Buffer | Tier 0 | Tier 1 | Tier 2 | Tier 3 | XXH3 |
+|---|---:|---:|---:|---:|---:|
+| 1 KiB | 1.92 | 7.03 | 13.12 | 23.91 | 26.44 |
+| 4 KiB | 1.95 | 7.15 | 16.42 | 62.19 | 39.51 |
+| 64 KiB | 1.93 | 7.34 | 21.75 | 63.29 | 51.28 |
+| 1 MiB | 1.94 | 7.30 | 21.77 | 64.11 | 50.47 |
+| 8 MiB | 1.92 | 7.04 | 19.09 | 25.17 | 24.91 |
+
+- The 8 MiB row is the memory, not the hash: XXH3 stops at the same rate.
+- Tier keeps multiple accumulators. Eight measured no faster on this CPU, so the multiplier is the limit.
+
+The `c-arm64` CI job runs `make -C c test-core` and `make -C c speed` on real arm64 CPUs and prints the throughput to its summary. From its first runs, 1 MiB buffer, in GiB/s:
+
+| CPU | Tier 0 | Tier 1 | Tier 2 | Fold, 8 lanes | Fold, 12 lanes | Fold, 16 lanes |
+|---|---:|---:|---:|---:|---:|---:|
+| arm64 Linux runner, first run | 2.28 | 13.88 | 23.49 | 18.04 | 17.72 | 19.42 |
+| arm64 Linux runner, second run | 2.28 | 13.82 | 23.10 | 18.07 | 17.68 | 19.19 |
+| Apple silicon runner, first run | 1.19 | 5.74 | 16.31 | 42.01 | 54.84 | 56.14 |
+| Apple silicon runner, second run | 1.34 | 4.95 | 16.79 | 40.49 | 53.35 | 61.02 |
+| Apple silicon runner, third run | 1.20 | 5.99 | 16.97 | 28.28 | 53.58 | 33.58 |
+
+- On the Linux core the streams of tier 2 beat every fold. A CPU of another kind can reverse either result, which is why the choice is timed at run time. On Apple silicon every fold beats the streams. The runs do not separate the highest lane counts, and `CRC_NEON_LANES` is at the higher one.
+- Both runners are shared virtual machines, and the Apple numbers moved by a third between buffer sizes. Read them as an order.
+- Change a default only with a new run of that job as the evidence.
+
 ## IO-injection seam (deliberate -- do not add mmap)
 
 The libraries do **no file IO and no mmap**. The caller injects IO. C/C++ take `read`/`write` (+ optional `seek`) callbacks. Go takes `io.Reader`/`io.Writer` and *sniffs* `io.Seeker` on both sides. The Reader uses it for the input-size probe, seek-based skipping, and footer/Block Index jumps. The Writer uses it to back-patch `file_length` (non-seekable output keeps the streaming sentinel).
